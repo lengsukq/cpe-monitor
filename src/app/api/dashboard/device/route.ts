@@ -10,13 +10,15 @@ export async function GET() {
     const client = getOrCreateCpeClient();
     await client.ensureLogin();
 
-    const [deviceInfo, onlineState, deviceInformation] = await Promise.all([
+    const [deviceInfo, onlineState, deviceInformation, topology, devCapacity] = await Promise.all([
       client.getDeviceInfo(),
       client.getOnlineState(),
       client.getDeviceInformation(),
+      client.getTopology().catch(() => ({})),
+      client.getDevCapacity().catch(() => ({})),
     ]);
 
-    return NextResponse.json({ deviceInfo, onlineState, deviceInformation });
+    return NextResponse.json({ deviceInfo, onlineState, deviceInformation, topology, devCapacity });
   } catch (error: any) {
     console.error('Device info error:', error);
     return NextResponse.json({ error: error.message || '获取设备信息失败' }, { status: 500 });

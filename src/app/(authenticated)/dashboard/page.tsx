@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Separator } from '@/components/ui/separator';
 import TrafficChart from '@/components/TrafficChart';
 import DeviceDetailDialog from '@/components/DeviceDetailDialog';
 
@@ -298,24 +299,85 @@ export default function DashboardPage() {
           ) : deviceInfo?.deviceInformation ? (() => {
             const info = deviceInfo.deviceInformation;
             const os = deviceInfo.onlineState;
+            const cell = os?.CellData;
+            const getCarrier = (mcc: string) => ({ '46000': '中国移动', '46001': '中国联通', '46003': '中国电信', '46005': '中国电信', '46006': '中国联通', '46007': '中国移动', '46008': '中国移动', '46009': '中国联通', '46011': '中国电信' })[mcc] || mcc;
             return (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">设备型号</p><p className="font-medium">{info.DeviceName || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">产品名称</p><p className="font-medium">{info.spreadname_zh || info.spreadname_en || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">固件版本</p><p className="font-medium">{info.SoftwareVersion || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">WebUI 版本</p><p className="font-medium">{info.WebUIVersion || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">硬件版本</p><p className="font-medium">{info.HardwareVersion || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">序列号</p><p className="font-medium">{info.SerialNumber || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">IMEI</p><p className="font-mono text-sm">{info.Imei || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">工作模式</p><p className="font-medium">{info.workmode || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">运营商</p><p className="font-medium">{info.Mccmnc === '46001' ? '中国联通' : info.Mccmnc === '46000' ? '中国移动' : info.Mccmnc === '46003' ? '中国电信' : info.Mccmnc || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">MAC 地址</p><p className="font-mono text-sm">{info.MacAddress1 || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">信号强度</p><p className="font-medium">{os?.CellData?.SignalStrength || overview?.signalStrength || 0} dBm</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">连接状态</p><Badge variant={os?.ConnectionStatus === '901' ? 'default' : 'secondary'}>{os?.ConnectionStatus === '901' ? '已连接' : '未连接'}</Badge></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">DNS</p><p className="font-mono text-xs">{info.wan_dns_address || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">IPv4 地址</p><p className="font-mono text-sm">{info.SecondWanIPAddress || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">IPv6 地址</p><p className="font-mono text-xs truncate" title={info.SecondWanIPv6Address}>{info.SecondWanIPv6Address || '-'}</p></div>
-                <div className="space-y-1"><p className="text-sm text-muted-foreground">运行时长</p><p className="font-medium">{formatDuration(parseInt(info.uptime || '0'))}</p></div>
+              <div className="space-y-4">
+                {/* 基本信息 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">产品名称</p><p className="font-medium">{info.spreadname_zh || info.spreadname_en || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">设备型号</p><p className="font-medium">{info.DeviceName || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">分类</p><p className="font-medium">{info.Classify?.toUpperCase() || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">运行时长</p><p className="font-medium">{formatDuration(parseInt(info.uptime || '0'))}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">连接状态</p><Badge variant={os?.ConnectionStatus === '901' ? 'default' : 'secondary'}>{os?.ConnectionStatus === '901' ? '已连接' : '未连接'}</Badge></div>
+                </div>
+
+                <Separator />
+
+                {/* 软件版本 */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">固件版本</p><p className="font-medium">{info.SoftwareVersion || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">WebUI 版本</p><p className="font-medium">{info.WebUIVersion || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">硬件版本</p><p className="font-medium">{info.HardwareVersion || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">参数版本</p><p className="font-medium">{info.ParameterVersion || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">初始版本</p><p className="font-medium">{info.iniversion || '-'}</p></div>
+                </div>
+
+                <Separator />
+
+                {/* 网络信息 */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">工作模式</p><p className="font-medium">{info.workmode || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">支持模式</p><p className="font-medium">{info.supportmode || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">运营商</p><p className="font-medium">{getCarrier(info.Mccmnc)}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">MCC-MNC</p><p className="font-mono text-sm">{info.Mccmnc || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">信号强度</p><p className="font-medium">{cell?.SignalStrength || overview?.signalStrength || 0} dBm</p></div>
+                </div>
+
+                {/* 蜂窝网络详情 */}
+                {cell && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-1"><p className="text-sm text-muted-foreground">网络类型</p><p className="font-medium">{getNetworkType(os)}</p></div>
+                    {cell.Band && <div className="space-y-1"><p className="text-sm text-muted-foreground">频段</p><p className="font-medium">{cell.Band}</p></div>}
+                    {cell.CellID && <div className="space-y-1"><p className="text-sm text-muted-foreground">小区 ID</p><p className="font-mono text-sm">{cell.CellID}</p></div>}
+                    {cell.PCI && <div className="space-y-1"><p className="text-sm text-muted-foreground">PCI</p><p className="font-medium">{cell.PCI}</p></div>}
+                    {cell.RSRP && <div className="space-y-1"><p className="text-sm text-muted-foreground">RSRP</p><p className="font-medium">{cell.RSRP} dBm</p></div>}
+                    {cell.RSRQ && <div className="space-y-1"><p className="text-sm text-muted-foreground">RSRQ</p><p className="font-medium">{cell.RSRQ} dB</p></div>}
+                    {cell.SINR && <div className="space-y-1"><p className="text-sm text-muted-foreground">SINR</p><p className="font-medium">{cell.SINR} dB</p></div>}
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* 标识信息 */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">IMEI</p><p className="font-mono text-sm">{info.Imei || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">IMSI</p><p className="font-mono text-sm">{info.Imsi || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">ICCID</p><p className="font-mono text-sm">{info.Iccid || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">MSISDN</p><p className="font-mono text-sm">{info.Msisdn || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">序列号</p><p className="font-mono text-sm">{info.SerialNumber || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">IMEI SVN</p><p className="font-medium">{info.ImeiSvn || '-'}</p></div>
+                </div>
+
+                <Separator />
+
+                {/* MAC 地址 */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">LAN MAC</p><p className="font-mono text-sm">{info.MacAddress1 || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">MAC2</p><p className="font-mono text-sm">{info.MacAddress2 || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">WiFi 2.4G MAC</p><p className="font-mono text-sm">{info.WifiMacAddrWl0 || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">WiFi 5G MAC</p><p className="font-mono text-sm">{info.WifiMacAddrWl1 || '-'}</p></div>
+                </div>
+
+                <Separator />
+
+                {/* 网络地址 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">IPv4 地址</p><p className="font-mono text-sm">{info.SecondWanIPAddress || info.WanIPAddress || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">IPv6 地址</p><p className="font-mono text-xs break-all">{info.SecondWanIPv6Address || info.WanIPv6Address || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">DNS (IPv4)</p><p className="font-mono text-xs">{info.wan_dns_address || '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">DNS (IPv6)</p><p className="font-mono text-xs">{info.wan_ipv6_dns_address || '-'}</p></div>
+                </div>
               </div>
             );
           })() : <p className="text-muted-foreground">无法获取设备信息，请检查 CPE 配置</p>}

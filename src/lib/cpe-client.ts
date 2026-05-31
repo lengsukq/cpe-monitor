@@ -264,6 +264,16 @@ export class CpeClient {
     return this.parseXmlResponse(raw);
   }
   async getOnlineState(): Promise<any> { return this.apiGet('/api/system/onlinestate?devid=all'); }
+  async getTopology(): Promise<any> {
+    const raw = await this.apiGet('/api/system/topology');
+    if (typeof raw === 'object') return raw;
+    return this.parseXmlResponse(raw);
+  }
+  async getDevCapacity(): Promise<any> {
+    const raw = await this.apiGet('/api/system/devcapacity');
+    if (typeof raw === 'object') return raw;
+    return this.parseXmlResponse(raw);
+  }
   async getTrafficStatistics(): Promise<any> {
     const raw = await this.apiGet('/api/monitoring/traffic-statistics');
     if (typeof raw === 'object') return raw;
