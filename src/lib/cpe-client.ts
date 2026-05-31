@@ -258,6 +258,11 @@ export class CpeClient {
   }
 
   async getDeviceInfo(): Promise<any> { return this.apiGet('/api/system/deviceinfoex'); }
+  async getDeviceInformation(): Promise<any> {
+    const raw = await this.apiGet('/api/device/information');
+    if (typeof raw === 'object') return raw;
+    return this.parseXmlResponse(raw);
+  }
   async getOnlineState(): Promise<any> { return this.apiGet('/api/system/onlinestate?devid=all'); }
   async getTrafficStatistics(): Promise<any> {
     const raw = await this.apiGet('/api/monitoring/traffic-statistics');

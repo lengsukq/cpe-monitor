@@ -295,18 +295,30 @@ export default function DashboardPage() {
         <CardContent>
           {deviceInfoLoading ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
-          ) : deviceInfo?.deviceInfo ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1"><p className="text-sm text-muted-foreground">设备型号</p><p className="font-medium">{deviceInfo.deviceInfo.DeviceName || 'H153-381'}</p></div>
-              <div className="space-y-1"><p className="text-sm text-muted-foreground">固件版本</p><p className="font-medium">{deviceInfo.deviceInfo.SoftwareVersion || '-'}</p></div>
-              <div className="space-y-1"><p className="text-sm text-muted-foreground">序列号</p><p className="font-medium">{deviceInfo.deviceInfo.SerialNumber || '-'}</p></div>
-              <div className="space-y-1"><p className="text-sm text-muted-foreground">IMEI</p><p className="font-medium">{deviceInfo.deviceInfo.IMEI || '-'}</p></div>
-              <div className="space-y-1"><p className="text-sm text-muted-foreground">网络制式</p><p className="font-medium">{getNetworkType(deviceInfo.onlineState)}</p></div>
-              <div className="space-y-1"><p className="text-sm text-muted-foreground">运营商</p><p className="font-medium">{deviceInfo.deviceInfo.WorkingProvider || '-'}</p></div>
-              <div className="space-y-1"><p className="text-sm text-muted-foreground">信号强度</p><p className="font-medium">{deviceInfo.onlineState?.CellData?.SignalStrength || overview?.signalStrength || 0} dBm</p></div>
-              <div className="space-y-1"><p className="text-sm text-muted-foreground">连接状态</p><Badge variant={deviceInfo.onlineState?.ConnectionStatus === '901' ? 'default' : 'secondary'}>{deviceInfo.onlineState?.ConnectionStatus === '901' ? '已连接' : '未连接'}</Badge></div>
-            </div>
-          ) : <p className="text-muted-foreground">无法获取设备信息，请检查 CPE 配置</p>}
+          ) : deviceInfo?.deviceInformation ? (() => {
+            const info = deviceInfo.deviceInformation;
+            const os = deviceInfo.onlineState;
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">设备型号</p><p className="font-medium">{info.DeviceName || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">产品名称</p><p className="font-medium">{info.spreadname_zh || info.spreadname_en || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">固件版本</p><p className="font-medium">{info.SoftwareVersion || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">WebUI 版本</p><p className="font-medium">{info.WebUIVersion || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">硬件版本</p><p className="font-medium">{info.HardwareVersion || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">序列号</p><p className="font-medium">{info.SerialNumber || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">IMEI</p><p className="font-mono text-sm">{info.Imei || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">工作模式</p><p className="font-medium">{info.workmode || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">运营商</p><p className="font-medium">{info.Mccmnc === '46001' ? '中国联通' : info.Mccmnc === '46000' ? '中国移动' : info.Mccmnc === '46003' ? '中国电信' : info.Mccmnc || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">MAC 地址</p><p className="font-mono text-sm">{info.MacAddress1 || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">信号强度</p><p className="font-medium">{os?.CellData?.SignalStrength || overview?.signalStrength || 0} dBm</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">连接状态</p><Badge variant={os?.ConnectionStatus === '901' ? 'default' : 'secondary'}>{os?.ConnectionStatus === '901' ? '已连接' : '未连接'}</Badge></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">DNS</p><p className="font-mono text-xs">{info.wan_dns_address || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">IPv4 地址</p><p className="font-mono text-sm">{info.SecondWanIPAddress || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">IPv6 地址</p><p className="font-mono text-xs truncate" title={info.SecondWanIPv6Address}>{info.SecondWanIPv6Address || '-'}</p></div>
+                <div className="space-y-1"><p className="text-sm text-muted-foreground">运行时长</p><p className="font-medium">{formatDuration(parseInt(info.uptime || '0'))}</p></div>
+              </div>
+            );
+          })() : <p className="text-muted-foreground">无法获取设备信息，请检查 CPE 配置</p>}
         </CardContent>
       </Card>
 
