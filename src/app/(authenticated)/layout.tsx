@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
+import TopNav from '@/components/TopNav';
 
 export default function AuthenticatedLayout({
   children,
@@ -13,38 +13,35 @@ export default function AuthenticatedLayout({
   const router = useRouter();
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        setIsAuthenticated(true);
-      } else {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          setIsAuthenticated(true);
+        } else {
+          router.push('/login');
+        }
+      } catch {
         router.push('/login');
       }
-    } catch {
-      router.push('/login');
-    }
-  };
+    };
+    checkAuth();
+  }, [router]);
 
   if (isAuthenticated === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted border-t-foreground" />
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
-  }
+  if (!isAuthenticated) return null;
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <main className="flex-1 bg-gray-50 p-8">
+    <div className="min-h-screen bg-background">
+      <TopNav />
+      <main className="pt-16 p-6 lg:p-8 max-w-screen-2xl mx-auto">
         {children}
       </main>
     </div>

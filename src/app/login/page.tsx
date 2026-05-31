@@ -40,10 +40,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">CPEye</CardTitle>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background relative overflow-hidden">
+      {/* Decorative background circles */}
+      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+
+      <Card className="w-full max-w-md backdrop-blur-xl bg-card/80 border border-border rounded-3xl relative z-10">
+        <CardHeader className="text-center space-y-2">
+          <CardTitle className="text-3xl font-bold tracking-tight">CPEye</CardTitle>
           <CardDescription>5G CPE 流量监控</CardDescription>
         </CardHeader>
         <CardContent>
@@ -56,15 +60,16 @@ export default function LoginPage() {
                 placeholder="请输入密码"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="rounded-xl"
                 required
               />
             </div>
 
             {error && (
-              <div className="text-red-500 text-sm text-center">{error}</div>
+              <div className="text-destructive text-sm text-center">{error}</div>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full rounded-xl" disabled={loading}>
               {loading ? '登录中...' : '登录'}
             </Button>
           </form>
