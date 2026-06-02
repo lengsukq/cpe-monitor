@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     if (loginResult) {
       return NextResponse.json({ success: true, message: 'CPE 连接成功', latency: `${latency}ms`, deviceUrl: finalUrl });
     } else {
-      return NextResponse.json({ success: false, message: 'CPE 连接失败，请检查地址和密码', latency: `${latency}ms` });
+      return NextResponse.json({ success: false, message: client.getLastLoginError(), latency: `${latency}ms`, deviceUrl: finalUrl });
     }
   } catch (error: any) {
     console.error('CPE test error:', error);

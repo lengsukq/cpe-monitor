@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import DeviceDetailDialog from '@/components/DeviceDetailDialog';
-import { formatBytes, formatBytesFromString, formatDuration, formatDurationFromString, getCarrier, getNetworkType } from '@/lib/format';
+import { formatBytesFromString, formatDurationFromString, getCarrier, getNetworkType } from '@/lib/format';
+import { Cpu, Network, RefreshCw, Wifi } from 'lucide-react';
 
 export default function DevicePage() {
   const [deviceInfo, setDeviceInfo] = useState<any>(null);
@@ -19,30 +21,41 @@ export default function DevicePage() {
   const [devicesLoading, setDevicesLoading] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deviceError, setDeviceError] = useState('');
+  const [devicesError, setDevicesError] = useState('');
+
+  async function fetchDeviceInfo() {
+    try {
+      const res = await fetch('/api/dashboard/device');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '获取设备信息失败');
+      setDeviceInfo(data);
+      setDeviceError('');
+    } catch (e: any) {
+      console.error(e);
+      setDeviceError(e.message || '无法获取设备信息');
+    }
+    finally { setLoading(false); }
+  }
+
+  async function fetchConnectedDevices() {
+    try {
+      const res = await fetch('/api/dashboard/devices');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '获取在线设备失败');
+      setRawDevices(data.devices || []);
+      setDevicesError('');
+    } catch (e: any) {
+      console.error(e);
+      setDevicesError(e.message || 'CPE 登录失败，无法获取在线设备列表。');
+    }
+    finally { setDevicesLoading(false); }
+  }
 
   useEffect(() => {
     fetchDeviceInfo();
     fetchConnectedDevices();
   }, []);
-
-  const fetchDeviceInfo = async () => {
-    try {
-      const res = await fetch('/api/dashboard/device');
-      if (res.ok) setDeviceInfo(await res.json());
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
-  };
-
-  const fetchConnectedDevices = async () => {
-    try {
-      const res = await fetch('/api/dashboard/devices');
-      if (res.ok) {
-        const data = await res.json();
-        setRawDevices(data.devices || []);
-      }
-    } catch (e) { console.error(e); }
-    finally { setDevicesLoading(false); }
-  };
 
   if (loading) {
     return (
@@ -57,19 +70,47 @@ export default function DevicePage() {
   const info = deviceInfo?.deviceInformation;
   const os = deviceInfo?.onlineState;
   const cell = os?.CellData;
+  const vendor = getDisplayValue(deviceInfo?.vendorName, ['vendorname', 'VendorName', 'vendor', 'name']);
+  const wlanDbho = deviceInfo?.wlanDbho;
+  const topology = deviceInfo?.topology;
+  const devCapacity = deviceInfo?.devCapacity;
+  const portalSettings = deviceInfo?.portalSettings;
+  const iocDeviceCapacity = deviceInfo?.iocDeviceCapacity;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">设备信息</h1>
+      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">设备信息</h1>
+          <p className="text-sm text-muted-foreground">聚合设备身份、蜂窝状态、拓扑、能力和在线终端接口</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => { fetchDeviceInfo(); fetchConnectedDevices(); }}>
+          <RefreshCw className="mr-2 h-4 w-4" />刷新
+        </Button>
+      </div>
+
+      {deviceError && (
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-300">
+          {deviceError}
+        </div>
+      )}
 
       {info ? (
         <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <CapabilityCard icon={<Cpu className="h-5 w-5" />} label="厂商/型号" value={[vendor, info.DeviceName].filter(Boolean).join(' / ') || '-'} />
+            <CapabilityCard icon={<Wifi className="h-5 w-5" />} label="双频优选" value={formatFeatureState(wlanDbho)} />
+            <CapabilityCard icon={<Network className="h-5 w-5" />} label="拓扑状态" value={formatFeatureState(topology)} />
+            <CapabilityCard icon={<ActivityDot />} label="能力清单" value={formatCapacitySummary(devCapacity, iocDeviceCapacity, portalSettings)} />
+          </div>
+
           {/* Basic Info */}
           <Card className="card-hover">
             <CardHeader><CardTitle>基本信息</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <Field label="产品名称" value={info.spreadname_zh || info.spreadname_en} />
+                <Field label="厂商" value={vendor} />
                 <Field label="设备型号" value={info.DeviceName} />
                 <Field label="分类" value={info.Classify?.toUpperCase()} />
                 <Field label="运行时长" value={formatDurationFromString(info.uptime)} />
@@ -167,7 +208,7 @@ export default function DevicePage() {
           </Card>
         </>
       ) : (
-        <Card><CardContent><p className="text-muted-foreground">无法获取设备信息，请检查 CPE 配置</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-muted-foreground">无法获取设备信息，请检查 CPE 配置或稍后刷新。</p></CardContent></Card>
       )}
 
       {/* Connected Devices */}
@@ -179,6 +220,12 @@ export default function DevicePage() {
           </div>
         </CardHeader>
         <CardContent>
+          {devicesError && (
+            <div className="mb-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-800 dark:text-yellow-200">
+              <p className="font-medium">CPE 登录/连接失败</p>
+              <p className="mt-1">{devicesError}</p>
+            </div>
+          )}
           {devicesLoading ? (
             <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
           ) : rawDevices.length > 0 ? (
@@ -226,6 +273,50 @@ export default function DevicePage() {
 
       <DeviceDetailDialog device={selectedDevice} open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
+  );
+}
+
+function getDisplayValue(source: any, keys: string[]) {
+  if (!source) return undefined;
+  if (typeof source === 'string') return source;
+  for (const key of keys) {
+    if (source[key]) return String(source[key]);
+  }
+  return undefined;
+}
+
+function formatFeatureState(value: any) {
+  if (!value) return '未返回';
+  if (typeof value === 'string') return value || '已返回';
+  const status = value.Enable ?? value.enabled ?? value.Switch ?? value.DbhoEnable ?? value.portalEnable;
+  if (status === '1' || status === 1 || status === true) return '已启用';
+  if (status === '0' || status === 0 || status === false) return '未启用';
+  return '已返回';
+}
+
+function formatCapacitySummary(devCapacity: any, iocDeviceCapacity: any, portalSettings: any) {
+  const parts = [];
+  if (devCapacity) parts.push('设备能力');
+  if (iocDeviceCapacity) parts.push('IoT 识别');
+  if (portalSettings) parts.push('Portal');
+  return parts.length ? parts.join(' / ') : '未返回';
+}
+
+function ActivityDot() {
+  return <span className="h-2.5 w-2.5 rounded-full bg-primary" />;
+}
+
+function CapabilityCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <Card className="card-hover">
+      <CardContent className="flex items-center gap-4 pt-6">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">{icon}</div>
+        <div className="min-w-0">
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="truncate font-medium">{value || '-'}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

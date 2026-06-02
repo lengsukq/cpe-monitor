@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Smartphone, Bell, Settings, ArrowRight } from 'lucide-react';
+import { Smartphone, Bell, Settings, ArrowRight, Activity, RefreshCw, Wifi } from 'lucide-react';
 import TrafficChart from '@/components/TrafficChart';
-import { formatBytes, formatRate, formatWithUnit, formatDuration, getSignalQuality } from '@/lib/format';
+import { formatRate, formatWithUnit, formatDuration, getSignalQuality } from '@/lib/format';
 
 export default function DashboardPage() {
   const [overview, setOverview] = useState<any>(null);
@@ -18,6 +19,54 @@ export default function DashboardPage() {
   const [trafficStats, setTrafficStats] = useState<any>(null);
   const [unit, setUnit] = useState<'MB' | 'GB'>('GB');
   const [startDate, setStartDate] = useState<any>(null);
+  const [overviewError, setOverviewError] = useState('');
+  const [dataError, setDataError] = useState('');
+
+  async function fetchOverview() {
+    try {
+      const res = await fetch('/api/dashboard/overview');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '获取概览失败');
+      setOverview(data);
+      setOverviewError(data.cpeError || '');
+    } catch (e: any) {
+      console.error(e);
+      setOverviewError(e.message || '无法获取实时状态，正在显示兜底数据');
+    }
+    finally { setLoading(false); }
+  }
+
+  async function fetchTrafficHistory() {
+    try {
+      const res = await fetch(`/api/dashboard/traffic?range=${timeRange}`);
+      setTrafficHistory(await res.json());
+    } catch (e) { console.error(e); }
+  }
+
+  async function fetchTrafficStats() {
+    try {
+      const res = await fetch('/api/dashboard/traffic-stats');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '获取流量统计失败');
+      setTrafficStats(data);
+      setDataError('');
+    } catch (e: any) {
+      console.error(e);
+      setDataError(e.message || 'CPE 登录失败，无法获取流量统计。');
+    }
+  }
+
+  async function fetchStartDate() {
+    try {
+      const res = await fetch('/api/dashboard/start-date');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '获取套餐配置失败');
+      setStartDate(data);
+    } catch (e: any) {
+      console.error(e);
+      setDataError(e.message || 'CPE 登录失败，无法获取套餐配置。');
+    }
+  }
 
   useEffect(() => {
     fetchOverview();
@@ -37,35 +86,6 @@ export default function DashboardPage() {
     fetchTrafficHistory();
   }, [timeRange]);
 
-  const fetchOverview = async () => {
-    try {
-      const res = await fetch('/api/dashboard/overview');
-      setOverview(await res.json());
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
-  };
-
-  const fetchTrafficHistory = async () => {
-    try {
-      const res = await fetch(`/api/dashboard/traffic?range=${timeRange}`);
-      setTrafficHistory(await res.json());
-    } catch (e) { console.error(e); }
-  };
-
-  const fetchTrafficStats = async () => {
-    try {
-      const res = await fetch('/api/dashboard/traffic-stats');
-      if (res.ok) setTrafficStats(await res.json());
-    } catch (e) { console.error(e); }
-  };
-
-  const fetchStartDate = async () => {
-    try {
-      const res = await fetch('/api/dashboard/start-date');
-      if (res.ok) setStartDate(await res.json());
-    } catch (e) { console.error(e); }
-  };
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -80,10 +100,42 @@ export default function DashboardPage() {
 
   const sq = overview ? getSignalQuality(overview.signalStrength) : null;
   const rate = trafficStats || {};
+  const isConnected = overview?.connectionStatus === '901';
+  const updateLabel = getUpdateStateLabel(overview?.updateState);
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">仪表盘</h1>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">仪表盘</h1>
+          <p className="text-sm text-muted-foreground">复用实时速率、在线状态、升级状态和采集配置接口展示 CPE 运行概览</p>
+        </div>
+        <Badge variant={overview?.source === 'cpe' ? 'default' : 'secondary'} className="w-fit rounded-full px-3 py-1">
+          {overview?.source === 'cpe' ? '实时 CPE 数据' : '数据库兜底数据'}
+        </Badge>
+      </div>
+
+      {overviewError && (
+        <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-800 dark:text-yellow-200">
+          <p className="font-medium">CPE 登录/连接失败</p>
+          <p className="mt-1">{overviewError}</p>
+        </div>
+      )}
+
+      {dataError && !overviewError && (
+        <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-800 dark:text-yellow-200">
+          <p className="font-medium">部分实时数据不可用</p>
+          <p className="mt-1">{dataError}</p>
+        </div>
+      )}
+
+      <Card className="card-hover bg-gradient-to-br from-card/90 to-card/50">
+        <CardContent className="grid gap-4 pt-6 md:grid-cols-3">
+          <StatusPill icon={<Wifi className="h-4 w-4" />} label="蜂窝连接" value={isConnected ? '已连接' : '未连接/未知'} tone={isConnected ? 'success' : 'muted'} />
+          <StatusPill icon={<RefreshCw className="h-4 w-4" />} label="升级状态" value={updateLabel} tone={overview?.updateState === 'unknown' ? 'muted' : 'info'} />
+          <StatusPill icon={<Activity className="h-4 w-4" />} label="定时采集" value={overview?.schedulerStatus?.running ? '运行中' : overview?.schedulerStatus?.enabled ? `每 ${overview.schedulerStatus.interval} 分钟` : '未启用'} tone={overview?.schedulerStatus?.running ? 'success' : 'muted'} />
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -168,6 +220,29 @@ export default function DashboardPage() {
   );
 }
 
+function getUpdateStateLabel(state: string | undefined) {
+  const map: Record<string, string> = {
+    '16': '空闲',
+    '17': '检查中',
+    '32': '有可用更新',
+    'unknown': '未知',
+  };
+  return map[state || 'unknown'] || `状态 ${state}`;
+}
+
+function StatusPill({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: 'success' | 'info' | 'muted' }) {
+  const toneClass = tone === 'success' ? 'bg-green-500/10 text-green-700 dark:text-green-300' : tone === 'info' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'bg-muted/60 text-muted-foreground';
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/40 p-4 backdrop-blur-sm">
+      <div className={`rounded-full p-2 ${toneClass}`}>{icon}</div>
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="font-medium">{value}</p>
+      </div>
+    </div>
+  );
+}
+
 function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <Card className="card-hover">
@@ -238,7 +313,7 @@ function DataPlanCard({ startDate, trafficStats }: { startDate: any; trafficStat
   );
 }
 
-function QuickLink({ href, icon, label, description }: { href: string; icon: React.ReactNode; label: string; description: string }) {
+function QuickLink({ href, icon, label, description }: { href: string; icon: ReactNode; label: string; description: string }) {
   return (
     <Link href={href}>
       <Card className="card-hover cursor-pointer group">

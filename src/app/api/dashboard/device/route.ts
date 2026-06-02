@@ -10,15 +10,39 @@ export async function GET() {
     const client = getOrCreateCpeClient();
     await client.ensureLogin();
 
-    const [deviceInfo, onlineState, deviceInformation, topology, devCapacity] = await Promise.all([
+    const [
+      deviceInfo,
+      onlineState,
+      deviceInformation,
+      topology,
+      devCapacity,
+      wlanDbho,
+      vendorName,
+      portalSettings,
+      iocDeviceCapacity,
+    ] = await Promise.all([
       client.getDeviceInfo(),
       client.getOnlineState(),
       client.getDeviceInformation(),
       client.getTopology().catch(() => ({})),
       client.getDevCapacity().catch(() => ({})),
+      client.getWlanDbho().catch(() => null),
+      client.getVendorName().catch(() => null),
+      client.getPortalSettings().catch(() => null),
+      client.getIocDeviceCapacity().catch(() => null),
     ]);
 
-    return NextResponse.json({ deviceInfo, onlineState, deviceInformation, topology, devCapacity });
+    return NextResponse.json({
+      deviceInfo,
+      onlineState,
+      deviceInformation,
+      topology,
+      devCapacity,
+      wlanDbho,
+      vendorName,
+      portalSettings,
+      iocDeviceCapacity,
+    });
   } catch (error: any) {
     console.error('Device info error:', error);
     return NextResponse.json({ error: error.message || '获取设备信息失败' }, { status: 500 });

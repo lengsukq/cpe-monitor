@@ -37,6 +37,11 @@ export async function GET() {
     let currentDownload = 0;
     let connectedDevices = 0;
     let signalStrength = 0;
+    let connectionStatus = 'unknown';
+    let updateState = 'unknown';
+    let networkType = 'unknown';
+    let source: 'cpe' | 'database' = 'database';
+    let cpeError = '';
 
     try {
       const client = getOrCreateCpeClient();
@@ -51,11 +56,16 @@ export async function GET() {
       currentUpload = parseInt(trafficStats?.CurrentUploadRate || '0');
       currentDownload = parseInt(trafficStats?.CurrentDownloadRate || '0');
       connectedDevices = hostInfo?.devices?.length || 0;
+      connectionStatus = onlineState?.ConnectionStatus || 'unknown';
+      updateState = onlineState?.UpdateState || onlineState?.upgState || 'unknown';
+      networkType = onlineState?.CellData?.Rat || onlineState?.cellularWanRadioAccessTechnology || 'unknown';
+      source = 'cpe';
 
       if (onlineState?.CellData) {
         signalStrength = parseInt(onlineState.CellData.SignalStrength || '0');
       }
-    } catch (e) {
+    } catch (e: any) {
+      cpeError = e.message || 'CPE 登录失败，请检查设备地址、网络连接和密码。';
       // Fallback to database
       try {
         const latestTraffic = db.prepare('SELECT * FROM traffic_data ORDER BY timestamp DESC LIMIT 1').all() as any[];
@@ -73,6 +83,11 @@ export async function GET() {
       currentDownload,
       connectedDevices,
       signalStrength,
+      connectionStatus,
+      updateState,
+      networkType,
+      source,
+      cpeError,
       schedulerStatus,
     });
   } catch (error) {
@@ -82,6 +97,11 @@ export async function GET() {
       currentDownload: 0,
       connectedDevices: 0,
       signalStrength: 0,
+      connectionStatus: 'unknown',
+      updateState: 'unknown',
+      networkType: 'unknown',
+      source: 'database',
+      cpeError: error instanceof Error ? error.message : 'CPE 状态获取失败',
       schedulerStatus: { enabled: false, interval: 60, running: false },
     });
   }

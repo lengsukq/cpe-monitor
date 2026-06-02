@@ -33,6 +33,7 @@ export class CpeClient {
   private username: string;
   private password: string;
   private session: CpeSession | null = null;
+  private lastLoginError = '';
 
   constructor(baseUrl: string, username: string, password: string) {
     this.baseUrl = baseUrl;
@@ -62,6 +63,7 @@ export class CpeClient {
 
   async login(): Promise<boolean> {
     try {
+      this.lastLoginError = '';
       const initResp = await fetch(`${this.baseUrl}/`, {
         method: 'GET',
         headers: {
@@ -75,7 +77,8 @@ export class CpeClient {
       const sessionId = sessionMatch ? sessionMatch[1] : '';
 
       if (!sessionId) {
-        console.error('Failed to get SessionID');
+        this.lastLoginError = 'CPE 已响应，但未返回 SessionID，请确认设备 Web 管理接口是否兼容。';
+        console.error(this.lastLoginError);
         return false;
       }
 
@@ -132,7 +135,8 @@ export class CpeClient {
       let serverNonce = this.decodeHtmlEntities(this.extractValue(challengeText, 'servernonce') || '');
 
       if (!salt || !serverNonce) {
-        console.error('Failed to parse challenge response:', challengeText);
+        this.lastLoginError = 'CPE 登录质询返回异常，请检查用户名或设备固件接口。';
+        console.error(this.lastLoginError, challengeText);
         return false;
       }
 
@@ -195,17 +199,45 @@ export class CpeClient {
         return true;
       }
 
-      console.error('Failed to extract RSA parameters:', authText);
+      this.lastLoginError = 'CPE 登录认证失败，请检查 CPE 管理密码是否正确。';
+      console.error(this.lastLoginError, authText);
       return false;
     } catch (error) {
-      console.error('CPE login failed:', error);
+      this.lastLoginError = this.formatConnectionError(error);
+      console.error('CPE login failed:', this.lastLoginError);
       return false;
     }
   }
 
   async ensureLogin(): Promise<boolean> {
     if (this.isSessionValid()) return true;
-    return await this.login();
+    const ok = await this.login();
+    if (!ok) throw new Error(this.lastLoginError || 'CPE 登录失败，请检查设备地址、网络连接和密码。');
+    return true;
+  }
+
+  getLastLoginError(): string {
+    return this.lastLoginError || 'CPE 登录失败，请检查设备地址、网络连接和密码。';
+  }
+
+  private formatConnectionError(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    const cause = error instanceof Error && 'cause' in error ? String((error as Error & { cause?: unknown }).cause) : '';
+    const detail = `${message} ${cause}`;
+
+    if (detail.includes('UND_ERR_CONNECT_TIMEOUT') || detail.includes('Connect Timeout')) {
+      return `无法连接 CPE (${this.baseUrl})：连接超时。请确认设备在线、地址正确，且当前电脑与 CPE 在同一网络。`;
+    }
+
+    if (detail.includes('ECONNREFUSED')) {
+      return `无法连接 CPE (${this.baseUrl})：设备拒绝连接。请确认 Web 管理端口和协议是否正确。`;
+    }
+
+    if (detail.includes('ENOTFOUND') || detail.includes('EAI_AGAIN')) {
+      return `无法解析 CPE 地址 (${this.baseUrl})。请检查 CPE 地址配置。`;
+    }
+
+    return `CPE 登录失败 (${this.baseUrl})：${message || '未知网络错误'}`;
   }
 
   private computeClientProof(password: string, saltHex: string, iterations: number, clientNonce: string, serverNonce: string): string {
@@ -228,7 +260,7 @@ export class CpeClient {
   private async apiGet(path: string): Promise<any> {
     if (!this.isSessionValid()) {
       const ok = await this.login();
-      if (!ok) throw new Error('CPE login failed');
+      if (!ok) throw new Error(this.getLastLoginError());
     }
 
     const resp = await fetch(`${this.baseUrl}${path}`, {
@@ -246,9 +278,43 @@ export class CpeClient {
     if (resp.status === 401 || resp.status === 403) {
       this.session = null;
       const ok = await this.login();
-      if (!ok) throw new Error('CPE re-login failed');
+      if (!ok) throw new Error(this.getLastLoginError());
 
       return this.apiGet(path); // retry
+    }
+
+    if (!resp.ok) throw new Error(`API request failed: ${resp.status}`);
+
+    const text = await resp.text();
+    try { return JSON.parse(text); } catch { return text; }
+  }
+
+  private async apiPost(path: string, body: string, contentType = 'application/json; charset=UTF-8'): Promise<any> {
+    if (!this.isSessionValid()) {
+      const ok = await this.login();
+      if (!ok) throw new Error(this.getLastLoginError());
+    }
+
+    const resp = await fetch(`${this.baseUrl}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': contentType,
+        'Cookie': `SessionID=${this.session!.sessionId}`,
+        '__RequestVerificationToken': this.session!.token,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        '_ResponseSource': 'Broswer',
+      },
+      body,
+    });
+
+    if (resp.status === 401 || resp.status === 403) {
+      this.session = null;
+      const ok = await this.login();
+      if (!ok) throw new Error(this.getLastLoginError());
+
+      return this.apiPost(path, body, contentType);
     }
 
     if (!resp.ok) throw new Error(`API request failed: ${resp.status}`);
@@ -273,6 +339,26 @@ export class CpeClient {
     const raw = await this.apiGet('/api/system/devcapacity');
     if (typeof raw === 'object') return raw;
     return this.parseXmlResponse(raw);
+  }
+  async getWlanDbho(): Promise<any> {
+    const raw = await this.apiGet('/api/wlan/wlandbho');
+    if (typeof raw === 'object') return raw;
+    return this.parseXmlResponse(raw);
+  }
+  async getPortalSettings(): Promise<any> {
+    const raw = await this.apiGet('/api/lan/portal-settings');
+    if (typeof raw === 'object') return raw;
+    return this.parseXmlResponse(raw);
+  }
+  async getIocDeviceCapacity(): Promise<any> { return this.apiGet('/system/ioc_device_capacity.json'); }
+  async getVendorName(language = 'zh_cn'): Promise<any> {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><request><language>${language}</language></request>`;
+    const raw = await this.apiPost('/api/device/vendorname', xml, 'application/x-www-form-urlencoded; charset=UTF-8');
+    if (typeof raw === 'object') return raw;
+    return this.parseXmlResponse(raw);
+  }
+  async checkOnlineUpgrade(): Promise<any> {
+    return this.apiPost('/api/system/onlineupg', JSON.stringify({ action: 'check', data: { UpdateAction: 1 } }));
   }
   async getTrafficStatistics(): Promise<any> {
     const raw = await this.apiGet('/api/monitoring/traffic-statistics');

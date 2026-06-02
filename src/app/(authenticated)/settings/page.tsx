@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 export default function SettingsPage() {
   const [cpeConfig, setCpeConfig] = useState({
@@ -37,13 +37,11 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; latency?: string } | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<{ updateState?: string; message?: string; error?: string } | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  useEffect(() => {
-    fetchConfigs();
-  }, []);
-
-  const fetchConfigs = async () => {
+  async function fetchConfigs() {
     try {
       const [cpeRes, notifRes] = await Promise.all([
         fetch('/api/settings/cpe'),
@@ -70,9 +68,9 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Failed to fetch configs:', error);
     }
-  };
+  }
 
-  const saveCpeConfig = async () => {
+  async function saveCpeConfig() {
     setLoading(true);
     try {
       const res = await fetch('/api/settings/cpe', {
@@ -89,9 +87,9 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const testCpeConnection = async () => {
+  async function testCpeConnection() {
     setTesting(true);
     setTestResult(null);
     try {
@@ -107,9 +105,34 @@ export default function SettingsPage() {
     } finally {
       setTesting(false);
     }
-  };
+  }
 
-  const saveEmailConfig = async () => {
+  async function fetchUpdateStatus() {
+    try {
+      const res = await fetch('/api/system/update');
+      const data = await res.json();
+      if (res.ok) setUpdateStatus(data);
+      else setUpdateStatus({ error: data.error || '无法获取升级状态' });
+    } catch {
+      setUpdateStatus({ error: '无法获取升级状态' });
+    }
+  }
+
+  async function checkSystemUpdate() {
+    setCheckingUpdate(true);
+    try {
+      const res = await fetch('/api/system/update', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) setUpdateStatus(data);
+      else setUpdateStatus({ error: data.error || '检查更新失败' });
+    } catch {
+      setUpdateStatus({ error: '检查更新请求失败' });
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }
+
+  async function saveEmailConfig() {
     setLoading(true);
     try {
       const res = await fetch('/api/settings/notification', {
@@ -124,9 +147,9 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const saveWechatConfig = async () => {
+  async function saveWechatConfig() {
     setLoading(true);
     try {
       const res = await fetch('/api/settings/notification', {
@@ -141,9 +164,9 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const changePassword = async () => {
+  async function changePassword() {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setMessage({ type: 'error', text: '两次输入的密码不一致' });
       return;
@@ -173,14 +196,19 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    fetchConfigs();
+    fetchUpdateStatus();
+  }, []);
 
   return (
     <div className="space-y-6 max-w-4xl">
       <h1 className="text-2xl font-bold">系统设置</h1>
 
       {message.text && (
-        <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+        <div className={`rounded-2xl border p-4 ${message.type === 'success' ? 'border-green-500/20 bg-green-500/10 text-green-800 dark:text-green-300' : 'border-red-500/20 bg-red-500/10 text-red-800 dark:text-red-300'}`}>
           {message.text}
         </div>
       )}
@@ -207,11 +235,30 @@ export default function SettingsPage() {
           </div>
 
           {testResult && (
-            <div className={`p-4 rounded-lg ${testResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            <div className={`rounded-2xl border p-4 ${testResult.success ? 'border-green-500/20 bg-green-500/10 text-green-800 dark:text-green-300' : 'border-red-500/20 bg-red-500/10 text-red-800 dark:text-red-300'}`}>
               <div className="font-semibold">{testResult.message}</div>
               {testResult.latency && <div className="text-sm mt-1">响应时间: {testResult.latency}</div>}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* 系统更新 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>系统更新</CardTitle>
+            <Badge variant={updateStatus?.error ? 'secondary' : 'outline'}>{getUpdateStateLabel(updateStatus?.updateState)}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-2xl border border-border/60 bg-background/40 p-4 text-sm text-muted-foreground">
+            {updateStatus?.error || updateStatus?.message || '仅在点击按钮时触发设备在线升级检查，不会自动执行写操作。'}
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={fetchUpdateStatus}>刷新升级状态</Button>
+            <Button onClick={checkSystemUpdate} disabled={checkingUpdate}>{checkingUpdate ? '检查中...' : '检查更新'}</Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -284,4 +331,14 @@ export default function SettingsPage() {
       </Card>
     </div>
   );
+}
+
+function getUpdateStateLabel(state?: string) {
+  const map: Record<string, string> = {
+    '16': '空闲',
+    '17': '检查中',
+    '32': '有可用更新',
+    unknown: '未知',
+  };
+  return map[state || 'unknown'] || `状态 ${state}`;
 }
