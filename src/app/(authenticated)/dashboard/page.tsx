@@ -235,7 +235,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="下载速率" value={formatRate(parseInt(rate.CurrentDownloadRate || '0'))} color="text-blue-600" />
         <StatCard label="上传速率" value={formatRate(parseInt(rate.CurrentUploadRate || '0'))} color="text-purple-600" />
-        <StatCard label="在线设备" value={`${overview?.connectedDevices || 0} 台`} color="text-green-600" />
+        <StatCard href="/device#online-devices" label="在线设备" value={`${overview?.connectedDevices || 0} 台`} color="text-green-600" />
         <Card className="card-hover">
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">信号强度</CardTitle></CardHeader>
           <CardContent>
@@ -337,13 +337,15 @@ function StatusPill({ icon, label, value, tone }: { icon: ReactNode; label: stri
   );
 }
 
-function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <Card className="card-hover">
+function StatCard({ label, value, color, href }: { label: string; value: string; color: string; href?: string }) {
+  const card = (
+    <Card className={`card-hover h-full ${href ? 'cursor-pointer transition-transform hover:-translate-y-0.5' : ''}`}>
       <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{label}</CardTitle></CardHeader>
       <CardContent><div className={`text-2xl font-bold ${color}`}>{value}</div></CardContent>
     </Card>
   );
+
+  return href ? <Link href={href} aria-label={`查看${label}详情`} className="block h-full">{card}</Link> : card;
 }
 
 function StatItem({ label, value }: { label: string; value: string }) {

@@ -75,6 +75,14 @@ export default function DevicePage() {
     void refreshDevicePage();
   }, []);
 
+  useEffect(() => {
+    if (loading || window.location.hash !== '#online-devices') return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('online-devices')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading]);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -359,7 +367,7 @@ export default function DevicePage() {
       )}
 
       {/* Connected Devices */}
-      <Card className="card-hover">
+      <Card id="online-devices" className="card-hover scroll-mt-24">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>在线设备</CardTitle>
