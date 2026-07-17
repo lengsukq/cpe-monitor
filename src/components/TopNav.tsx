@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Smartphone, Bell, FileText, Settings, LogOut, MessageSquareText } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { LayoutDashboard, Smartphone, Bell, FileText, Settings, LogOut, Menu, MessageSquareText, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navItems = [
@@ -16,13 +17,18 @@ const navItems = [
 
 export default function TopNav() {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-16 backdrop-blur-xl bg-background/70 border-b border-border">
-      <div className="h-full max-w-screen-2xl mx-auto px-4 lg:px-8 flex items-center justify-between">
+    <header className="fixed left-0 right-0 top-0 z-50 border-b border-border bg-background/70 backdrop-blur-xl">
+      <div className="relative mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 lg:px-8">
         {/* Logo + Nav */}
         <div className="flex items-center gap-8">
-          <Link href="/dashboard" className="text-lg font-bold tracking-tight">
+          <Link href="/dashboard" className="text-lg font-bold tracking-tight" onClick={() => setMenuOpen(false)}>
             CPEye
           </Link>
 
@@ -58,7 +64,39 @@ export default function TopNav() {
             <LogOut className="h-4 w-4" />
             <span className="hidden sm:inline">退出</span>
           </Link>
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground md:hidden"
+            aria-label={menuOpen ? '关闭导航菜单' : '打开导航菜单'}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-navigation"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
+
+        {menuOpen ? (
+          <nav id="mobile-navigation" className="absolute left-0 right-0 top-full border-b border-border bg-background/95 p-3 shadow-xl backdrop-blur-xl md:hidden">
+            <div className="grid grid-cols-2 gap-2">
+              {navItems.map((item) => {
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={isActive ? 'flex items-center gap-3 rounded-2xl bg-primary/10 px-3 py-3 text-sm font-medium text-primary transition' : 'flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground'}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        ) : null}
       </div>
     </header>
   );
