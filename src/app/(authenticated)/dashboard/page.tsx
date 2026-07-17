@@ -440,14 +440,14 @@ function DataPlanCard({ startDate, trafficStats }: { startDate: any; trafficStat
 function QuickLink({ href, icon, label, description }: { href: string; icon: ReactNode; label: string; description: string }) {
   return (
     <Link href={href}>
-      <Card className="card-hover cursor-pointer group">
-        <CardContent className="pt-6 flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-muted group-hover:bg-primary/10 transition-colors">{icon}</div>
-          <div className="flex-1">
+      <Card className="card-hover group h-full cursor-pointer py-0">
+        <CardContent className="flex min-h-20 items-center gap-4 p-4">
+          <div className="shrink-0 rounded-xl bg-muted p-3 transition-colors group-hover:bg-primary/10">{icon}</div>
+          <div className="min-w-0 flex-1">
             <p className="font-medium">{label}</p>
-            <p className="text-sm text-muted-foreground">{description}</p>
+            <p className="truncate text-sm text-muted-foreground">{description}</p>
           </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
         </CardContent>
       </Card>
     </Link>
