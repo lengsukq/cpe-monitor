@@ -135,7 +135,7 @@ export default function DevicePage() {
             </div>
           </section>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:gap-4 xl:grid-cols-4">
             <CapabilityCard icon={<Cpu className="h-5 w-5" />} label="厂商/型号" value={[vendor, info.DeviceName].filter(Boolean).join(' / ') || '-'} />
             <CapabilityCard icon={<Wifi className="h-5 w-5" />} label="双频优选" value={formatFeatureState(wlanDbho)} />
             <CapabilityCard icon={<Network className="h-5 w-5" />} label="拓扑状态" value={formatFeatureState(topology)} />
@@ -490,12 +490,10 @@ function IdentityTile({ icon, label, value, mono }: { icon: ReactNode; label: st
 function CapabilityCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <Card className="card-hover">
-      <CardContent className="flex items-center gap-4 pt-6">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">{icon}</div>
-        <div className="min-w-0">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="truncate font-medium">{value || '-'}</p>
-        </div>
+      <CardContent className="flex min-h-20 items-center gap-3 p-4 lg:p-5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">{icon}</div>
+        <p className="min-w-0 flex-1 text-sm leading-5 text-muted-foreground">{label}</p>
+        <p className="max-w-[42%] truncate text-right text-sm font-semibold leading-5 text-foreground">{value || '-'}</p>
       </CardContent>
     </Card>
   );
