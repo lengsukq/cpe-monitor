@@ -1,15 +1,17 @@
 import { db } from './db';
 
 export async function generateDailyReport() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
+  const now = new Date();
+  const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  const todayStr = dateFormatter.format(now);
+  const today = new Date(`${todayStr}T00:00:00+08:00`);
   const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const todayStr = today.toISOString().split('T')[0];
-  const todayIso = today.toISOString();
-  const tomorrowIso = tomorrow.toISOString();
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const sqliteTimestamp = (date: Date) => date.toISOString().slice(0, 19).replace('T', ' ');
+  const todayIso = sqliteTimestamp(today);
+  const tomorrowIso = sqliteTimestamp(tomorrow);
 
   // Get today's traffic data
   const todayTraffic = db.prepare(
@@ -32,7 +34,10 @@ export async function generateDailyReport() {
       signalCount++;
     }
 
-    const hour = new Date(data.timestamp).getHours();
+    const timestamp = new Date(`${String(data.timestamp).replace(' ', 'T')}Z`);
+    const hour = Number(new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Shanghai', hour: '2-digit', hour12: false,
+    }).format(timestamp));
     hourlyTraffic[hour] = (hourlyTraffic[hour] || 0) + (data.download_bytes || 0) + (data.upload_bytes || 0);
   }
 
@@ -75,7 +80,10 @@ export async function generateDailyReport() {
 
   // Calculate network quality
   const avgSignal = signalCount > 0 ? Math.round(totalSignal / signalCount) : 0;
-  const uptimePercent = todayTraffic.length > 0 ? (todayTraffic.length / 24) * 100 : 0;
+  const intervalSetting = db.prepare("SELECT value FROM system_settings WHERE key = 'scheduler_interval'").get() as { value?: string } | undefined;
+  const intervalMinutes = Math.max(1, Number(intervalSetting?.value || 60));
+  const expectedSamples = (24 * 60) / intervalMinutes;
+  const uptimePercent = todayTraffic.length > 0 ? Math.min(100, (todayTraffic.length / expectedSamples) * 100) : 0;
 
   let networkQuality = '差';
   if (avgSignal >= -70 && uptimePercent >= 95) {

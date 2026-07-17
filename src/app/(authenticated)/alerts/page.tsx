@@ -43,10 +43,10 @@ interface AlertRule {
 }
 
 const metricTypes = [
-  { value: 'traffic_down', label: '下载流量' },
-  { value: 'traffic_up', label: '上传流量' },
-  { value: 'devices', label: '设备数量' },
-  { value: 'signal', label: '信号强度' },
+  { value: 'traffic_down', label: '下载流量', unit: 'MB' },
+  { value: 'traffic_up', label: '上传流量', unit: 'MB' },
+  { value: 'devices', label: '设备数量', unit: '台' },
+  { value: 'signal', label: '信号强度', unit: 'dBm' },
 ];
 
 const operators = [
@@ -147,6 +147,7 @@ export default function AlertsPage() {
   };
 
   const getMetricLabel = (type: string) => metricTypes.find((m) => m.value === type)?.label || type;
+  const getMetricUnit = (type: string) => metricTypes.find((m) => m.value === type)?.unit || '';
   const getOperatorLabel = (op: string) => operators.find((o) => o.value === op)?.label || op;
 
   return (
@@ -179,7 +180,7 @@ export default function AlertsPage() {
                   <TableRow key={rule.id}>
                     <TableCell className="font-medium">{rule.name}</TableCell>
                     <TableCell>{getMetricLabel(rule.metricType)}</TableCell>
-                    <TableCell>{getOperatorLabel(rule.operator)} {rule.threshold}</TableCell>
+                    <TableCell>{getOperatorLabel(rule.operator)} {rule.threshold} {getMetricUnit(rule.metricType)}</TableCell>
                     <TableCell>
                       {rule.notifyEmail && '邮件 '}
                       {rule.notifyWechat && '微信'}
@@ -239,7 +240,7 @@ export default function AlertsPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>阈值</Label>
+                <Label>阈值（流量用 MB，设备用台，信号用 dBm）</Label>
                 <Input type="number" value={String(formData.threshold)} onChange={(e) => setFormData({ ...formData, threshold: Number(e.target.value) })} />
               </div>
             </div>

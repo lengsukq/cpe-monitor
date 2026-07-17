@@ -41,7 +41,7 @@ export default function AuthenticatedLayout({
   return (
     <div className="min-h-screen bg-background">
       <TopNav />
-      <main className="pt-16 p-6 lg:p-8 max-w-screen-2xl mx-auto">
+      <main className="max-w-screen-2xl mx-auto px-6 pb-6 pt-24 lg:px-8 lg:pb-8 lg:pt-24">
         {children}
       </main>
     </div>

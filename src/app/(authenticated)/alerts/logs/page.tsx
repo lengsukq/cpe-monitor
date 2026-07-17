@@ -44,7 +44,8 @@ export default function AlertLogsPage() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleString('zh-CN');
+    const date = new Date(`${dateStr.replace(' ', 'T')}Z`);
+    return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
   };
 
   return (

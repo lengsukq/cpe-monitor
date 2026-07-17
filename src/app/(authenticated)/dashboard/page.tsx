@@ -7,9 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Smartphone, Bell, Settings, ArrowRight, Activity, RefreshCw, Wifi } from 'lucide-react';
+import { Smartphone, Bell, Settings, ArrowRight, Activity, RefreshCw, Wifi, Radio, Clock3, ShieldCheck } from 'lucide-react';
 import TrafficChart from '@/components/TrafficChart';
 import { formatRate, formatWithUnit, formatDuration, getSignalQuality } from '@/lib/format';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function DashboardPage() {
   const [overview, setOverview] = useState<any>(null);
@@ -21,6 +23,8 @@ export default function DashboardPage() {
   const [startDate, setStartDate] = useState<any>(null);
   const [overviewError, setOverviewError] = useState('');
   const [dataError, setDataError] = useState('');
+  const [deviceSnapshot, setDeviceSnapshot] = useState<any>(null);
+  const [schedulerSaving, setSchedulerSaving] = useState(false);
 
   async function fetchOverview() {
     try {
@@ -68,11 +72,39 @@ export default function DashboardPage() {
     }
   }
 
+  async function fetchDeviceSnapshot() {
+    try {
+      const res = await fetch('/api/dashboard/device');
+      if (res.ok) setDeviceSnapshot(await res.json());
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function updateScheduler(enabled: boolean, interval = overview?.schedulerStatus?.interval || 60) {
+    setSchedulerSaving(true);
+    try {
+      const res = await fetch('/api/dashboard/scheduler', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, interval }),
+      });
+      if (!res.ok) throw new Error('调度设置保存失败');
+      const data = await res.json();
+      setOverview((current: any) => current ? { ...current, schedulerStatus: data.status || { enabled, interval, running: enabled } } : current);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSchedulerSaving(false);
+    }
+  }
+
   useEffect(() => {
     fetchOverview();
     fetchTrafficHistory();
     fetchTrafficStats();
     fetchStartDate();
+    fetchDeviceSnapshot();
 
     const interval = setInterval(() => {
       fetchOverview();
@@ -102,6 +134,7 @@ export default function DashboardPage() {
   const rate = trafficStats || {};
   const isConnected = overview?.connectionStatus === '901';
   const updateLabel = getUpdateStateLabel(overview?.updateState);
+  const cell = deviceSnapshot?.cellInformation || {};
 
   return (
     <div className="space-y-6">
@@ -136,6 +169,67 @@ export default function DashboardPage() {
           <StatusPill icon={<Activity className="h-4 w-4" />} label="定时采集" value={overview?.schedulerStatus?.running ? '运行中' : overview?.schedulerStatus?.enabled ? `每 ${overview.schedulerStatus.interval} 分钟` : '未启用'} tone={overview?.schedulerStatus?.running ? 'success' : 'muted'} />
         </CardContent>
       </Card>
+
+      <div className="grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
+        <Card className="card-hover overflow-hidden border-sky-500/15 bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,.16),transparent_42%),linear-gradient(135deg,hsl(var(--card)),hsl(var(--card)))]">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2"><Radio className="h-4 w-4 text-sky-500" />当前小区</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">实时蜂窝注册信息与 CPE 身份</p>
+            </div>
+            <Badge variant="outline" className="rounded-full">{overview?.networkType && overview.networkType !== 'unknown' ? overview.networkType : '等待数据'}</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+              <SnapshotItem label="设备型号" value={getSnapshotValue(deviceSnapshot?.deviceInformation, ['DeviceName', 'spreadname_zh', 'spreadname_en'])} />
+              <SnapshotItem label="运营商" value={cell.carrier || getCarrierName(deviceSnapshot?.deviceInformation?.Mccmnc)} />
+              <SnapshotItem label="频段" value={cell.band} />
+              <SnapshotItem label="小区 ID" value={cell.cellId} mono />
+              <SnapshotItem label="PCI" value={cell.pci} />
+              <SnapshotItem label="RSRP" value={cell.rsrp} />
+              <SnapshotItem label="RSRQ" value={cell.rsrq} />
+              <SnapshotItem label="SINR" value={cell.sinr} />
+              <SnapshotItem label="当前状态" value={overview?.connectionStatus === '901' ? '已连接' : '未连接/未知'} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-amber-500" />定时监控</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">采集流量、设备数和信号，并触发告警</p>
+            </div>
+            <Switch
+              checked={Boolean(overview?.schedulerStatus?.enabled)}
+              disabled={schedulerSaving}
+              onCheckedChange={(checked) => updateScheduler(checked)}
+              aria-label="启用定时监控"
+            />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/30 px-3 py-3">
+              <div>
+                <p className="text-sm font-medium">采集频率</p>
+                <p className="text-xs text-muted-foreground">后台任务 {overview?.schedulerStatus?.running ? '正在运行' : '尚未运行'}</p>
+              </div>
+              <Select
+                value={String(overview?.schedulerStatus?.interval || 60)}
+                onValueChange={(value) => updateScheduler(Boolean(overview?.schedulerStatus?.enabled), Number(value))}
+              >
+                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[5, 15, 30, 60].map((minutes) => <SelectItem key={minutes} value={String(minutes)}>每 {minutes} 分钟</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <ShieldCheck className="h-4 w-4 text-emerald-500" />
+              告警规则按静默期去重，通知渠道在“设置”中配置
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -261,6 +355,30 @@ function StatItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function SnapshotItem({ label, value, mono = false }: { label: string; value?: string | number | null; mono?: boolean }) {
+  return <div className="space-y-1"><p className="text-xs text-muted-foreground">{label}</p><p className={`truncate font-medium ${mono ? 'font-mono text-xs' : ''}`}>{value || '-'}</p></div>;
+}
+
+function getSnapshotValue(source: any, keys: string[]) {
+  for (const key of keys) if (source?.[key]) return String(source[key]);
+  return '-';
+}
+
+function getCarrierName(mccmnc?: string) {
+  if (!mccmnc) return '-';
+  const value = String(mccmnc).replace(/[^0-9]/g, '');
+  const carriers: Record<string, string> = {
+    '46000': '中国移动', '46002': '中国移动', '46007': '中国移动', '46008': '中国移动',
+    '46001': '中国联通', '46006': '中国联通', '46009': '中国联通',
+    '46003': '中国电信', '46005': '中国电信', '46011': '中国电信',
+  };
+  return carriers[value] || (value.startsWith('460') ? `中国运营商（${value}）` : String(mccmnc));
+}
+
+function withUnit(value: string | number | undefined, unit: string) {
+  return value === undefined || value === null || value === '' ? '-' : `${value} ${unit}`;
+}
+
 function UnitToggle({ unit, onChange }: { unit: 'MB' | 'GB'; onChange: (u: 'MB' | 'GB') => void }) {
   return (
     <div className="flex gap-1">
@@ -272,7 +390,13 @@ function UnitToggle({ unit, onChange }: { unit: 'MB' | 'GB'; onChange: (u: 'MB' 
 
 function DataPlanCard({ startDate, trafficStats }: { startDate: any; trafficStats: any }) {
   const limitBytes = parseInt(startDate.trafficmaxlimit || '0');
-  const usedBytes = parseInt(trafficStats.TotalDownload || '0') + parseInt(trafficStats.TotalUpload || '0');
+  // The quota resets monthly; Current* is only the current WAN session.
+  // The router's month_statistics endpoint provides the actual package cycle.
+  const monthDownload = parseInt(trafficStats.CurrentMonthDownload || '0');
+  const monthUpload = parseInt(trafficStats.CurrentMonthUpload || '0');
+  const usedBytes = monthDownload + monthUpload > 0
+    ? monthDownload + monthUpload
+    : parseInt(trafficStats.CurrentDownload || '0') + parseInt(trafficStats.CurrentUpload || '0');
   const percent = limitBytes > 0 ? Math.min((usedBytes / limitBytes) * 100, 100) : 0;
   const remaining = Math.max(limitBytes - usedBytes, 0);
   const threshold = parseInt(startDate.MonthThreshold || '90');

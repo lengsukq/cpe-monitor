@@ -29,11 +29,20 @@ export async function GET(request: Request) {
       case '24h': default: startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     }
 
+    // SQLite datetime('now') is stored as UTC text in `YYYY-MM-DD HH:mm:ss`
+    // format. ISO strings do not compare correctly with that representation.
+    const sqliteTimestamp = (date: Date) => date.toISOString().slice(0, 19).replace('T', ' ');
     const data = db.prepare(
       'SELECT timestamp, upload_bytes, download_bytes, connected_devices, signal_strength FROM traffic_data WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp'
-    ).all(startTime.toISOString(), now.toISOString());
+    ).all(sqliteTimestamp(startTime), sqliteTimestamp(now)) as any[];
 
-    return NextResponse.json(data);
+    return NextResponse.json(data.map((row) => ({
+      timestamp: row.timestamp,
+      uploadBytes: row.upload_bytes,
+      downloadBytes: row.download_bytes,
+      connectedDevices: row.connected_devices,
+      signalStrength: row.signal_strength,
+    })));
   } catch (error) {
     console.error('Traffic history error:', error);
     return NextResponse.json({ error: '获取流量数据失败' }, { status: 500 });
