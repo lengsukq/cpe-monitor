@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Mail, MessageSquareText, RadioTower, RefreshCw, ShieldCheck, Smartphone } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Mail, MessageSquareText, RadioTower, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
 
 interface SmsMessage {
   id: string;
@@ -20,13 +20,17 @@ interface SmsSyncStatus {
   lastError: string | null;
 }
 
-type Filter = 'all' | 'unread';
+type Filter = 'all' | 'unread' | 'read';
+type DirectionFilter = 'all' | 'inbound' | 'outbound';
 
 export default function SmsPage() {
   const [messages, setMessages] = useState<SmsMessage[]>([]);
   const [total, setTotal] = useState(0);
   const [unread, setUnread] = useState(0);
   const [filter, setFilter] = useState<Filter>('all');
+  const [direction, setDirection] = useState<DirectionFilter>('all');
+  const [keywordInput, setKeywordInput] = useState('');
+  const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
@@ -70,9 +74,33 @@ export default function SmsPage() {
     loadMessages();
   }, []);
 
+  function applyQuery(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setKeyword(keywordInput.trim());
+  }
+
+  function clearQuery() {
+    setKeywordInput('');
+    setKeyword('');
+    setFilter('all');
+    setDirection('all');
+  }
+
+  const hasActiveQuery = Boolean(keyword || filter !== 'all' || direction !== 'all');
   const visibleMessages = useMemo(
-    () => filter === 'unread' ? messages.filter((message) => message.unread) : messages,
-    [filter, messages],
+    () => {
+      const normalizedKeyword = keyword.toLocaleLowerCase();
+      return messages.filter((message) => {
+        const matchesKeyword = !normalizedKeyword || [message.phone, message.content, message.date]
+          .join(' ')
+          .toLocaleLowerCase()
+          .includes(normalizedKeyword);
+        const matchesReadStatus = filter === 'all' || (filter === 'unread' ? message.unread : !message.unread);
+        const matchesDirection = direction === 'all' || message.direction === direction;
+        return matchesKeyword && matchesReadStatus && matchesDirection;
+      });
+    },
+    [direction, filter, keyword, messages],
   );
 
   return (
@@ -124,13 +152,74 @@ export default function SmsPage() {
         <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-tight">最近短信</h2>
-            <p className="mt-1 text-sm text-muted-foreground">数据来自本地持久化副本；手动同步会拉取 CPE 最新数据</p>
+            <p className="mt-1 text-sm text-muted-foreground">数据来自本地持久化副本；可按号码、内容和状态查询</p>
           </div>
-          <div className="flex rounded-full bg-muted p-1 text-sm">
-            <button onClick={() => setFilter('all')} className={`rounded-full px-4 py-2 transition ${filter === 'all' ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground'}`}>全部</button>
-            <button onClick={() => setFilter('unread')} className={`rounded-full px-4 py-2 transition ${filter === 'unread' ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground'}`}>未读 {unread > 0 ? `(${unread})` : ''}</button>
-          </div>
+          <span className="shrink-0 rounded-full bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+            显示 {visibleMessages.length} / {total} 条
+          </span>
         </div>
+
+        <form onSubmit={applyQuery} className="mt-5 rounded-2xl border border-border/70 bg-muted/20 p-3 sm:p-4">
+          <div className="flex flex-col gap-3 lg:flex-row">
+            <label className="sr-only" htmlFor="sms-search">搜索短信</label>
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                id="sms-search"
+                value={keywordInput}
+                onChange={(event) => setKeywordInput(event.target.value)}
+                placeholder="搜索号码、短信内容或时间"
+                className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm outline-none transition focus:border-ring focus:ring-3 focus:ring-ring/30"
+              />
+            </div>
+            <button type="submit" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40">
+              <Search className="h-4 w-4" />
+              查询
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="mr-1 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              筛选
+            </span>
+            <div className="flex rounded-full bg-background p-1 text-xs shadow-sm ring-1 ring-border/60">
+              {([
+                ['all', '全部'],
+                ['unread', `未读${unread > 0 ? ` (${unread})` : ''}`],
+                ['read', '已读'],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilter(value)}
+                  className={`rounded-full px-3 py-1.5 transition ${filter === value ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <label className="sr-only" htmlFor="sms-direction">短信方向</label>
+            <select
+              id="sms-direction"
+              value={direction}
+              onChange={(event) => setDirection(event.target.value as DirectionFilter)}
+              className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs outline-none transition focus:border-ring focus:ring-3 focus:ring-ring/30"
+            >
+              <option value="all">全部方向</option>
+              <option value="inbound">收到的</option>
+              <option value="outbound">已发送</option>
+            </select>
+
+            {hasActiveQuery ? (
+              <button type="button" onClick={clearQuery} className="ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-background hover:text-foreground">
+                <X className="h-3.5 w-3.5" />
+                清除条件
+              </button>
+            ) : null}
+          </div>
+        </form>
 
         {error ? <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
         {!error && sync?.lastError ? <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">上次自动同步失败：{sync.lastError}</div> : null}
@@ -139,7 +228,7 @@ export default function SmsPage() {
         ) : visibleMessages.length === 0 ? (
           <div className="flex min-h-48 flex-col items-center justify-center gap-3 text-center text-muted-foreground">
             <MessageSquareText className="h-8 w-8 opacity-40" />
-            <p>{filter === 'unread' ? '没有未读短信' : '暂无短信'}</p>
+            <p>{messages.length === 0 ? '暂无短信' : hasActiveQuery ? '没有符合条件的短信' : '没有短信'}</p>
           </div>
         ) : (
           <div className="mt-5 divide-y divide-border">
