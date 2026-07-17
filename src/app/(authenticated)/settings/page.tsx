@@ -259,8 +259,13 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <h1 className="text-2xl font-bold">系统设置</h1>
+    <div className="mx-auto w-full max-w-5xl space-y-6 pb-8">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold tracking-tight">系统设置</h1>
+        <p className="mt-2 text-sm text-muted-foreground">管理 CPE 连接、短信同步与通知渠道</p>
+      </div>
+
+      <div className="mx-auto w-full max-w-4xl space-y-6">
 
       {message.text && (
         <div className={`rounded-2xl border p-4 ${message.type === 'success' ? 'border-green-500/20 bg-green-500/10 text-green-800 dark:text-green-300' : 'border-red-500/20 bg-red-500/10 text-red-800 dark:text-red-300'}`}>
@@ -359,7 +364,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader><CardTitle>邮件通知配置</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>SMTP 服务器</Label>
               <Input value={emailConfig.smtpHost} onChange={(e) => setEmailConfig({ ...emailConfig, smtpHost: e.target.value })} placeholder="smtp.gmail.com" />
@@ -369,7 +374,7 @@ export default function SettingsPage() {
               <Input value={emailConfig.smtpPort} onChange={(e) => setEmailConfig({ ...emailConfig, smtpPort: e.target.value })} placeholder="587" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>SMTP 用户名</Label>
               <Input value={emailConfig.smtpUser} onChange={(e) => setEmailConfig({ ...emailConfig, smtpUser: e.target.value })} />
@@ -422,6 +427,7 @@ export default function SettingsPage() {
           <Button onClick={changePassword} disabled={loading}>修改密码</Button>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
