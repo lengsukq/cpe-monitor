@@ -193,6 +193,32 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      <section className="relative overflow-hidden rounded-[2rem] bg-[#102219] px-4 py-5 text-white shadow-xl shadow-emerald-950/15 sm:px-6 sm:py-7 lg:px-8">
+        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-emerald-300/15 blur-3xl" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-200/75 sm:text-xs">
+              <Gauge className="h-3.5 w-3.5" />
+              CPE / runtime summary
+            </p>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">运行摘要</h2>
+            <p className="mt-1 max-w-xl text-xs leading-5 text-emerald-50/65 sm:text-sm">把设备、网络、信号、终端和短信同步状态收拢在一处，方便快速判断当前是否需要处理。</p>
+          </div>
+          <Link href="/device" className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/15">
+            查看设备详情
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+        <div className="relative mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
+          <SummaryTile icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="CPE 连接" value={isConnected ? '已连接' : '未连接/未知'} detail={overview?.source === 'cpe' ? '实时数据' : '数据库兜底'} href="/device" />
+          <SummaryTile icon={<Smartphone className="h-3.5 w-3.5" />} label="在线终端" value={String(overview?.connectedDevices || 0) + ' 台'} detail="点击查看在线列表" href="/device#online-devices" />
+          <SummaryTile icon={<Radio className="h-3.5 w-3.5" />} label="当前小区" value={cell.cellId || '-'} detail={(cell.networkType || overview?.networkType || '网络未知') + ' · ' + getCarrierName(deviceSnapshot?.deviceInformation?.Mccmnc)} href="/device" />
+          <SummaryTile icon={<Wifi className="h-3.5 w-3.5" />} label="信号强度" value={overview?.signalStrength ? String(overview.signalStrength) + ' dBm' : '-'} detail={sq?.label || '等待数据'} href="/device" />
+          <SummaryTile icon={<MessageSquareText className="h-3.5 w-3.5" />} label="短信同步" value={smsSyncLabel} detail={smsSyncDetail} href="/sms" />
+        </div>
+        <p className="relative mt-4 truncate text-[10px] text-emerald-100/45 sm:text-xs">设备型号：{deviceName || '-'} · 每 5 秒自动刷新实时状态</p>
+      </section>
+
       {overviewError && (
         <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-800 dark:text-yellow-200">
           <p className="font-medium">CPE 登录/连接失败</p>
@@ -356,31 +382,6 @@ export default function DashboardPage() {
         <QuickLink href="/settings" icon={<Settings className="h-5 w-5" />} label="系统设置" description="CPE 连接、通知配置" />
       </div>
 
-      <section className="relative overflow-hidden rounded-[2rem] bg-[#102219] px-4 py-5 text-white shadow-xl shadow-emerald-950/15 sm:px-6 sm:py-7 lg:px-8">
-        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-emerald-300/15 blur-3xl" />
-        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-200/75 sm:text-xs">
-              <Gauge className="h-3.5 w-3.5" />
-              CPE / runtime summary
-            </p>
-            <h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">运行摘要</h2>
-            <p className="mt-1 max-w-xl text-xs leading-5 text-emerald-50/65 sm:text-sm">把设备、网络、信号、终端和短信同步状态收拢在一处，方便快速判断当前是否需要处理。</p>
-          </div>
-          <Link href="/device" className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/15">
-            查看设备详情
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-        <div className="relative mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
-          <SummaryTile icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="CPE 连接" value={isConnected ? '已连接' : '未连接/未知'} detail={overview?.source === 'cpe' ? '实时数据' : '数据库兜底'} href="/device" />
-          <SummaryTile icon={<Smartphone className="h-3.5 w-3.5" />} label="在线终端" value={String(overview?.connectedDevices || 0) + ' 台'} detail="点击查看在线列表" href="/device#online-devices" />
-          <SummaryTile icon={<Radio className="h-3.5 w-3.5" />} label="当前小区" value={cell.cellId || '-'} detail={(cell.networkType || overview?.networkType || '网络未知') + ' · ' + getCarrierName(deviceSnapshot?.deviceInformation?.Mccmnc)} href="/device" />
-          <SummaryTile icon={<Wifi className="h-3.5 w-3.5" />} label="信号强度" value={overview?.signalStrength ? String(overview.signalStrength) + ' dBm' : '-'} detail={sq?.label || '等待数据'} href="/device" />
-          <SummaryTile icon={<MessageSquareText className="h-3.5 w-3.5" />} label="短信同步" value={smsSyncLabel} detail={smsSyncDetail} href="/sms" />
-        </div>
-        <p className="relative mt-4 truncate text-[10px] text-emerald-100/45 sm:text-xs">设备型号：{deviceName || '-'} · 每 5 秒自动刷新实时状态</p>
-      </section>
     </div>
   );
 }
