@@ -17,9 +17,13 @@ export function formatWithUnit(bytes: number, unit: 'MB' | 'GB'): string {
   return (bytes / divisor).toFixed(2) + ' ' + unit;
 }
 
-export function formatRate(kbps: number): string {
-  if (kbps >= 1024) return (kbps / 1024).toFixed(1) + ' MB/s';
-  return kbps + ' KB/s';
+/** CPE traffic-rate fields are bytes per second; the router UI displays bits/s. */
+export function formatRate(bytesPerSecond: number): string {
+  const bitsPerSecond = Math.max(0, bytesPerSecond) * 8;
+  if (bitsPerSecond >= 1_000_000_000) return (bitsPerSecond / 1_000_000_000).toFixed(1) + ' Gbps';
+  if (bitsPerSecond >= 1_000_000) return (bitsPerSecond / 1_000_000).toFixed(1) + ' Mbps';
+  if (bitsPerSecond >= 1_000) return (bitsPerSecond / 1_000).toFixed(1) + ' Kbps';
+  return Math.round(bytesPerSecond) + ' B/s';
 }
 
 export function formatDuration(seconds: number): string {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, initializeDatabase } from '@/lib/db';
-import { getSchedulerStatus } from '@/lib/scheduler';
+import { ensureSchedulerStarted, getSchedulerStatus } from '@/lib/scheduler';
 import { getOrCreateCpeClient } from '@/lib/cpe-client';
 
 let dbInitialized = false;
@@ -17,6 +17,9 @@ export async function GET() {
       initializeDatabase();
       dbInitialized = true;
     }
+
+    // Restore an enabled scheduler after a server restart.
+    await ensureSchedulerStarted();
 
     let settingsMap: Record<string, string> = {};
     try {
@@ -40,6 +43,7 @@ export async function GET() {
     let connectionStatus = 'unknown';
     let updateState = 'unknown';
     let networkType = 'unknown';
+    let networkSnapshot: any = null;
     let source: 'cpe' | 'database' = 'database';
     let cpeError = '';
 
@@ -47,23 +51,22 @@ export async function GET() {
       const client = getOrCreateCpeClient();
       await client.ensureLogin();
 
-      const [trafficStats, onlineState, hostInfo] = await Promise.all([
+      const [trafficStats, snapshot, hostInfo] = await Promise.all([
         client.getTrafficStatistics(),
-        client.getOnlineState(),
+        client.getNetworkSnapshot(),
         client.getHostInfo(),
       ]);
+      networkSnapshot = snapshot;
 
       currentUpload = parseInt(trafficStats?.CurrentUploadRate || '0');
       currentDownload = parseInt(trafficStats?.CurrentDownloadRate || '0');
-      connectedDevices = hostInfo?.devices?.length || 0;
-      connectionStatus = onlineState?.ConnectionStatus || 'unknown';
-      updateState = onlineState?.UpdateState || onlineState?.upgState || 'unknown';
-      networkType = onlineState?.CellData?.Rat || onlineState?.cellularWanRadioAccessTechnology || 'unknown';
+      connectedDevices = hostInfo?.devices?.filter((device: any) => device.online).length || 0;
+      connectionStatus = snapshot?.connectionStatus || 'unknown';
+      const deviceState = await client.getOnlineState();
+      updateState = deviceState?.UpdateState || deviceState?.upgState || 'unknown';
+      networkType = snapshot?.networkType || 'unknown';
       source = 'cpe';
-
-      if (onlineState?.CellData) {
-        signalStrength = parseInt(onlineState.CellData.SignalStrength || '0');
-      }
+      signalStrength = snapshot?.signalStrength || 0;
     } catch (e: any) {
       cpeError = e.message || 'CPE 登录失败，请检查设备地址、网络连接和密码。';
       // Fallback to database
@@ -86,6 +89,7 @@ export async function GET() {
       connectionStatus,
       updateState,
       networkType,
+      networkSnapshot,
       source,
       cpeError,
       schedulerStatus,

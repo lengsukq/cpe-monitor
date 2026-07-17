@@ -9,9 +9,12 @@ export async function GET() {
 
     const client = getOrCreateCpeClient();
     await client.ensureLogin();
-    const stats = await client.getTrafficStatistics();
+    const [stats, monthStatistics] = await Promise.all([
+      client.getTrafficStatistics(),
+      client.getMonthStatistics(),
+    ]);
 
-    return NextResponse.json(stats);
+    return NextResponse.json({ ...stats, ...monthStatistics });
   } catch (error: any) {
     console.error('Traffic stats error:', error);
     return NextResponse.json({ error: error.message || '获取流量统计失败' }, { status: 500 });

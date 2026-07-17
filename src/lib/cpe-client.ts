@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import forge from 'node-forge';
 import { db, initializeDatabase } from './db';
 
 interface CpeSession {
@@ -13,6 +14,7 @@ interface CpeDevice {
   name: string;
   ip: string;
   mac: string;
+  online: boolean;
   uploadBytes: number;
   downloadBytes: number;
   onlineDuration: number;
@@ -26,6 +28,18 @@ interface CpeTrafficData {
   devices: CpeDevice[];
 }
 
+export interface CpeSmsMessage {
+  id: string;
+  phone: string;
+  content: string;
+  date: string;
+  status: string;
+  type: string;
+  box: string;
+  unread: boolean;
+  direction: 'inbound' | 'outbound';
+}
+
 const SESSION_TTL = 10 * 60 * 1000; // 10 minutes
 
 export class CpeClient {
@@ -33,6 +47,8 @@ export class CpeClient {
   private username: string;
   private password: string;
   private session: CpeSession | null = null;
+  private loginPromise: Promise<boolean> | null = null;
+  private requestQueue: Promise<void> = Promise.resolve();
   private lastLoginError = '';
 
   constructor(baseUrl: string, username: string, password: string) {
@@ -48,6 +64,25 @@ export class CpeClient {
 
   private generateNonce(): string {
     return crypto.randomBytes(32).toString('hex');
+  }
+
+  private async withRequestLock<T>(task: () => Promise<T>): Promise<T> {
+    const previous = this.requestQueue;
+    let release!: () => void;
+    this.requestQueue = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    try {
+      return await task();
+    } finally {
+      release();
+    }
+  }
+
+  private async relogin(): Promise<boolean> {
+    return this.withRequestLock(async () => {
+      this.session = null;
+      return this.login();
+    });
   }
 
   private decodeHtmlEntities(str: string): string {
@@ -211,7 +246,12 @@ export class CpeClient {
 
   async ensureLogin(): Promise<boolean> {
     if (this.isSessionValid()) return true;
-    const ok = await this.login();
+    // Several dashboard requests can arrive at the same time. Reuse one
+    // in-flight login so we do not invalidate competing sessions.
+    if (!this.loginPromise) {
+      this.loginPromise = this.login().finally(() => { this.loginPromise = null; });
+    }
+    const ok = await this.loginPromise;
     if (!ok) throw new Error(this.lastLoginError || 'CPE 登录失败，请检查设备地址、网络连接和密码。');
     return true;
   }
@@ -257,50 +297,55 @@ export class CpeClient {
     return match ? match[1] : null;
   }
 
-  private async apiGet(path: string): Promise<any> {
-    if (!this.isSessionValid()) {
-      const ok = await this.login();
-      if (!ok) throw new Error(this.getLastLoginError());
-    }
-
-    const resp = await fetch(`${this.baseUrl}${path}`, {
-      headers: {
-        'Cookie': `SessionID=${this.session!.sessionId}`,
-        '__RequestVerificationToken': this.session!.token,
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        '_ResponseSource': 'Broswer',
-      },
-    });
-
-    // If unauthorized, re-login once
-    if (resp.status === 401 || resp.status === 403) {
-      this.session = null;
-      const ok = await this.login();
-      if (!ok) throw new Error(this.getLastLoginError());
-
-      return this.apiGet(path); // retry
-    }
-
-    if (!resp.ok) throw new Error(`API request failed: ${resp.status}`);
-
-    const text = await resp.text();
-    try { return JSON.parse(text); } catch { return text; }
+  private extractXmlTag(xml: string, tag: string): string {
+    const safeTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = xml.match(new RegExp(`<${safeTag}>([\\s\\S]*?)</${safeTag}>`, 'i'));
+    return match ? this.decodeHtmlEntities(match[1]).trim() : '';
   }
 
-  private async apiPost(path: string, body: string, contentType = 'application/json; charset=UTF-8'): Promise<any> {
-    if (!this.isSessionValid()) {
-      const ok = await this.login();
-      if (!ok) throw new Error(this.getLastLoginError());
+  private async refreshTokenUnlocked(): Promise<void> {
+    if (!this.session) return;
+    const sessionId = this.session.sessionId;
+    const requestToken = this.session.token;
+    const response = await fetch(`${this.baseUrl}/api/webserver/token`, {
+      headers: {
+        Cookie: `SessionID=${sessionId}`,
+        '__RequestVerificationToken': requestToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        Accept: 'application/json, text/javascript, */*; q=0.01',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        _ResponseSource: 'Broswer',
+      },
+    });
+    const text = await response.text();
+    let token = '';
+    try {
+      token = JSON.parse(text)?.token || '';
+    } catch {
+      token = this.extractXmlTag(text, 'token');
     }
+    if (token && this.session?.sessionId === sessionId) {
+      this.session.token = this.decodeHtmlEntities(token).substring(32);
+    }
+  }
 
-    const resp = await fetch(`${this.baseUrl}${path}`, {
+  private rsaEncrypt(value: string): string {
+    if (!this.session) throw new Error('CPE session is not available');
+    const pem = forge.pki.publicKeyToPem({ n: this.session.rsan, e: this.session.rsae } as any);
+    const publicKey = forge.pki.publicKeyFromPem(pem);
+    const base64 = forge.util.encode64(forge.util.encodeUtf8(value));
+    return forge.util.bytesToHex(publicKey.encrypt(forge.util.encodeUtf8(base64), 'RSA-OAEP'));
+  }
+
+  private async postWithSession(path: string, body: string, contentType: string): Promise<{ status: number; text: string }> {
+    const session = this.session;
+    if (!session) throw new Error('CPE session is not available');
+    const response = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': contentType,
-        'Cookie': `SessionID=${this.session!.sessionId}`,
-        '__RequestVerificationToken': this.session!.token,
+        'Cookie': `SessionID=${session.sessionId}`,
+        '__RequestVerificationToken': session.token,
         'X-Requested-With': 'XMLHttpRequest',
         'Accept': 'application/json, text/javascript, */*; q=0.01',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -308,28 +353,173 @@ export class CpeClient {
       },
       body,
     });
+    return { status: response.status, text: await response.text() };
+  }
 
-    if (resp.status === 401 || resp.status === 403) {
-      this.session = null;
-      const ok = await this.login();
+  private async apiPostEncrypted(
+    path: string,
+    data: Record<string, string | number>,
+    encryptPhone = false,
+    retry = true,
+  ): Promise<string> {
+    const encryptedAttempt = await this.withRequestLock(async () => {
+      await this.ensureLogin();
+      await this.refreshTokenUnlocked();
+
+      const firstNonce = forge.util.bytesToHex(forge.random.getBytesSync(32));
+      const secondNonce = forge.util.bytesToHex(forge.random.getBytesSync(32));
+      const requestData: Record<string, string | number> = {
+        ...data,
+        nonce: this.rsaEncrypt(firstNonce + secondNonce),
+        hmac_len: 32,
+      };
+      if (encryptPhone && typeof requestData.phone === 'string') {
+        requestData.phone = this.rsaEncrypt(requestData.phone);
+      }
+      const requestXml = `<?xml version="1.0" encoding="UTF-8"?><request>${Object.entries(requestData)
+        .map(([key, value]) => `<${key}>${String(value)}</${key}>`)
+        .join('')}</request>`;
+      const result = await this.postWithSession(
+        path,
+        requestXml,
+        encryptPhone ? 'application/x-www-form-urlencoded; charset=UTF-8;enp' : 'application/x-www-form-urlencoded; charset=UTF-8',
+      );
+      return { result, firstNonce, secondNonce };
+    });
+
+    const { result, firstNonce, secondNonce } = encryptedAttempt;
+    if (retry && (result.status === 401 || result.status === 403)) {
+      const ok = await this.relogin();
       if (!ok) throw new Error(this.getLastLoginError());
-
-      return this.apiPost(path, body, contentType);
+      return this.apiPostEncrypted(path, data, encryptPhone, false);
+    }
+    if (result.status < 200 || result.status >= 300) {
+      throw new Error(`API request failed: ${result.status}`);
     }
 
-    if (!resp.ok) throw new Error(`API request failed: ${resp.status}`);
+    const xml = result.text;
+    if (retry && /<title>[^<]*(登录|login)/i.test(xml)) {
+      const ok = await this.relogin();
+      if (!ok) throw new Error(this.getLastLoginError());
+      return this.apiPostEncrypted(path, data, encryptPhone, false);
+    }
+    if (/<error[\s>]/i.test(xml)) return '';
 
-    const text = await resp.text();
-    try { return JSON.parse(text); } catch { return text; }
+    const encrypted = this.extractXmlTag(xml, 'pwd');
+    const hash = this.extractXmlTag(xml, 'hash');
+    const iterations = Number(this.extractXmlTag(xml, 'iter'));
+    if (!encrypted || !hash || !iterations) return xml;
+
+    const firstKey = crypto.pbkdf2Sync(
+      Buffer.from(firstNonce.slice(0, 32), 'utf8'),
+      Buffer.from(firstNonce.slice(32, 64), 'hex'),
+      iterations,
+      32,
+      'sha256'
+    );
+    const secondKey = crypto.pbkdf2Sync(
+      Buffer.from(secondNonce.slice(0, 32), 'utf8'),
+      Buffer.from(secondNonce.slice(32, 64), 'hex'),
+      iterations,
+      32,
+      'sha256'
+    );
+    const actualHash = crypto.createHmac('sha256', secondKey).update(Buffer.from(encrypted, 'hex')).digest('hex');
+    if (actualHash !== hash) throw new Error('CPE SMS response integrity check failed');
+
+    const decipher = crypto.createDecipheriv('aes-128-cbc', firstKey.subarray(0, 16), firstKey.subarray(16, 32));
+    return Buffer.concat([decipher.update(Buffer.from(encrypted, 'hex')), decipher.final()]).toString('utf8');
   }
 
-  async getDeviceInfo(): Promise<any> { return this.apiGet('/api/system/deviceinfoex'); }
-  async getDeviceInformation(): Promise<any> {
+  private async apiGet(path: string, retry = true): Promise<any> {
+    const result = await this.withRequestLock(async () => {
+      if (!this.isSessionValid()) {
+        const ok = await this.ensureLogin();
+        if (!ok) throw new Error(this.getLastLoginError());
+      }
+      const session = this.session;
+      if (!session) throw new Error('CPE session is not available');
+      const resp = await fetch(`${this.baseUrl}${path}`, {
+        headers: {
+          'Cookie': `SessionID=${session.sessionId}`,
+          '__RequestVerificationToken': session.token,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json, text/javascript, */*; q=0.01',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          '_ResponseSource': 'Broswer',
+        },
+      });
+      return { status: resp.status, text: await resp.text() };
+    });
+
+    // If unauthorized, re-login once
+    if (retry && (result.status === 401 || result.status === 403)) {
+      const ok = await this.relogin();
+      if (!ok) throw new Error(this.getLastLoginError());
+
+      return this.apiGet(path, false); // retry once after renewal
+    }
+
+    if (result.status < 200 || result.status >= 300) throw new Error(`API request failed: ${result.status}`);
+
+    if (retry && /<title>[^<]*(登录|login)/i.test(result.text)) {
+      const ok = await this.relogin();
+      if (!ok) throw new Error(this.getLastLoginError());
+      return this.apiGet(path, false);
+    }
+    try { return JSON.parse(result.text); } catch { return result.text; }
+  }
+
+  private async apiPost(path: string, body: string, contentType = 'application/json; charset=UTF-8', retry = true): Promise<any> {
+    const result = await this.withRequestLock(async () => {
+      if (!this.isSessionValid()) {
+        const ok = await this.ensureLogin();
+        if (!ok) throw new Error(this.getLastLoginError());
+      }
+      return this.postWithSession(path, body, contentType);
+    });
+
+    if (retry && (result.status === 401 || result.status === 403)) {
+      const ok = await this.relogin();
+      if (!ok) throw new Error(this.getLastLoginError());
+
+      return this.apiPost(path, body, contentType, false);
+    }
+
+    if (result.status < 200 || result.status >= 300) throw new Error(`API request failed: ${result.status}`);
+
+    try { return JSON.parse(result.text); } catch { return result.text; }
+  }
+
+  async getDeviceInfo(retry = true): Promise<any> {
+    const data = await this.apiGet('/api/system/deviceinfoex');
+    if (retry && (!data || typeof data !== 'object' || Object.keys(data).length === 0)) {
+      const ok = await this.relogin();
+      if (!ok) throw new Error(this.getLastLoginError());
+      return this.getDeviceInfo(false);
+    }
+    return data;
+  }
+  async getCellInformation(): Promise<any> { return this.getNetworkSnapshot(); }
+  async getDeviceInformation(retry = true): Promise<any> {
     const raw = await this.apiGet('/api/device/information');
-    if (typeof raw === 'object') return raw;
-    return this.parseXmlResponse(raw);
+    const data = typeof raw === 'object' ? raw : this.parseXmlResponse(raw);
+    if (retry && (!data || typeof data !== 'object' || !data.DeviceName || !data.Imei || !data.MacAddress1)) {
+      const ok = await this.relogin();
+      if (!ok) throw new Error(this.getLastLoginError());
+      return this.getDeviceInformation(false);
+    }
+    return data;
   }
-  async getOnlineState(): Promise<any> { return this.apiGet('/api/system/onlinestate?devid=all'); }
+  async getOnlineState(retry = true): Promise<any> {
+    const data = await this.apiGet('/api/system/onlinestate');
+    if (retry && (!data || typeof data !== 'object' || !data.DeviceName || !data.CurrentVersion || !data.IpAddress)) {
+      const ok = await this.relogin();
+      if (!ok) throw new Error(this.getLastLoginError());
+      return this.getOnlineState(false);
+    }
+    return data;
+  }
   async getTopology(): Promise<any> {
     const raw = await this.apiGet('/api/system/topology');
     if (typeof raw === 'object') return raw;
@@ -366,52 +556,240 @@ export class CpeClient {
     return this.parseXmlResponse(raw);
   }
 
+  async getMonthStatistics(): Promise<Record<string, string>> {
+    const raw = await this.apiGet('/api/monitoring/month_statistics');
+    return this.parseXmlResponse(raw);
+  }
+
   async getStartDate(): Promise<any> {
     const raw = await this.apiGet('/api/monitoring/start_date');
     if (typeof raw === 'object') return raw;
     return this.parseXmlResponse(raw);
   }
 
-  private parseXmlResponse(xml: string): Record<string, string> {
-    const result: Record<string, string> = {};
-    const matches = xml.matchAll(/<(\w+)>([^<]*)<\/\1>/g);
-    for (const m of matches) {
-      result[m[1]] = m[2];
+  async getMonitoringStatus(): Promise<Record<string, string>> {
+    return this.parseXmlResponse(await this.apiGet('/api/monitoring/status'));
+  }
+
+  async getCurrentPlmn(): Promise<Record<string, string>> {
+    return this.parseXmlResponse(await this.apiGet('/api/net/current-plmn'));
+  }
+
+  async getCellInfo(): Promise<Record<string, string>> {
+    return this.parseXmlResponse(await this.apiGet('/api/net/cell-info'));
+  }
+
+  async getSignalInfo(): Promise<Record<string, string>> {
+    return this.parseXmlResponse(await this.apiGet('/api/device/signal'));
+  }
+
+  private parseSmsMessages(xml: string): CpeSmsMessage[] {
+    if (!xml || /<error[\s>]/i.test(xml)) return [];
+    const messages: CpeSmsMessage[] = [];
+    const blocks = xml.matchAll(/<message>([\s\S]*?)<\/message>/gi);
+    for (const block of blocks) {
+      const item = block[1];
+      const phone = this.extractXmlTag(item, 'phone');
+      const content = this.extractXmlTag(item, 'content');
+      const date = this.extractXmlTag(item, 'date');
+      const status = this.extractXmlTag(item, 'smstat');
+      const type = this.extractXmlTag(item, 'smstype');
+      const box = this.extractXmlTag(item, 'curbox');
+      const index = this.extractXmlTag(item, 'index');
+      if (!phone && !content && !date) continue;
+      messages.push({
+        id: index || `${phone}|${date}|${content}`,
+        phone: phone || '-',
+        content,
+        date,
+        status,
+        type,
+        box,
+        unread: status === '0',
+        direction: box === '0' ? 'inbound' : 'outbound',
+      });
+    }
+    return messages;
+  }
+
+  async getSmsCount(): Promise<Record<string, string>> {
+    const raw = await this.apiGet('/api/sms/sms-count');
+    if (typeof raw === 'object') return raw;
+    return this.parseXmlResponse(raw);
+  }
+
+  async getSmsMessages(): Promise<{ messages: CpeSmsMessage[]; count: Record<string, string> }> {
+    const readSnapshot = async () => {
+      const count = await this.getSmsCount();
+      const contacts: CpeSmsMessage[] = [];
+      const pageSize = 50;
+
+      for (let page = 1; page <= 20; page += 1) {
+        const xml = await this.apiPostEncrypted('/api/sms/sms-list-contact', { pageindex: page, readcount: pageSize });
+        const pageMessages = this.parseSmsMessages(xml);
+        if (pageMessages.length === 0) break;
+        contacts.push(...pageMessages);
+        if (pageMessages.length < pageSize) break;
+      }
+
+      const phoneNumbers = [...new Set(contacts.map((message) => message.phone).filter(Boolean))];
+      const messages: CpeSmsMessage[] = [];
+      for (const phone of phoneNumbers) {
+        for (let page = 1; page <= 20; page += 1) {
+          const xml = await this.apiPostEncrypted('/api/sms/sms-list-phone', {
+            phone,
+            pageindex: page,
+            readcount: pageSize,
+          }, true);
+          const pageMessages = this.parseSmsMessages(xml);
+          if (pageMessages.length === 0) break;
+          messages.push(...pageMessages);
+          if (pageMessages.length < pageSize) break;
+        }
+      }
+
+      const source = messages.length > 0 ? messages : contacts;
+      const unique = new Map<string, CpeSmsMessage>();
+      for (const message of source) unique.set(message.id, message);
+      return {
+        messages: [...unique.values()].sort((a, b) => b.date.localeCompare(a.date)),
+        count,
+      };
+    };
+
+    let result = await readSnapshot();
+    const expectedMessages = Number(result.count.LocalInbox || 0);
+    if (expectedMessages > 0 && result.messages.length === 0) {
+      // A CPE can return a valid count while its encrypted list request is
+      // tied to a session that was invalidated by another dashboard request.
+      const ok = await this.relogin();
+      if (!ok) throw new Error(this.getLastLoginError());
+      result = await readSnapshot();
     }
     return result;
   }
 
-  async getHostInfo(): Promise<{ devices: CpeDevice[] }> {
-    const data = await this.apiGet('/api/system/HostInfo');
-    const devices: CpeDevice[] = [];
-    if (data && Array.isArray(data)) {
-      for (const host of data) {
-        devices.push({
-          name: host.HostName || 'Unknown',
-          ip: host.IPAddress || '',
-          mac: host.MACAddress || '',
-          uploadBytes: parseInt(host.UploadBytes || '0'),
-          downloadBytes: parseInt(host.DownloadBytes || '0'),
-          onlineDuration: parseInt(host.OnlineDuration || '0'),
-        });
+  async getNetworkSnapshot(retry = true): Promise<any> {
+    const [status, plmn, cellInfo, signal] = await Promise.all([
+      this.getMonitoringStatus(),
+      this.getCurrentPlmn(),
+      this.getCellInfo(),
+      this.getSignalInfo(),
+    ]);
+
+    const signalStrength = this.parseSignalValue(signal.nrrsrp || signal.rsrp || status.SignalStrength);
+    const mode = signal.mode || status.CurrentNetworkTypeEx || status.CurrentNetworkType || '';
+
+    const snapshot = {
+      status,
+      plmn,
+      cellInfo,
+      signal,
+      connectionStatus: status.ConnectionStatus || 'unknown',
+      carrier: plmn.FullName || plmn.ShortName || plmn.Numeric || '-',
+      plmnCode: plmn.Numeric || signal.plmn || '-',
+      networkType: mode === '12' || signal.bandInfo?.startsWith('N') ? '5G NR' : mode,
+      cellId: signal.cell_id || cellInfo.cellinfo || '-',
+      pci: signal.pci || '-',
+      band: signal.band || signal.bandInfo || '-',
+      nrarfcn: signal.nrearfcn || '-',
+      rsrp: signal.nrrsrp || signal.rsrp || '-',
+      rsrq: signal.nrrsrq || signal.rsrq || '-',
+      rssi: signal.nrrssi || signal.rssi || '-',
+      sinr: signal.nrsinr || signal.sinr || '-',
+      signalStrength,
+    };
+
+    if (retry && (!plmn.FullName || !signal.mode || !signal.nrrsrp)) {
+      const ok = await this.relogin();
+      if (!ok) throw new Error(this.getLastLoginError());
+      return this.getNetworkSnapshot(false);
+    }
+    return snapshot;
+  }
+
+  private parseXmlResponse(xml: unknown): Record<string, string> {
+    const result: Record<string, string> = {};
+    if (xml && typeof xml === 'object' && !Array.isArray(xml)) {
+      const object = xml as Record<string, unknown>;
+      const source = object.response && typeof object.response === 'object'
+        ? object.response as Record<string, unknown>
+        : object.data && typeof object.data === 'object'
+          ? object.data as Record<string, unknown>
+          : object;
+      for (const [key, value] of Object.entries(source)) {
+        if (value !== null && ['string', 'number', 'boolean'].includes(typeof value)) {
+          result[key] = this.decodeHtmlEntities(String(value));
+        }
       }
+      return result;
+    }
+    if (typeof xml !== 'string' || /<error[\s>]/i.test(xml)) return result;
+    const matches = xml.matchAll(/<([\w-]+)>([^<]*)<\/\1>/g);
+    for (const m of matches) {
+      result[m[1]] = this.decodeHtmlEntities(m[2]);
+    }
+    return result;
+  }
+
+  private parseSignalValue(value: unknown): number {
+    const match = String(value ?? '').match(/-?\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : 0;
+  }
+
+  private async getHostInfoRaw(retry = true): Promise<any[]> {
+    const data = await this.apiGet('/api/system/HostInfo');
+    if (retry && (!Array.isArray(data) || data.length === 0)) {
+      const ok = await this.relogin();
+      if (!ok) throw new Error(this.getLastLoginError());
+      return this.getHostInfoRaw(false);
+    }
+    return Array.isArray(data) ? data : [];
+  }
+
+  async getHostInfo(): Promise<{ devices: CpeDevice[] }> {
+    const data = await this.getHostInfoRaw();
+    const devices: CpeDevice[] = [];
+    for (const host of data) {
+      const txKBytes = parseInt(host.TxKBytes || '0', 10);
+      const rxKBytes = parseInt(host.RxKBytes || '0', 10);
+      devices.push({
+        name: host.ActualName || host.HostName || 'Unknown',
+        ip: host.IPAddress || '',
+        mac: host.MACAddress || '',
+        online: Boolean(host.Active),
+        uploadBytes: (txKBytes || parseInt(host.UploadBytes || '0', 10)) * 1024,
+        downloadBytes: (rxKBytes || parseInt(host.DownloadBytes || '0', 10)) * 1024,
+        onlineDuration: parseInt(host.AssociatedTime || host.OnlineDuration || '0', 10),
+      });
     }
     return { devices };
   }
 
   async getRawHostInfo(): Promise<any[]> {
-    const data = await this.apiGet('/api/system/HostInfo');
-    return Array.isArray(data) ? data : [];
+    return this.getHostInfoRaw();
   }
 
   async getTrafficData(): Promise<CpeTrafficData> {
     await this.ensureLogin();
-    const [onlineState, hostInfo] = await Promise.all([this.getOnlineState(), this.getHostInfo()]);
-    let signalStrength = 0;
-    if (onlineState?.CellData) signalStrength = parseInt(onlineState.CellData.SignalStrength || '0');
+    const [networkSnapshot, hostInfo, trafficStats] = await Promise.all([
+      this.getNetworkSnapshot(),
+      this.getHostInfo(),
+      this.getTrafficStatistics(),
+    ]);
+    const signalStrength = networkSnapshot.signalStrength || 0;
+    const onlineDevices = hostInfo.devices.filter((device) => device.online);
     let totalUpload = 0, totalDownload = 0;
-    for (const d of hostInfo.devices) { totalUpload += d.uploadBytes; totalDownload += d.downloadBytes; }
-    return { uploadBytes: totalUpload, downloadBytes: totalDownload, connectedDevices: hostInfo.devices.length, signalStrength, devices: hostInfo.devices };
+    for (const d of onlineDevices) { totalUpload += d.uploadBytes; totalDownload += d.downloadBytes; }
+    // Keep the history/alert counters aligned with the router's own traffic
+    // statistics. Per-device counters remain available for report rankings.
+    return {
+      uploadBytes: parseInt(trafficStats?.CurrentUpload || String(totalUpload), 10) || 0,
+      downloadBytes: parseInt(trafficStats?.CurrentDownload || String(totalDownload), 10) || 0,
+      connectedDevices: onlineDevices.length,
+      signalStrength,
+      devices: onlineDevices,
+    };
   }
 }
 
@@ -420,6 +798,10 @@ let cachedClient: CpeClient | null = null;
 
 export function getCpeClient(): CpeClient | null {
   return cachedClient;
+}
+
+export function resetCpeClient() {
+  cachedClient = null;
 }
 
 export function initCpeClient(url: string, username: string, password: string): CpeClient {
@@ -437,14 +819,15 @@ export function getOrCreateCpeClient(): CpeClient {
   } catch {}
 
   const config = db.prepare('SELECT * FROM cpe_config LIMIT 1').get() as any;
-  if (!config || !config.cpe_password_encrypted) {
+  const password = process.env.CPE_PASSWORD || config?.cpe_password_encrypted;
+  if (!password) {
     throw new Error('CPE not configured');
   }
 
   cachedClient = new CpeClient(
-    config.cpe_url || 'http://192.168.31.1',
-    config.cpe_username || 'admin',
-    config.cpe_password_encrypted
+    config?.cpe_url || process.env.CPE_DEFAULT_URL || 'http://192.168.31.1',
+    config?.cpe_username || process.env.CPE_USERNAME || 'admin',
+    password || ''
   );
   return cachedClient;
 }
