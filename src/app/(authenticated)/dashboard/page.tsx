@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Smartphone, Bell, Settings, ArrowRight, Activity, RefreshCw, Wifi, Radio, Clock3, ShieldCheck } from 'lucide-react';
+import { Smartphone, Bell, Settings, ArrowRight, Activity, RefreshCw, Wifi, Radio, Clock3, ShieldCheck, MessageSquareText, Gauge, CheckCircle2 } from 'lucide-react';
 import TrafficChart from '@/components/TrafficChart';
 import { formatRate, formatWithUnit, formatDuration, getSignalQuality } from '@/lib/format';
 import { Switch } from '@/components/ui/switch';
@@ -24,7 +24,10 @@ export default function DashboardPage() {
   const [overviewError, setOverviewError] = useState('');
   const [dataError, setDataError] = useState('');
   const [deviceSnapshot, setDeviceSnapshot] = useState<any>(null);
+  const [smsSync, setSmsSync] = useState<any>(null);
   const [schedulerSaving, setSchedulerSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
 
   async function fetchOverview() {
     try {
@@ -33,6 +36,7 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error(data.error || '获取概览失败');
       setOverview(data);
       setOverviewError(data.cpeError || '');
+      setLastRefreshAt(new Date());
     } catch (e: any) {
       console.error(e);
       setOverviewError(e.message || '无法获取实时状态，正在显示兜底数据');
@@ -81,6 +85,29 @@ export default function DashboardPage() {
     }
   }
 
+  async function fetchSmsSyncStatus() {
+    try {
+      const res = await fetch('/api/dashboard/sms/settings');
+      const data = await res.json();
+      if (res.ok) setSmsSync(data);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function refreshDashboard() {
+    setRefreshing(true);
+    await Promise.allSettled([
+      fetchOverview(),
+      fetchTrafficHistory(),
+      fetchTrafficStats(),
+      fetchStartDate(),
+      fetchDeviceSnapshot(),
+      fetchSmsSyncStatus(),
+    ]);
+    setRefreshing(false);
+  }
+
   async function updateScheduler(enabled: boolean, interval = overview?.schedulerStatus?.interval || 60) {
     setSchedulerSaving(true);
     try {
@@ -105,6 +132,7 @@ export default function DashboardPage() {
     fetchTrafficStats();
     fetchStartDate();
     fetchDeviceSnapshot();
+    fetchSmsSyncStatus();
 
     const interval = setInterval(() => {
       fetchOverview();
@@ -135,17 +163,34 @@ export default function DashboardPage() {
   const isConnected = overview?.connectionStatus === '901';
   const updateLabel = getUpdateStateLabel(overview?.updateState);
   const cell = deviceSnapshot?.cellInformation || {};
+  const deviceName = getSnapshotValue(deviceSnapshot?.deviceInformation, ['DeviceName', 'spreadname_zh', 'spreadname_en']);
+  const smsSyncLabel = smsSync?.enabled ? '每 ' + smsSync.interval + ' 分钟' : '已暂停';
+  const smsSyncDetail = smsSync?.lastError
+    ? '最近同步失败'
+    : smsSync?.lastSyncedAt
+      ? '最近同步 ' + formatLastRefresh(new Date(smsSync.lastSyncedAt))
+      : '尚未同步';
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">仪表盘</h1>
-          <p className="text-sm text-muted-foreground">复用实时速率、在线状态、升级状态和采集配置接口展示 CPE 运行概览</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/70">CPE / live console</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">仪表盘</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">把实时状态、流量、套餐和设备活动集中在一个可操作的监控台里。</p>
         </div>
-        <Badge variant={overview?.source === 'cpe' ? 'default' : 'secondary'} className="w-fit rounded-full px-3 py-1">
-          {overview?.source === 'cpe' ? '实时 CPE 数据' : '数据库兜底数据'}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-xs text-muted-foreground">
+            {lastRefreshAt ? '更新于 ' + formatLastRefresh(lastRefreshAt) : '正在同步'}
+          </div>
+          <Badge variant={overview?.source === 'cpe' ? 'default' : 'secondary'} className="rounded-full px-3 py-1">
+            {overview?.source === 'cpe' ? '实时 CPE 数据' : '数据库兜底数据'}
+          </Badge>
+          <Button size="sm" variant="outline" onClick={() => { void refreshDashboard(); }} disabled={refreshing}>
+            <RefreshCw className={refreshing ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
+            {refreshing ? '刷新中' : '刷新数据'}
+          </Button>
+        </div>
       </div>
 
       {overviewError && (
@@ -163,7 +208,7 @@ export default function DashboardPage() {
       )}
 
       <Card className="card-hover bg-gradient-to-br from-card/90 to-card/50">
-        <CardContent className="grid gap-4 pt-6 md:grid-cols-3">
+        <CardContent className="grid grid-cols-3 gap-2 p-3 sm:gap-3 sm:p-4">
           <StatusPill icon={<Wifi className="h-4 w-4" />} label="蜂窝连接" value={isConnected ? '已连接' : '未连接/未知'} tone={isConnected ? 'success' : 'muted'} />
           <StatusPill icon={<RefreshCw className="h-4 w-4" />} label="升级状态" value={updateLabel} tone={overview?.updateState === 'unknown' ? 'muted' : 'info'} />
           <StatusPill icon={<Activity className="h-4 w-4" />} label="定时采集" value={overview?.schedulerStatus?.running ? '运行中' : overview?.schedulerStatus?.enabled ? `每 ${overview.schedulerStatus.interval} 分钟` : '未启用'} tone={overview?.schedulerStatus?.running ? 'success' : 'muted'} />
@@ -310,6 +355,32 @@ export default function DashboardPage() {
         <QuickLink href="/alerts" icon={<Bell className="h-5 w-5" />} label="告警规则" description="管理流量告警阈值" />
         <QuickLink href="/settings" icon={<Settings className="h-5 w-5" />} label="系统设置" description="CPE 连接、通知配置" />
       </div>
+
+      <section className="relative overflow-hidden rounded-[2rem] bg-[#102219] px-4 py-5 text-white shadow-xl shadow-emerald-950/15 sm:px-6 sm:py-7 lg:px-8">
+        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-emerald-300/15 blur-3xl" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-200/75 sm:text-xs">
+              <Gauge className="h-3.5 w-3.5" />
+              CPE / runtime summary
+            </p>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">运行摘要</h2>
+            <p className="mt-1 max-w-xl text-xs leading-5 text-emerald-50/65 sm:text-sm">把设备、网络、信号、终端和短信同步状态收拢在一处，方便快速判断当前是否需要处理。</p>
+          </div>
+          <Link href="/device" className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/15">
+            查看设备详情
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+        <div className="relative mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
+          <SummaryTile icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="CPE 连接" value={isConnected ? '已连接' : '未连接/未知'} detail={overview?.source === 'cpe' ? '实时数据' : '数据库兜底'} href="/device" />
+          <SummaryTile icon={<Smartphone className="h-3.5 w-3.5" />} label="在线终端" value={String(overview?.connectedDevices || 0) + ' 台'} detail="点击查看在线列表" href="/device#online-devices" />
+          <SummaryTile icon={<Radio className="h-3.5 w-3.5" />} label="当前小区" value={cell.cellId || '-'} detail={(cell.networkType || overview?.networkType || '网络未知') + ' · ' + getCarrierName(deviceSnapshot?.deviceInformation?.Mccmnc)} href="/device" />
+          <SummaryTile icon={<Wifi className="h-3.5 w-3.5" />} label="信号强度" value={overview?.signalStrength ? String(overview.signalStrength) + ' dBm' : '-'} detail={sq?.label || '等待数据'} href="/device" />
+          <SummaryTile icon={<MessageSquareText className="h-3.5 w-3.5" />} label="短信同步" value={smsSyncLabel} detail={smsSyncDetail} href="/sms" />
+        </div>
+        <p className="relative mt-4 truncate text-[10px] text-emerald-100/45 sm:text-xs">设备型号：{deviceName || '-'} · 每 5 秒自动刷新实时状态</p>
+      </section>
     </div>
   );
 }
@@ -327,14 +398,35 @@ function getUpdateStateLabel(state: string | undefined) {
 function StatusPill({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: 'success' | 'info' | 'muted' }) {
   const toneClass = tone === 'success' ? 'bg-green-500/10 text-green-700 dark:text-green-300' : tone === 'info' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'bg-muted/60 text-muted-foreground';
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/40 p-4 backdrop-blur-sm">
+    <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border/60 bg-background/40 p-2.5 backdrop-blur-sm sm:gap-3 sm:rounded-2xl sm:p-4">
       <div className={`rounded-full p-2 ${toneClass}`}>{icon}</div>
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="font-medium">{value}</p>
+      <div className="min-w-0">
+        <p className="truncate text-[10px] text-muted-foreground sm:text-xs">{label}</p>
+        <p className="truncate text-xs font-medium sm:text-sm">{value}</p>
       </div>
     </div>
   );
+}
+
+function SummaryTile({ icon, label, value, detail, href }: { icon: ReactNode; label: string; value: string; detail: string; href?: string }) {
+  const content = (
+    <div className="min-w-0 rounded-2xl border border-white/10 bg-black/10 p-3 transition hover:bg-white/10 sm:p-4">
+      <p className="flex items-center gap-1.5 truncate text-[10px] text-emerald-100/60 sm:text-xs">{icon}{label}</p>
+      <p className="mt-2 truncate text-sm font-semibold sm:text-lg">{value}</p>
+      <p className="mt-1 truncate text-[10px] text-emerald-50/55 sm:text-xs">{detail}</p>
+    </div>
+  );
+
+  return href ? <Link href={href} className="block min-w-0">{content}</Link> : content;
+}
+
+function formatLastRefresh(value: Date) {
+  if (Number.isNaN(value.getTime())) return '-';
+  return value.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 function StatCard({ label, value, color, href }: { label: string; value: string; color: string; href?: string }) {
