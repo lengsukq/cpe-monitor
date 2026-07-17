@@ -46,7 +46,10 @@ export async function POST(request: Request) {
       stopScheduler();
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      status: { enabled: Boolean(enabled), interval: Number(interval || 60), running: getSchedulerStatus().running },
+    });
   } catch (error) {
     console.error('Scheduler update error:', error);
     return NextResponse.json({ error: '更新调度设置失败' }, { status: 500 });

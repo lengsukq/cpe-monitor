@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Smartphone, Bell, FileText, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Smartphone, Bell, FileText, Settings, LogOut, MessageSquareText } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navItems = [
   { href: '/dashboard', label: '仪表盘', icon: LayoutDashboard },
   { href: '/device', label: '设备', icon: Smartphone },
+  { href: '/sms', label: '短信', icon: MessageSquareText },
   { href: '/alerts', label: '告警', icon: Bell },
   { href: '/reports', label: '报告', icon: FileText },
   { href: '/settings', label: '设置', icon: Settings },

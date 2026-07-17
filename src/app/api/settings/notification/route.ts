@@ -26,14 +26,18 @@ export async function POST(request: Request) {
     if (!dbInitialized) { initializeDatabase(); dbInitialized = true; }
 
     const { type, config, enabled } = await request.json();
+    if (!type || !config || !['email', 'wechat'].includes(type)) {
+      return NextResponse.json({ error: '通知配置格式不正确' }, { status: 400 });
+    }
+    const serializedConfig = typeof config === 'string' ? config : JSON.stringify(config);
     const existing = db.prepare('SELECT * FROM notification_config WHERE type = ?').get(type) as any;
 
     if (existing) {
       db.prepare('UPDATE notification_config SET config = ?, enabled = ?, updated_at = datetime("now") WHERE id = ?')
-        .run(config, enabled !== undefined ? (enabled ? 1 : 0) : 1, existing.id);
+        .run(serializedConfig, enabled !== undefined ? (enabled ? 1 : 0) : 1, existing.id);
     } else {
       db.prepare('INSERT INTO notification_config (type, config, enabled) VALUES (?, ?, ?)')
-        .run(type, config, enabled !== undefined ? (enabled ? 1 : 0) : 1);
+        .run(type, serializedConfig, enabled !== undefined ? (enabled ? 1 : 0) : 1);
     }
 
     return NextResponse.json({ success: true });

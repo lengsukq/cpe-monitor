@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 
 export default function SettingsPage() {
   const [cpeConfig, setCpeConfig] = useState({
@@ -34,18 +35,28 @@ export default function SettingsPage() {
     confirmPassword: '',
   });
 
+  const [smsSyncConfig, setSmsSyncConfig] = useState({
+    enabled: true,
+    interval: '15',
+    running: false,
+    lastSyncedAt: null as string | null,
+    lastError: null as string | null,
+  });
+
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; latency?: string } | null>(null);
   const [updateStatus, setUpdateStatus] = useState<{ updateState?: string; message?: string; error?: string } | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [savingSmsSync, setSavingSmsSync] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   async function fetchConfigs() {
     try {
-      const [cpeRes, notifRes] = await Promise.all([
+      const [cpeRes, notifRes, smsSyncRes] = await Promise.all([
         fetch('/api/settings/cpe'),
         fetch('/api/settings/notification'),
+        fetch('/api/dashboard/sms/settings'),
       ]);
 
       const cpeData = await cpeRes.json();
@@ -64,6 +75,17 @@ export default function SettingsPage() {
         } else if (config.type === 'wechat') {
           setWechatConfig(JSON.parse(config.config));
         }
+      }
+
+      if (smsSyncRes.ok) {
+        const smsSyncData = await smsSyncRes.json();
+        setSmsSyncConfig({
+          enabled: Boolean(smsSyncData.enabled),
+          interval: String(smsSyncData.interval || 15),
+          running: Boolean(smsSyncData.running),
+          lastSyncedAt: smsSyncData.lastSyncedAt || null,
+          lastError: smsSyncData.lastError || null,
+        });
       }
     } catch (error) {
       console.error('Failed to fetch configs:', error);
@@ -166,6 +188,39 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveSmsSyncConfig() {
+    const interval = Number(smsSyncConfig.interval);
+    if (!Number.isInteger(interval) || interval < 1 || interval > 1440) {
+      setMessage({ type: 'error', text: '短信同步间隔必须是 1 到 1440 之间的整数分钟' });
+      return;
+    }
+
+    setSavingSmsSync(true);
+    try {
+      const res = await fetch('/api/dashboard/sms/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: smsSyncConfig.enabled, interval }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '保存失败');
+
+      const sync = data.sync || {};
+      setSmsSyncConfig({
+        enabled: Boolean(sync.enabled),
+        interval: String(sync.interval || interval),
+        running: Boolean(sync.running),
+        lastSyncedAt: sync.lastSyncedAt || null,
+        lastError: sync.lastError || null,
+      });
+      setMessage({ type: 'success', text: '短信自动同步设置已保存' });
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : '保存失败' });
+    } finally {
+      setSavingSmsSync(false);
+    }
+  }
+
   async function changePassword() {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setMessage({ type: 'error', text: '两次输入的密码不一致' });
@@ -240,6 +295,44 @@ export default function SettingsPage() {
               {testResult.latency && <div className="text-sm mt-1">响应时间: {testResult.latency}</div>}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* 短信自动同步 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle>短信自动同步</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">独立于流量监控，短信会持久化到本地数据库。</p>
+            </div>
+            <Switch
+              checked={smsSyncConfig.enabled}
+              disabled={savingSmsSync}
+              onCheckedChange={(enabled) => setSmsSyncConfig({ ...smsSyncConfig, enabled })}
+              aria-label="启用短信自动同步"
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="max-w-xs space-y-2">
+            <Label>同步间隔（分钟）</Label>
+            <Input
+              type="number"
+              min="1"
+              max="1440"
+              step="1"
+              value={smsSyncConfig.interval}
+              onChange={(e) => setSmsSyncConfig({ ...smsSyncConfig, interval: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">默认 15 分钟，可设置为 1–1440 分钟的整数。</p>
+          </div>
+          <div className="rounded-2xl border border-border/60 bg-background/40 p-4 text-sm text-muted-foreground">
+            <p>状态：{smsSyncConfig.enabled ? (smsSyncConfig.running ? '后台同步运行中' : '等待启动') : '已暂停'}</p>
+            <p className="mt-1">最近同步：{formatSyncTime(smsSyncConfig.lastSyncedAt)}</p>
+            {smsSyncConfig.lastError ? <p className="mt-1 text-amber-700 dark:text-amber-300">上次失败：{smsSyncConfig.lastError}</p> : null}
+          </div>
+          <Button onClick={saveSmsSyncConfig} disabled={savingSmsSync}>{savingSmsSync ? '保存中...' : '保存短信同步设置'}</Button>
         </CardContent>
       </Card>
 
@@ -341,4 +434,11 @@ function getUpdateStateLabel(state?: string) {
     unknown: '未知',
   };
   return map[state || 'unknown'] || `状态 ${state}`;
+}
+
+function formatSyncTime(value: string | null) {
+  if (!value) return '尚未同步';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }

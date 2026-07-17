@@ -1,4 +1,5 @@
 import type { WechatConfig } from '@/types';
+import type { CpeSmsMessage } from '@/lib/cpe-client';
 
 export async function sendWechatMessage(webhookUrl: string, content: string): Promise<boolean> {
   try {
@@ -61,6 +62,21 @@ export async function sendAlertWechat(config: WechatConfig, alert: {
 
 ---
 > 请及时检查设备状态`;
+
+  return sendWechatMessage(config.webhookUrl, content);
+}
+
+export async function sendSmsWechat(config: WechatConfig, sms: CpeSmsMessage) {
+  const content = `## CPE 新短信
+
+**号码**: ${sms.phone}
+
+**时间**: ${sms.date || '未知时间'}
+
+> ${sms.content.replace(/\n/g, '\n> ')}
+
+---
+> 由 CPE Monitor 自动同步；不会发送短信`;
 
   return sendWechatMessage(config.webhookUrl, content);
 }

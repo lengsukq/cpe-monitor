@@ -146,9 +146,39 @@ export function initializeDatabase() {
     )
   `);
 
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS sms_messages (
+      fingerprint TEXT PRIMARY KEY,
+      message_id TEXT,
+      phone TEXT NOT NULL,
+      content TEXT NOT NULL,
+      received_at TEXT,
+      unread INTEGER DEFAULT 0,
+      direction TEXT DEFAULT 'inbound',
+      notified INTEGER DEFAULT 0,
+      raw_json TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_sms_messages_received_at
+    ON sms_messages (received_at DESC)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_sms_messages_unread_received_at
+    ON sms_messages (unread, received_at DESC)
+  `);
+
   const stmt = database.prepare('INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)');
   stmt.run('scheduler_enabled', 'false');
   stmt.run('scheduler_interval', '60');
+  stmt.run('sms_sync_enabled', 'true');
+  stmt.run('sms_sync_interval', '15');
+  stmt.run('sms_initial_sync_completed', 'false');
+  stmt.run('sms_last_sync_at', '');
+  stmt.run('sms_last_sync_error', '');
 
   console.log('SQLite database initialized');
 }

@@ -3,21 +3,34 @@ import { render } from '@react-email/render';
 import DailyReportEmail from '@/emails/daily-report';
 import AlertNotificationEmail from '@/emails/alert-notification';
 import type { EmailConfig, DailyReport } from '@/types';
+import type { CpeSmsMessage } from '@/lib/cpe-client';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;',
+  }[character] || character));
+}
 
-export async function sendEmail(to: string | string[], subject: string, html: string) {
+function createTransporter(config?: EmailConfig) {
+  return nodemailer.createTransport({
+    host: config?.smtpHost || process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(config?.smtpPort || process.env.SMTP_PORT || 587),
+    secure: Number(config?.smtpPort || process.env.SMTP_PORT || 587) === 465,
+    auth: {
+      user: config?.smtpUser || process.env.SMTP_USER,
+      pass: config?.smtpPass || process.env.SMTP_PASS,
+    },
+  });
+}
+
+export async function sendEmail(to: string | string[], subject: string, html: string, config?: EmailConfig) {
   try {
-    const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    const info = await createTransporter(config).sendMail({
+      from: config?.from || process.env.SMTP_FROM || process.env.SMTP_USER,
       to: Array.isArray(to) ? to.join(', ') : to,
       subject,
       html,
@@ -32,17 +45,33 @@ export async function sendEmail(to: string | string[], subject: string, html: st
 
 export async function sendDailyReport(config: EmailConfig, report: DailyReport) {
   const emailHtml = await render(DailyReportEmail({ data: report }));
-  return sendEmail(config.to, `CPE 流量日报 - ${report.reportDate}`, emailHtml);
+  return sendEmail(config.to, `CPE 流量日报 - ${report.reportDate}`, emailHtml, config);
 }
 
 export async function sendAlertNotification(config: EmailConfig, alert: { ruleName: string; message: string; timestamp: string }) {
   const emailHtml = await render(AlertNotificationEmail({ data: alert }));
-  return sendEmail(config.to, `CPE 告警通知 - ${alert.ruleName}`, emailHtml);
+  return sendEmail(config.to, `CPE 告警通知 - ${alert.ruleName}`, emailHtml, config);
 }
 
-export async function testEmailConnection(): Promise<boolean> {
+export async function sendSmsNotification(config: EmailConfig, sms: CpeSmsMessage) {
+  const phone = escapeHtml(sms.phone);
+  const content = escapeHtml(sms.content).replace(/\n/g, '<br />');
+  const receivedAt = escapeHtml(sms.date || '未知时间');
+  const emailHtml = `
+    <div style="font-family:Arial,sans-serif;color:#172033;max-width:640px">
+      <p style="color:#64748b;font-size:12px;letter-spacing:.08em;text-transform:uppercase">CPE Monitor · SMS</p>
+      <h2 style="margin:0 0 18px">收到一条新短信</h2>
+      <p><strong>号码：</strong>${phone}</p>
+      <p><strong>时间：</strong>${receivedAt}</p>
+      <div style="margin-top:18px;padding:16px 18px;border-left:3px solid #16a34a;background:#f1f5f9;line-height:1.7">${content}</div>
+      <p style="margin-top:20px;color:#64748b;font-size:12px">由 CPE Monitor 自动同步；此通知不会发送短信。</p>
+    </div>`;
+  return sendEmail(config.to, `CPE 新短信 - ${sms.phone}`, emailHtml, config);
+}
+
+export async function testEmailConnection(config?: EmailConfig): Promise<boolean> {
   try {
-    await transporter.verify();
+    await createTransporter(config).verify();
     return true;
   } catch {
     return false;
