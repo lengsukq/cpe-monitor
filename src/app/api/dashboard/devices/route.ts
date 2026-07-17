@@ -9,9 +9,10 @@ export async function GET() {
 
     const client = getOrCreateCpeClient();
     await client.ensureLogin();
-    const devices = await client.getRawHostInfo();
+    const allDevices = await client.getRawHostInfo();
+    const devices = allDevices.filter((device: any) => device.Active);
 
-    return NextResponse.json({ devices });
+    return NextResponse.json({ devices, total: allDevices.length });
   } catch (error: any) {
     console.error('Devices list error:', error);
     return NextResponse.json({ error: error.message || '获取设备列表失败' }, { status: 500 });

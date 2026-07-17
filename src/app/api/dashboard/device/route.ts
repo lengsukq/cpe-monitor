@@ -10,32 +10,33 @@ export async function GET() {
     const client = getOrCreateCpeClient();
     await client.ensureLogin();
 
-    const [
-      deviceInfo,
-      onlineState,
-      deviceInformation,
-      topology,
-      devCapacity,
-      wlanDbho,
-      vendorName,
-      portalSettings,
-      iocDeviceCapacity,
-    ] = await Promise.all([
+    const safe = async <T>(task: () => Promise<T>, fallback: T): Promise<T> => {
+      try { return await task(); } catch { return fallback; }
+    };
+
+    // Identity endpoints are critical to this page. Fetch them first so a
+    // transient CPE token/session response cannot silently turn all IDs into '-'.
+    const [deviceInfo, onlineState, deviceInformation, cellInformation] = await Promise.all([
       client.getDeviceInfo(),
       client.getOnlineState(),
       client.getDeviceInformation(),
-      client.getTopology().catch(() => ({})),
-      client.getDevCapacity().catch(() => ({})),
-      client.getWlanDbho().catch(() => null),
-      client.getVendorName().catch(() => null),
-      client.getPortalSettings().catch(() => null),
-      client.getIocDeviceCapacity().catch(() => null),
+      client.getCellInformation(),
+    ]);
+
+    const [topology, devCapacity, wlanDbho, vendorName, portalSettings, iocDeviceCapacity] = await Promise.all([
+      safe(() => client.getTopology(), {}),
+      safe(() => client.getDevCapacity(), {}),
+      safe(() => client.getWlanDbho(), null),
+      safe(() => client.getVendorName(), null),
+      safe(() => client.getPortalSettings(), null),
+      safe(() => client.getIocDeviceCapacity(), null),
     ]);
 
     return NextResponse.json({
       deviceInfo,
       onlineState,
       deviceInformation,
+      cellInformation,
       topology,
       devCapacity,
       wlanDbho,
