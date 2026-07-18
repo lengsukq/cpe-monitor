@@ -1,0 +1,43 @@
+---
+description: Security rules for auth, secrets, SQL, and CPE credentials
+alwaysApply: true
+---
+
+# Security
+
+## Secrets and env
+
+- Never commit `.env`, `.env.local`, credentials, or private keys
+- Never hardcode JWT secrets, CPE passwords, SMTP passwords, or webhook tokens
+- New code must **not** introduce `|| 'default-secret'` (or similar) fallbacks — require env vars
+- Do not log passwords, tokens, cookies, or full CPE session material
+
+## Auth
+
+- Protected APIs must call `getSession()` (or a shared helper) and return `401` when missing
+- Session cookie: httpOnly `token`; do not store JWT in `localStorage`
+- Password hashing only via `src/lib/auth.ts` helpers (`bcryptjs`)
+
+## Data access
+
+```typescript
+// BAD
+db.prepare(`SELECT * FROM users WHERE username = '${username}'`).get();
+
+// GOOD
+db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+```
+
+- Always bind parameters for user-controlled values
+- Validate settings inputs (CPE URL, SMTP host/port, WeCom webhook URL) before save
+
+## CPE credentials
+
+- Read only from env and/or `system_settings` — never embed in client bundles
+- Never return raw CPE passwords in API JSON responses
+- Prefer not writing secrets into server logs or error messages
+
+## Scope discipline
+
+- Do not weaken auth “for debugging” in committed code
+- Treat `src/lib/cpe-client.ts` session state as sensitive process memory

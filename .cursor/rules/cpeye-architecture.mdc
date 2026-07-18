@@ -1,0 +1,50 @@
+---
+description: CPEye architecture facts and module boundaries (source of truth)
+alwaysApply: true
+---
+
+# CPEye Architecture
+
+## Runtime stack (authoritative)
+
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js 16 App Router, React 19 |
+| UI | shadcn/ui + Tailwind v4 (`@/components/ui/*`) |
+| DB | better-sqlite3 → `data/cpe-monitor.db` |
+| Auth | jose JWT in httpOnly cookie `token`, bcryptjs passwords |
+| Jobs | node-cron + in-process intervals (`src/lib/scheduler.ts`) |
+| CPE | `src/lib/cpe-client.ts` (SRP login, session cache) |
+
+**Not runtime truth** (docs/deps may be stale): Neon Postgres, HeroUI, Vercel serverless, active Drizzle query usage. Prefer `package.json` + `src/lib/*` over README when they conflict.
+
+## Module ownership
+
+| Concern | Own here |
+|---------|----------|
+| CPE HTTP/protocol | `src/lib/cpe-client.ts` only — do not open parallel CPE clients |
+| Collection, alerts, SMS sync, daily report cron | `src/lib/scheduler.ts` |
+| SQLite open + `initializeDatabase()` | `src/lib/db.ts` |
+| Session / password / JWT | `src/lib/auth.ts` |
+| Shared domain types | `src/types/` |
+| Email / WeCom notify | `src/lib/notifiers/*` |
+| Report aggregation | `src/lib/report-generator.ts` |
+| Display formatters | `src/lib/format.ts` |
+| HTTP API | `src/app/api/**/route.ts` |
+| Authenticated UI | `src/app/(authenticated)/**` |
+
+## Data flow
+
+```
+UI → API routes → auth + db + cpe-client
+scheduler → cpe-client + db + notifiers
+```
+
+- Prefer real-time CPE data; fall back to SQLite history when CPE is unavailable
+- Side effects (starting scheduler) must stay explicit and idempotent (`ensureSchedulerStarted`)
+
+## Product conventions
+
+- User-facing API error strings may stay **Chinese** for consistency with existing routes
+- Path alias: `@/*` → `./src/*`
+- Prefer extending existing modules over new parallel stacks

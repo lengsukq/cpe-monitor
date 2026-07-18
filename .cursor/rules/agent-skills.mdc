@@ -1,1 +1,31 @@
+---
+description: When to use CPEye project skills and subagents
+alwaysApply: true
+---
 
+# Project Skills and Agents
+
+Use project skills under `.cursor/skills/` and agents under `.cursor/agents/` when the task matches.
+
+## Skills
+
+| Skill | Use when |
+|-------|----------|
+| `clean-code-review` | Reviewing diffs/PRs, “check clean code”, post-change quality pass |
+| `cpeye-feature` | Adding metrics, alerts, settings fields, SMS, reports, scheduler behavior |
+| `api-route-authoring` | Creating or editing `src/app/api/**/route.ts` |
+
+## Subagents
+
+| Agent | Use when |
+|-------|----------|
+| `clean-code-reviewer` | Dedicated Clean Code review; use proactively after non-trivial edits |
+| `cpeye-domain` | CPE protocol, scheduler, alerts, SMS, reports domain questions or designs |
+| `security-auditor` | Auth, JWT, env secrets, SQL injection, credential handling audits |
+
+## Priority
+
+1. Respect always-applied rules (`clean-code`, `cpeye-architecture`, `security`)
+2. Load the matching skill workflow before large edits
+3. Prefer domain agent for CPE/scheduler design; security agent for auth/secret changes
+4. Do not invent Neon/HeroUI/Vercel serverless assumptions — follow architecture rule

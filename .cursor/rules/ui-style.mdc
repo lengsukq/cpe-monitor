@@ -1,1 +1,52 @@
+---
+description: UI conventions for React pages and components (shadcn + Tailwind)
+globs: src/**/*.tsx
+alwaysApply: false
+---
 
+# UI Style
+
+## Stack
+
+- shadcn/ui primitives from `@/components/ui/*`
+- Tailwind v4 semantic tokens: `bg-background`, `text-muted-foreground`, `border-border`
+- Class merge: `cn()` from the project util
+- Icons: `lucide-react`
+- Toasts: `sonner`
+- Themes: `next-themes` (do not invent a parallel theme system)
+
+## Components
+
+- Prefer **named exports** for new components
+- Put reusable pieces under `src/components/`; keep page-only UI extractable nearby
+- Build on existing `Card`, `Button`, `Badge`, `Input`, dialogs — avoid one-off CSS frameworks
+
+```tsx
+// GOOD
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+
+export function SignalCard({ className, strength }: { className?: string; strength: number }) {
+  return (
+    <Card className={cn(className)}>
+      <CardHeader>
+        <CardTitle>Signal</CardTitle>
+      </CardHeader>
+      <CardContent>{strength} dBm</CardContent>
+    </Card>
+  );
+}
+```
+
+## Pages
+
+- Client pages: keep fetch logic in named async functions; explicit loading and error state
+- Avoid growing past ~300–500 lines — split charts, tables, and forms into components
+- Format rates/bytes/duration via `src/lib/format.ts` when possible
+- Do not use `useState<any>`; type API response shapes
+
+## Accessibility and UX
+
+- Buttons and inputs need visible labels or `aria-label`
+- Destructive actions confirm when irreversible
+- Prefer existing layout patterns (`TopNav`, `PageHeader`) over custom chrome

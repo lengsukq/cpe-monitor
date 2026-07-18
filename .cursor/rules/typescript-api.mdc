@@ -1,0 +1,61 @@
+---
+description: TypeScript and API route conventions for lib and route handlers
+globs: src/app/api/**/*.ts,src/lib/**/*.ts
+alwaysApply: false
+---
+
+# TypeScript and API Routes
+
+## Route handler shape
+
+Protected routes follow this order:
+
+1. `getSession()` → `401` + `{ error: '未登录' }` if missing
+2. Ensure DB ready (`initializeDatabase()` or shared helper)
+3. Business logic in `try/catch`
+4. Success: `NextResponse.json(payload)`
+5. Failure: `NextResponse.json({ error: '…' }, { status })` + `console.error`
+
+```typescript
+// GOOD skeleton
+export async function GET() {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: '未登录' }, { status: 401 });
+  }
+
+  try {
+    initializeDatabase();
+    // typed work…
+    return NextResponse.json({ /* data */ });
+  } catch (error) {
+    console.error('overview failed', error);
+    return NextResponse.json({ error: '获取失败' }, { status: 500 });
+  }
+}
+```
+
+## Typing
+
+- Prefer interfaces in `src/types` for request/response DTOs and domain models
+- Map SQLite rows (snake_case) to camelCase at the TS boundary
+- Avoid new `as any` on query results — define a row interface instead
+- Parse `request.json()` into a typed body; validate required fields before use
+
+## SQL
+
+- Use bound parameters only (`?` placeholders)
+- Keep SQL in lib/repository helpers when a pattern repeats across routes
+- Schema changes: extend `initializeDatabase()` in `src/lib/db.ts` until Drizzle is actually used
+
+## Side effects
+
+- Scheduler start/stop must be explicit and idempotent (`ensureSchedulerStarted`)
+- Do not start background jobs from unrelated GET endpoints without need
+- CPE access only via `getOrCreateCpeClient()` from `src/lib/cpe-client.ts`
+
+## Errors
+
+- User-facing messages may stay Chinese (match existing routes)
+- Auth failures → 401; validation → 400; missing resource → 404; unexpected → 500
+- Soft CPE fallback is OK when labeled (`source: 'cpe' | 'database'`)

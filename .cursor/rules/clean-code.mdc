@@ -1,0 +1,55 @@
+---
+description: Practical Clean Code hard rules for all CPEye changes
+alwaysApply: true
+---
+
+# Clean Code
+
+## Naming
+
+- Functions/methods: verbs or verb phrases (`collectTrafficData`, `ensureLogin`)
+- Variables/types: nouns or noun phrases (`networkSnapshot`, `AlertRule`)
+- No 1–2 character names except conventional loop indices in tiny scopes
+- Prefer full words over cryptic abbreviations
+
+## Functions and structure
+
+- Keep functions small; extract when a block needs a comment to explain “why”
+- One level of abstraction per function — do not mix SQL, HTTP response shaping, and CPE protocol in one long handler forever
+- Prefer early returns over deep nesting
+- DRY: extract shared helpers instead of copy-pasting session checks or DB init across routes
+
+## Errors and control flow
+
+```typescript
+// BAD
+try {
+  await work();
+} catch {}
+
+// BAD — auth/hard failure must not look successful
+return NextResponse.json({ data: defaults }); // when session is missing
+
+// GOOD
+try {
+  await work();
+} catch (error) {
+  console.error('Failed to collect traffic', error);
+  return NextResponse.json({ error: '采集失败' }, { status: 500 });
+}
+```
+
+- Never silent `catch {}`
+- Never return HTTP 200 for missing auth or unrecoverable failures
+- Soft fallbacks (e.g. CPE down → historical DB) are OK only when intentional and documented in the response (`source`, `cpeError`)
+
+## Types and comments
+
+- New code: no new `as any` or `useState<any>` without a real interface
+- Map DB rows / API bodies to typed interfaces at the boundary
+- Comments only for non-obvious intent, trade-offs, or constraints — no narration
+
+## Size guardrails
+
+- Prefer splitting files that grow past ~300 lines of mixed concerns (page + chart + form + fetch)
+- Prefer extending existing modules over parallel “utils” dumps
