@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import PageHeader from '@/components/PageHeader';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -151,14 +152,15 @@ export default function AlertsPage() {
   const getOperatorLabel = (op: string) => operators.find((o) => o.value === op)?.label || op;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">告警规则</h1>
-        <Button onClick={openCreateModal}>新建规则</Button>
-      </div>
+    <div className="page-enter space-y-6">
+      <PageHeader
+        title="告警规则"
+        description="为流量、设备数量与信号强度设定阈值，达到条件时通过邮件或企业微信通知。"
+        actions={<Button onClick={openCreateModal}>新建规则</Button>}
+      />
 
-      <Card>
-        <CardContent className="pt-6">
+      <Card className="card-hover">
+        <CardContent className="overflow-x-auto pt-6">
           <Table>
             <TableHeader>
               <TableRow>

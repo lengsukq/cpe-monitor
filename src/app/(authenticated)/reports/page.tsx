@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -85,14 +86,15 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">每日报告</h1>
-        <Button onClick={generatePreview}>生成今日预览</Button>
-      </div>
+    <div className="page-enter space-y-6">
+      <PageHeader
+        title="每日报告"
+        description="汇总每日流量、峰值时段、网络质量与设备使用排名，便于回顾历史运行情况。"
+        actions={<Button onClick={generatePreview}>生成今日预览</Button>}
+      />
 
-      <Card>
-        <CardContent className="pt-6">
+      <Card className="card-hover">
+        <CardContent className="overflow-x-auto pt-6">
           {loading ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12" />)}
@@ -146,15 +148,15 @@ export default function ReportsPage() {
           {previewReport && (
             <div className="space-y-6">
               <div className="grid grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-muted rounded-lg">
+                <div className="text-center p-4 rounded-2xl bg-muted/70">
                   <div className="text-sm text-muted-foreground">总下载</div>
-                  <div className="text-xl font-bold text-blue-600">{formatBytes(previewReport.totalDownload)}</div>
+                  <div className="text-xl font-bold text-brand">{formatBytes(previewReport.totalDownload)}</div>
                 </div>
-                <div className="text-center p-4 bg-muted rounded-lg">
+                <div className="text-center p-4 rounded-2xl bg-muted/70">
                   <div className="text-sm text-muted-foreground">总上传</div>
-                  <div className="text-xl font-bold text-purple-600">{formatBytes(previewReport.totalUpload)}</div>
+                  <div className="text-xl font-bold text-info">{formatBytes(previewReport.totalUpload)}</div>
                 </div>
-                <div className="text-center p-4 bg-muted rounded-lg">
+                <div className="text-center p-4 rounded-2xl bg-muted/70">
                   <div className="text-sm text-muted-foreground">峰值时段</div>
                   <div className="text-xl font-bold">{previewReport.peakHour !== null ? `${previewReport.peakHour}:00` : '-'}</div>
                 </div>

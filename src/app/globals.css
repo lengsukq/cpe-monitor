@@ -46,6 +46,15 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --color-brand: var(--brand);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
 }
 
 :root {
@@ -54,8 +63,17 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.5 0.16 201);
+  --primary-foreground: oklch(0.985 0.01 201);
+  --brand: oklch(0.6 0.14 201);
+  --success: oklch(0.55 0.16 150);
+  --success-foreground: oklch(0.98 0.02 150);
+  --warning: oklch(0.74 0.16 75);
+  --warning-foreground: oklch(0.22 0.06 75);
+  --danger: oklch(0.58 0.22 25);
+  --danger-foreground: oklch(0.98 0.01 25);
+  --info: oklch(0.58 0.15 250);
+  --info-foreground: oklch(0.98 0.01 250);
   --secondary: oklch(0.96 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.96 0 0);
@@ -65,12 +83,12 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.9 0 0);
   --input: oklch(0.9 0 0);
-  --ring: oklch(0.7 0 0);
-  --chart-1: oklch(0.65 0.15 260);
-  --chart-2: oklch(0.6 0.12 160);
-  --chart-3: oklch(0.55 0.1 40);
-  --chart-4: oklch(0.5 0.08 300);
-  --chart-5: oklch(0.45 0.06 100);
+  --ring: oklch(0.62 0.1 201);
+  --chart-1: oklch(0.6 0.15 201);
+  --chart-2: oklch(0.6 0.13 175);
+  --chart-3: oklch(0.72 0.16 75);
+  --chart-4: oklch(0.62 0.16 300);
+  --chart-5: oklch(0.6 0.14 150);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -79,7 +97,7 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(0.98 0 0);
+  --background: oklch(0.985 0.005 201);
   --foreground: oklch(0.15 0 0);
 }
 
@@ -90,8 +108,17 @@
   --card-foreground: oklch(0.95 0 0);
   --popover: oklch(0.2 0 0);
   --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.9 0 0);
-  --primary-foreground: oklch(0.15 0 0);
+  --primary: oklch(0.72 0.14 201);
+  --primary-foreground: oklch(0.16 0.03 201);
+  --brand: oklch(0.72 0.14 201);
+  --success: oklch(0.72 0.16 150);
+  --success-foreground: oklch(0.16 0.04 150);
+  --warning: oklch(0.8 0.16 75);
+  --warning-foreground: oklch(0.18 0.05 75);
+  --danger: oklch(0.72 0.2 25);
+  --danger-foreground: oklch(0.16 0.03 25);
+  --info: oklch(0.74 0.14 250);
+  --info-foreground: oklch(0.16 0.03 250);
   --secondary: oklch(0.25 0 0);
   --secondary-foreground: oklch(0.95 0 0);
   --muted: oklch(0.25 0 0);
@@ -101,12 +128,12 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.55 0 0);
-  --chart-1: oklch(0.7 0.15 260);
-  --chart-2: oklch(0.65 0.12 160);
-  --chart-3: oklch(0.6 0.1 40);
-  --chart-4: oklch(0.55 0.08 300);
-  --chart-5: oklch(0.5 0.06 100);
+  --ring: oklch(0.62 0.12 201);
+  --chart-1: oklch(0.72 0.14 201);
+  --chart-2: oklch(0.7 0.13 175);
+  --chart-3: oklch(0.8 0.16 75);
+  --chart-4: oklch(0.7 0.15 300);
+  --chart-5: oklch(0.7 0.14 150);
   --sidebar: oklch(0.18 0 0);
   --sidebar-foreground: oklch(0.95 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -131,10 +158,46 @@
 
 /* Glass utility */
 .glass {
-  @apply backdrop-blur-xl bg-card/70 border border-border;
+  @apply border border-border bg-card/70 backdrop-blur-xl;
 }
 
-/* Smooth transitions globally */
+/* Shared dark hero panels (dashboard / device / sms / settings) */
+.surface-hero {
+  @apply relative overflow-hidden rounded-[2rem] border border-brand/20 bg-[#062a31] text-white shadow-xl shadow-brand/15;
+}
+
+/* Card hover feedback */
 .card-hover {
-  @apply transition-all duration-300 hover:shadow-lg hover:scale-[1.01];
+  @apply transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:ring-1 hover:ring-brand/10;
+}
+
+/* Subtle entrance for page content */
+.page-enter {
+  @apply animate-in fade-in-0 slide-in-from-bottom-2 duration-500;
+}
+
+/* Skeleton shimmer */
+.shimmer {
+  @apply relative overflow-hidden;
+}
+.shimmer::after {
+  content: "";
+  @apply absolute inset-0 -translate-x-full;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--foreground) 6%, transparent),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Focus ring helper for non-shadcn controls */
+.focus-ring {
+  @apply outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40;
 }

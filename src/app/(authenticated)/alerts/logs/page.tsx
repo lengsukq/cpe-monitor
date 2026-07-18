@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PageHeader from '@/components/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -49,11 +50,14 @@ export default function AlertLogsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">告警日志</h1>
+    <div className="page-enter space-y-6">
+      <PageHeader
+        title="告警日志"
+        description="查看历史触发记录与通知状态，便于排查规则是否按预期生效。"
+      />
 
-      <Card>
-        <CardContent className="pt-6">
+      <Card className="card-hover">
+        <CardContent className="overflow-x-auto pt-6">
           {loading ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12" />)}

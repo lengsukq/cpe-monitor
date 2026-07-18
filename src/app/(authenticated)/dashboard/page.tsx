@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import PageHeader from '@/components/PageHeader';
+import Callout from '@/components/Callout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Smartphone, Bell, Settings, ArrowRight, Activity, RefreshCw, Wifi, Radio, Clock3, ShieldCheck, MessageSquareText, Gauge, CheckCircle2 } from 'lucide-react';
 import TrafficChart from '@/components/TrafficChart';
@@ -172,37 +174,37 @@ export default function DashboardPage() {
       : '尚未同步';
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/70">CPE / live console</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">仪表盘</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">把实时状态、流量、套餐和设备活动集中在一个可操作的监控台里。</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="text-xs text-muted-foreground">
-            {lastRefreshAt ? '更新于 ' + formatLastRefresh(lastRefreshAt) : '正在同步'}
-          </div>
-          <Badge variant={overview?.source === 'cpe' ? 'default' : 'secondary'} className="rounded-full px-3 py-1">
-            {overview?.source === 'cpe' ? '实时 CPE 数据' : '数据库兜底数据'}
-          </Badge>
-          <Button size="sm" variant="outline" onClick={() => { void refreshDashboard(); }} disabled={refreshing}>
-            <RefreshCw className={refreshing ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
-            {refreshing ? '刷新中' : '刷新数据'}
-          </Button>
-        </div>
-      </div>
+    <div className="page-enter space-y-6">
+      <PageHeader
+        eyebrow="CPE / live console"
+        title="仪表盘"
+        description="把实时状态、流量、套餐和设备活动集中在一个可操作的监控台里。"
+        actions={
+          <>
+            <div className="text-xs text-muted-foreground">
+              {lastRefreshAt ? '更新于 ' + formatLastRefresh(lastRefreshAt) : '正在同步'}
+            </div>
+            <Badge variant={overview?.source === 'cpe' ? 'default' : 'secondary'} className="rounded-full px-3 py-1">
+              {overview?.source === 'cpe' ? '实时 CPE 数据' : '数据库兜底数据'}
+            </Badge>
+            <Button size="sm" variant="outline" onClick={() => { void refreshDashboard(); }} disabled={refreshing}>
+              <RefreshCw className={refreshing ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
+              {refreshing ? '刷新中' : '刷新数据'}
+            </Button>
+          </>
+        }
+      />
 
-      <section className="relative overflow-hidden rounded-[2rem] bg-[#102219] px-4 py-5 text-white shadow-xl shadow-emerald-950/15 sm:px-6 sm:py-7 lg:px-8">
-        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-emerald-300/15 blur-3xl" />
+      <section className="surface-hero px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-brand/20 blur-3xl" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-200/75 sm:text-xs">
+            <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-brand/80 sm:text-xs">
               <Gauge className="h-3.5 w-3.5" />
               CPE / runtime summary
             </p>
             <h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">运行摘要</h2>
-            <p className="mt-1 max-w-xl text-xs leading-5 text-emerald-50/65 sm:text-sm">把设备、网络、信号、终端和短信同步状态收拢在一处，方便快速判断当前是否需要处理。</p>
+            <p className="mt-1 max-w-xl text-xs leading-5 text-white/70 sm:text-sm">把设备、网络、信号、终端和短信同步状态收拢在一处，方便快速判断当前是否需要处理。</p>
           </div>
           <Link href="/device" className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/15">
             查看设备详情
@@ -216,21 +218,19 @@ export default function DashboardPage() {
           <SummaryTile icon={<Wifi className="h-3.5 w-3.5" />} label="信号强度" value={overview?.signalStrength ? String(overview.signalStrength) + ' dBm' : '-'} detail={sq?.label || '等待数据'} href="/device" />
           <SummaryTile icon={<MessageSquareText className="h-3.5 w-3.5" />} label="短信同步" value={smsSyncLabel} detail={smsSyncDetail} href="/sms" />
         </div>
-        <p className="relative mt-4 truncate text-[10px] text-emerald-100/45 sm:text-xs">设备型号：{deviceName || '-'} · 每 5 秒自动刷新实时状态</p>
+        <p className="relative mt-4 truncate text-[10px] text-white/50 sm:text-xs">设备型号：{deviceName || '-'} · 每 5 秒自动刷新实时状态</p>
       </section>
 
       {overviewError && (
-        <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-800 dark:text-yellow-200">
-          <p className="font-medium">CPE 登录/连接失败</p>
-          <p className="mt-1">{overviewError}</p>
-        </div>
+        <Callout tone="warning" title="CPE 登录/连接失败">
+          {overviewError}
+        </Callout>
       )}
 
       {dataError && !overviewError && (
-        <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-800 dark:text-yellow-200">
-          <p className="font-medium">部分实时数据不可用</p>
-          <p className="mt-1">{dataError}</p>
-        </div>
+        <Callout tone="warning" title="部分实时数据不可用">
+          {dataError}
+        </Callout>
       )}
 
       <Card className="card-hover bg-gradient-to-br from-card/90 to-card/50">
@@ -242,10 +242,10 @@ export default function DashboardPage() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
-        <Card className="card-hover overflow-hidden border-sky-500/15 bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,.16),transparent_42%),linear-gradient(135deg,hsl(var(--card)),hsl(var(--card)))]">
+        <Card className="card-hover overflow-hidden border-brand/15 bg-[radial-gradient(circle_at_top_right,color-mix(in_oklch,var(--brand),transparent_84%),transparent_42%),linear-gradient(135deg,var(--card),var(--card))]">
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
-              <CardTitle className="flex items-center gap-2"><Radio className="h-4 w-4 text-sky-500" />当前小区</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Radio className="h-4 w-4 text-brand" />当前小区</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">实时蜂窝注册信息与 CPE 身份</p>
             </div>
             <Badge variant="outline" className="rounded-full">{overview?.networkType && overview.networkType !== 'unknown' ? overview.networkType : '等待数据'}</Badge>
@@ -268,7 +268,7 @@ export default function DashboardPage() {
         <Card className="card-hover">
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
-              <CardTitle className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-amber-500" />定时监控</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-warning" />定时监控</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">采集流量、设备数和信号，并触发告警</p>
             </div>
             <Switch
@@ -295,7 +295,7 @@ export default function DashboardPage() {
               </Select>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <ShieldCheck className="h-4 w-4 text-emerald-500" />
+              <ShieldCheck className="h-4 w-4 text-success" />
               告警规则按静默期去重，通知渠道在“设置”中配置
             </div>
           </CardContent>
@@ -304,9 +304,9 @@ export default function DashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="下载速率" value={formatRate(parseInt(rate.CurrentDownloadRate || '0'))} color="text-blue-600" />
-        <StatCard label="上传速率" value={formatRate(parseInt(rate.CurrentUploadRate || '0'))} color="text-purple-600" />
-        <StatCard href="/device#online-devices" label="在线设备" value={`${overview?.connectedDevices || 0} 台`} color="text-green-600" />
+        <StatCard label="下载速率" value={formatRate(parseInt(rate.CurrentDownloadRate || '0'))} color="text-brand" />
+        <StatCard label="上传速率" value={formatRate(parseInt(rate.CurrentUploadRate || '0'))} color="text-info" />
+        <StatCard href="/device#online-devices" label="在线设备" value={`${overview?.connectedDevices || 0} 台`} color="text-success" />
         <Card className="card-hover">
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">信号强度</CardTitle></CardHeader>
           <CardContent>
@@ -397,7 +397,7 @@ function getUpdateStateLabel(state: string | undefined) {
 }
 
 function StatusPill({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: 'success' | 'info' | 'muted' }) {
-  const toneClass = tone === 'success' ? 'bg-green-500/10 text-green-700 dark:text-green-300' : tone === 'info' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'bg-muted/60 text-muted-foreground';
+  const toneClass = tone === 'success' ? 'bg-success/10 text-success' : tone === 'info' ? 'bg-info/10 text-info' : 'bg-muted/60 text-muted-foreground';
   return (
     <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border/60 bg-background/40 p-2.5 backdrop-blur-sm sm:gap-3 sm:rounded-2xl sm:p-4">
       <div className={`rounded-full p-2 ${toneClass}`}>{icon}</div>
@@ -412,9 +412,9 @@ function StatusPill({ icon, label, value, tone }: { icon: ReactNode; label: stri
 function SummaryTile({ icon, label, value, detail, href }: { icon: ReactNode; label: string; value: string; detail: string; href?: string }) {
   const content = (
     <div className="min-w-0 rounded-2xl border border-white/10 bg-black/10 p-3 transition hover:bg-white/10 sm:p-4">
-      <p className="flex items-center gap-1.5 truncate text-[10px] text-emerald-100/60 sm:text-xs">{icon}{label}</p>
+      <p className="flex items-center gap-1.5 truncate text-[10px] text-white/60 sm:text-xs">{icon}{label}</p>
       <p className="mt-2 truncate text-sm font-semibold sm:text-lg">{value}</p>
-      <p className="mt-1 truncate text-[10px] text-emerald-50/55 sm:text-xs">{detail}</p>
+      <p className="mt-1 truncate text-[10px] text-white/55 sm:text-xs">{detail}</p>
     </div>
   );
 
@@ -504,14 +504,14 @@ function DataPlanCard({ startDate, trafficStats }: { startDate: any; trafficStat
         <div>
           <p className="text-sm text-muted-foreground">已用 / 总量</p>
           <p className="text-2xl font-bold">
-            <span className={isOver ? 'text-red-600' : isWarning ? 'text-yellow-600' : 'text-blue-600'}>
+            <span className={isOver ? 'text-danger' : isWarning ? 'text-warning' : 'text-brand'}>
               {formatWithUnit(usedBytes, 'GB')}
             </span>
             <span className="text-muted-foreground text-base font-normal"> / {formatWithUnit(limitBytes, 'GB')}</span>
           </p>
         </div>
         <div className="text-right">
-          <p className={`text-2xl font-bold ${isOver ? 'text-red-600' : isWarning ? 'text-yellow-600' : 'text-green-600'}`}>
+          <p className={`text-2xl font-bold ${isOver ? 'text-danger' : isWarning ? 'text-warning' : 'text-brand'}`}>
             {percent.toFixed(1)}%
           </p>
           <p className="text-sm text-muted-foreground">剩余 {formatWithUnit(remaining, 'GB')}</p>
@@ -519,7 +519,7 @@ function DataPlanCard({ startDate, trafficStats }: { startDate: any; trafficStat
       </div>
       <div className="w-full bg-muted rounded-full h-3">
         <div
-          className={`h-3 rounded-full transition-all duration-500 ${isOver ? 'bg-red-600' : isWarning ? 'bg-yellow-500' : 'bg-blue-600'}`}
+          className={`h-3 rounded-full transition-all duration-500 ${isOver ? 'bg-danger' : isWarning ? 'bg-warning' : 'bg-brand'}`}
           style={{ width: `${Math.min(percent, 100)}%` }}
         />
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Mail, MessageSquareText, RadioTower, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
+import Callout from '@/components/Callout';
 
 interface SmsMessage {
   id: string;
@@ -104,18 +105,18 @@ export default function SmsPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[2rem] bg-[#102219] px-6 py-7 text-white shadow-2xl shadow-emerald-950/15 lg:px-9 lg:py-9">
-        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-emerald-300/15 blur-3xl" />
-        <div className="absolute bottom-0 right-1/3 h-24 w-72 rounded-full bg-lime-200/10 blur-3xl" />
+    <div className="page-enter space-y-6">
+      <section className="surface-hero px-6 py-7 shadow-2xl lg:px-9 lg:py-9">
+        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-brand/20 blur-3xl" />
+        <div className="absolute bottom-0 right-1/3 h-24 w-72 rounded-full bg-brand/10 blur-3xl" />
         <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200/80">
+            <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-brand/80">
               <RadioTower className="h-4 w-4" />
               CPE / message channel
             </div>
             <h1 className="max-w-xl text-3xl font-semibold tracking-tight lg:text-5xl">短信收件箱</h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-emerald-50/70">
+            <p className="mt-3 max-w-xl text-sm leading-6 text-white/70">
               短信会同步到本地数据库并保留完整内容。此页面只读，不会调用发送、删除或标记已读接口。
             </p>
           </div>
@@ -130,19 +131,19 @@ export default function SmsPage() {
         </div>
         <div className="relative mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
-            <p className="text-xs text-emerald-100/60">本地收件箱</p>
-            <p className="mt-1 text-2xl font-semibold">{total}<span className="ml-1 text-sm font-normal text-emerald-100/60">条</span></p>
+            <p className="text-xs text-white/60">本地收件箱</p>
+            <p className="mt-1 text-2xl font-semibold">{total}<span className="ml-1 text-sm font-normal text-white/60">条</span></p>
           </div>
-          <div className="rounded-2xl border border-emerald-200/20 bg-emerald-200/10 p-4">
-            <p className="text-xs text-emerald-100/70">未读</p>
-            <p className="mt-1 text-2xl font-semibold text-emerald-200">{unread}<span className="ml-1 text-sm font-normal text-emerald-100/60">条</span></p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
-            <p className="text-xs text-emerald-100/60">同步策略</p>
-            <p className="mt-1 flex items-center gap-2 text-sm font-medium"><ShieldCheck className="h-4 w-4 text-emerald-300" />{sync?.enabled ? `每 ${sync.interval} 分钟` : '已暂停'}</p>
+          <div className="rounded-2xl border border-brand/20 bg-brand/10 p-4">
+            <p className="text-xs text-white/70">未读</p>
+            <p className="mt-1 text-2xl font-semibold text-brand">{unread}<span className="ml-1 text-sm font-normal text-white/60">条</span></p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
-            <p className="text-xs text-emerald-100/60">最近同步</p>
+            <p className="text-xs text-white/60">同步策略</p>
+            <p className="mt-1 flex items-center gap-2 text-sm font-medium"><ShieldCheck className="h-4 w-4 text-brand" />{sync?.enabled ? `每 ${sync.interval} 分钟` : '已暂停'}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+            <p className="text-xs text-white/60">最近同步</p>
             <p className="mt-1 text-sm font-medium">{formatSyncTime(sync?.lastSyncedAt)}</p>
           </div>
         </div>
@@ -221,8 +222,8 @@ export default function SmsPage() {
           </div>
         </form>
 
-        {error ? <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-        {!error && sync?.lastError ? <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">上次自动同步失败：{sync.lastError}</div> : null}
+        {error ? <div className="mt-4"><Callout tone="danger">{error}</Callout></div> : null}
+        {!error && sync?.lastError ? <div className="mt-4"><Callout tone="warning">上次自动同步失败：{sync.lastError}</Callout></div> : null}
         {loading ? (
           <div className="flex min-h-48 items-center justify-center text-sm text-muted-foreground">正在读取短信…</div>
         ) : visibleMessages.length === 0 ? (
@@ -235,7 +236,7 @@ export default function SmsPage() {
             {visibleMessages.map((message, index) => (
               <article key={`${message.id}-${index}`} className="group grid gap-4 py-5 md:grid-cols-[minmax(150px,0.3fr)_minmax(0,1fr)_150px] md:items-start">
                 <div className="flex items-center gap-3">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${message.unread ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${message.unread ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
                     {message.direction === 'inbound' ? <Smartphone className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
                   </div>
                   <div className="min-w-0">
@@ -245,7 +246,7 @@ export default function SmsPage() {
                 </div>
                 <p className={`whitespace-pre-wrap text-sm leading-6 ${message.unread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>{message.content || '（无内容）'}</p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground md:justify-end">
-                  {message.unread ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> : null}
+                  {message.unread ? <span className="h-1.5 w-1.5 rounded-full bg-brand" /> : null}
                   <span>{message.date || '未知时间'}</span>
                 </div>
               </article>

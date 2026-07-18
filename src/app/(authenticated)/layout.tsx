@@ -31,7 +31,7 @@ export default function AuthenticatedLayout({
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted border-t-foreground" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-brand" />
       </div>
     );
   }
@@ -41,7 +41,7 @@ export default function AuthenticatedLayout({
   return (
     <div className="min-h-screen bg-background">
       <TopNav />
-      <main className="max-w-screen-2xl mx-auto px-6 pb-6 pt-24 lg:px-8 lg:pb-8 lg:pt-24">
+      <main className="mx-auto max-w-screen-2xl px-4 pb-8 pt-24 sm:px-6 lg:px-8 lg:pb-10">
         {children}
       </main>
     </div>

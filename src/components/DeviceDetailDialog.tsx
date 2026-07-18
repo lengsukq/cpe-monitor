@@ -122,11 +122,11 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-muted-foreground">上行流量</p>
-              <p className="text-sm font-medium text-purple-600">{formatBytes(device.TxKBytes, true)}</p>
+              <p className="text-sm font-medium text-info">{formatBytes(device.TxKBytes, true)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">下行流量</p>
-              <p className="text-sm font-medium text-blue-600">{formatBytes(device.RxKBytes, true)}</p>
+              <p className="text-sm font-medium text-brand">{formatBytes(device.RxKBytes, true)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">当前上行速率</p>

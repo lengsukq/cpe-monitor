@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PageHeader from '@/components/PageHeader';
+import Callout from '@/components/Callout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -107,33 +109,31 @@ export default function DevicePage() {
   const iocDeviceCapacity = deviceInfo?.iocDeviceCapacity;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">设备信息</h1>
-          <p className="text-sm text-muted-foreground">聚合设备身份、蜂窝状态、拓扑、能力和在线终端接口</p>
-        </div>
-        <Button size="sm" variant="outline" onClick={() => { void refreshDevicePage(); }}>
-          <RefreshCw className="mr-2 h-4 w-4" />刷新
-        </Button>
-      </div>
+    <div className="page-enter space-y-6">
+      <PageHeader
+        title="设备信息"
+        description="聚合设备身份、蜂窝状态、拓扑、能力和在线终端接口。"
+        actions={
+          <Button size="sm" variant="outline" onClick={() => { void refreshDevicePage(); }}>
+            <RefreshCw className="mr-2 h-4 w-4" />刷新
+          </Button>
+        }
+      />
 
       {deviceError && (
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-300">
-          {deviceError}
-        </div>
+        <Callout tone="danger">{deviceError}</Callout>
       )}
 
       {info ? (
         <>
-          <section className="relative overflow-hidden rounded-[2rem] border border-emerald-300/20 bg-[#102219] px-6 py-7 text-white shadow-xl shadow-emerald-950/15 lg:px-8">
-            <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-emerald-300/15 blur-3xl" />
-            <div className="absolute bottom-0 left-1/3 h-24 w-72 rounded-full bg-lime-200/10 blur-3xl" />
+          <section className="surface-hero px-6 py-7 lg:px-8">
+            <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-brand/20 blur-3xl" />
+            <div className="absolute bottom-0 left-1/3 h-24 w-72 rounded-full bg-brand/10 blur-3xl" />
             <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
               <div>
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200/80"><Router className="h-4 w-4" />CPE identity console</p>
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-brand/80"><Router className="h-4 w-4" />CPE identity console</p>
                 <h2 className="mt-3 text-3xl font-semibold tracking-tight">{info.spreadname_zh || info.spreadname_en || info.DeviceName}</h2>
-                <p className="mt-2 text-sm text-emerald-50/70">{getCarrier(info.Mccmnc)} · {cell?.networkType || '网络状态读取中'} · {info.DeviceName}</p>
+                <p className="mt-2 text-sm text-white/70">{getCarrier(info.Mccmnc)} · {cell?.networkType || '网络状态读取中'} · {info.DeviceName}</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[620px]">
                 <IdentityTile icon={<Phone className="h-4 w-4" />} label="SIM 手机号" value={info.Msisdn || '未返回'} />
@@ -376,10 +376,9 @@ export default function DevicePage() {
         </CardHeader>
         <CardContent>
           {devicesError && (
-            <div className="mb-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-800 dark:text-yellow-200">
-              <p className="font-medium">CPE 登录/连接失败</p>
-              <p className="mt-1">{devicesError}</p>
-            </div>
+            <Callout tone="warning" title="CPE 登录/连接失败" className="mb-4">
+              {devicesError}
+            </Callout>
           )}
           {devicesLoading ? (
             <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
@@ -489,7 +488,7 @@ function ActivityDot() {
 function IdentityTile({ icon, label, value, mono }: { icon: ReactNode; label: string; value: string | number; mono?: boolean }) {
   return (
     <div className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-4 py-3 backdrop-blur-sm">
-      <p className="flex items-center gap-2 text-xs text-emerald-100/65">{icon}{label}</p>
+      <p className="flex items-center gap-2 text-xs text-white/65">{icon}{label}</p>
       <p className={`mt-1 truncate text-sm font-semibold text-white ${mono ? 'font-mono' : ''}`}>{value}</p>
     </div>
   );

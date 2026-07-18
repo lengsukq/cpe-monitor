@@ -24,12 +24,16 @@ export default function TopNav() {
   }, [pathname]);
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 border-b border-border bg-background/70 backdrop-blur-xl">
+    <header className="fixed left-0 right-0 top-0 z-50 border-b border-border/80 bg-background/75 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       <div className="relative mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 lg:px-8">
         {/* Logo + Nav */}
         <div className="flex items-center gap-8">
-          <Link href="/dashboard" className="text-lg font-bold tracking-tight" onClick={() => setMenuOpen(false)}>
-            CPEye
+          <Link
+            href="/dashboard"
+            className="text-lg font-bold tracking-tight text-foreground transition hover:text-brand"
+            onClick={() => setMenuOpen(false)}
+          >
+            <span className="bg-gradient-to-r from-brand to-info bg-clip-text text-transparent">CPEye</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
@@ -40,10 +44,10 @@ export default function TopNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      ? 'bg-brand/10 text-brand shadow-sm ring-1 ring-brand/15'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -87,7 +91,7 @@ export default function TopNav() {
                     key={item.href}
                     href={item.href}
                     onClick={() => setMenuOpen(false)}
-                    className={isActive ? 'flex items-center gap-3 rounded-2xl bg-primary/10 px-3 py-3 text-sm font-medium text-primary transition' : 'flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground'}
+                    className={isActive ? 'flex items-center gap-3 rounded-2xl bg-brand/10 px-3 py-3 text-sm font-medium text-brand ring-1 ring-brand/15 transition' : 'flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground'}
                   >
                     <Icon className="h-4 w-4" />
                     <span>{item.label}</span>
