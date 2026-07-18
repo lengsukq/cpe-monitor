@@ -6,20 +6,13 @@ import DeviceTable from './components/DeviceTable';
 import QualityBadge from './components/QualityBadge';
 import Footer from './components/Footer';
 import type { DailyReport } from '@/types';
+import { formatBytes } from '@/lib/format';
 
 interface DailyReportEmailProps {
   data: DailyReport;
 }
 
 export default function DailyReportEmail({ data }: DailyReportEmailProps) {
-  const formatBytes = (bytes: number | null) => {
-    if (!bytes) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
-
   const topDevices = Array.isArray(data.topDevices) ? data.topDevices : [];
 
   return (

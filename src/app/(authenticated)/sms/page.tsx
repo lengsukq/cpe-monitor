@@ -1,8 +1,18 @@
 'use client';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Mail, MessageSquareText, RadioTower, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
-import Callout from '@/components/Callout';
+import { Mail, MessageSquareText, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
+import { Callout } from '@/components/Callout';
+import { PageHeader } from '@/components/PageHeader';
+import { PageShell } from '@/components/PageShell';
+import { PageOverview } from '@/components/PageOverview';
+import { EmptyState } from '@/components/EmptyState';
+import { LoadingBlock } from '@/components/LoadingBlock';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { apiFetch } from '@/lib/client-api';
+import { formatSyncTime } from '@/lib/format';
 
 interface SmsMessage {
   id: string;
@@ -41,9 +51,12 @@ export default function SmsPage() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('/api/dashboard/sms');
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || '获取短信失败');
+      const data = await apiFetch<{
+        messages?: SmsMessage[];
+        total?: number;
+        unread?: number;
+        sync?: SmsSyncStatus | null;
+      }>('/api/dashboard/sms', undefined, '获取短信失败');
       setMessages(data.messages || []);
       setTotal(data.total || 0);
       setUnread(data.unread || 0);
@@ -59,9 +72,11 @@ export default function SmsPage() {
     setSyncing(true);
     setError('');
     try {
-      const response = await fetch('/api/dashboard/sms/sync', { method: 'POST' });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || '同步短信失败');
+      const data = await apiFetch<{ sync?: SmsSyncStatus | null }>(
+        '/api/dashboard/sms/sync',
+        { method: 'POST' },
+        '同步短信失败',
+      );
       setSync(data.sync || null);
       await loadMessages();
     } catch (syncError) {
@@ -105,51 +120,52 @@ export default function SmsPage() {
   );
 
   return (
-    <div className="page-enter space-y-6">
-      <section className="surface-hero px-6 py-7 shadow-2xl lg:px-9 lg:py-9">
-        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-brand/20 blur-3xl" />
-        <div className="absolute bottom-0 right-1/3 h-24 w-72 rounded-full bg-brand/10 blur-3xl" />
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-brand/80">
-              <RadioTower className="h-4 w-4" />
-              CPE / message channel
-            </div>
-            <h1 className="max-w-xl text-3xl font-semibold tracking-tight lg:text-5xl">短信收件箱</h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-white/70">
-              短信会同步到本地数据库并保留完整内容。此页面只读，不会调用发送、删除或标记已读接口。
-            </p>
-          </div>
-          <button
-            onClick={syncAndLoadMessages}
-            disabled={loading || syncing}
-            className="inline-flex items-center justify-center gap-2 self-start rounded-full border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/15 disabled:cursor-wait disabled:opacity-60 lg:self-auto"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading || syncing ? 'animate-spin' : ''}`} />
+    <PageShell>
+      <PageHeader
+        eyebrow="CPE / message channel"
+        title="短信收件箱"
+        description="短信会同步到本地数据库并保留完整内容。此页面只读，不会调用发送、删除或标记已读接口。"
+        actions={
+          <Button size="sm" variant="outline" onClick={() => { void syncAndLoadMessages(); }} disabled={loading || syncing}>
+            <RefreshCw className={loading || syncing ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
             {syncing ? '同步中…' : '同步并刷新'}
-          </button>
-        </div>
-        <div className="relative mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
-            <p className="text-xs text-white/60">本地收件箱</p>
-            <p className="mt-1 text-2xl font-semibold">{total}<span className="ml-1 text-sm font-normal text-white/60">条</span></p>
-          </div>
-          <div className="rounded-2xl border border-brand/20 bg-brand/10 p-4">
-            <p className="text-xs text-white/70">未读</p>
-            <p className="mt-1 text-2xl font-semibold text-brand">{unread}<span className="ml-1 text-sm font-normal text-white/60">条</span></p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
-            <p className="text-xs text-white/60">同步策略</p>
-            <p className="mt-1 flex items-center gap-2 text-sm font-medium"><ShieldCheck className="h-4 w-4 text-brand" />{sync?.enabled ? `每 ${sync.interval} 分钟` : '已暂停'}</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
-            <p className="text-xs text-white/60">最近同步</p>
-            <p className="mt-1 text-sm font-medium">{formatSyncTime(sync?.lastSyncedAt)}</p>
-          </div>
-        </div>
-      </section>
+          </Button>
+        }
+      />
 
-      <section className="rounded-[1.75rem] border border-border bg-card/80 p-5 shadow-sm lg:p-7">
+      <PageOverview
+        eyebrow={<><MessageSquareText className="h-3.5 w-3.5" />CPE / message channel</>}
+        title="短信概览"
+        description="本地收件箱与自动同步状态，数据来自持久化副本。"
+        items={[
+          {
+            label: '本地收件箱',
+            value: `${total} 条`,
+            detail: '已同步到本地数据库',
+            icon: <MessageSquareText className="h-3.5 w-3.5" />,
+          },
+          {
+            label: '未读',
+            value: `${unread} 条`,
+            detail: unread > 0 ? '有待查看短信' : '全部已读',
+            icon: <Mail className="h-3.5 w-3.5" />,
+          },
+          {
+            label: '同步策略',
+            value: sync?.enabled ? `每 ${sync.interval} 分钟` : '已暂停',
+            detail: sync?.running ? '后台运行中' : '等待下一次同步',
+            icon: <ShieldCheck className="h-3.5 w-3.5" />,
+          },
+          {
+            label: '最近同步',
+            value: formatSyncTime(sync?.lastSyncedAt),
+            detail: sync?.lastError ? '最近一次同步失败' : '状态正常',
+            icon: <RefreshCw className="h-3.5 w-3.5" />,
+          },
+        ]}
+      />
+
+      <section className="rounded-3xl border border-border bg-card/80 p-5 shadow-sm lg:p-7">
         <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-tight">最近短信</h2>
@@ -165,12 +181,12 @@ export default function SmsPage() {
             <label className="sr-only" htmlFor="sms-search">搜索短信</label>
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
+              <Input
                 id="sms-search"
                 value={keywordInput}
                 onChange={(event) => setKeywordInput(event.target.value)}
                 placeholder="搜索号码、短信内容或时间"
-                className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm outline-none transition focus:border-ring focus:ring-3 focus:ring-ring/30"
+                className="h-10 rounded-xl pl-9"
               />
             </div>
             <button type="submit" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40">
@@ -225,11 +241,14 @@ export default function SmsPage() {
         {error ? <div className="mt-4"><Callout tone="danger">{error}</Callout></div> : null}
         {!error && sync?.lastError ? <div className="mt-4"><Callout tone="warning">上次自动同步失败：{sync.lastError}</Callout></div> : null}
         {loading ? (
-          <div className="flex min-h-48 items-center justify-center text-sm text-muted-foreground">正在读取短信…</div>
+          <div className="mt-5"><LoadingBlock variant="table" /></div>
         ) : visibleMessages.length === 0 ? (
-          <div className="flex min-h-48 flex-col items-center justify-center gap-3 text-center text-muted-foreground">
-            <MessageSquareText className="h-8 w-8 opacity-40" />
-            <p>{messages.length === 0 ? '暂无短信' : hasActiveQuery ? '没有符合条件的短信' : '没有短信'}</p>
+          <div className="mt-5">
+            <EmptyState
+              icon={<MessageSquareText className="h-5 w-5" />}
+              title={messages.length === 0 ? '暂无短信' : hasActiveQuery ? '没有符合条件的短信' : '没有短信'}
+              description={messages.length === 0 ? '点击「同步并刷新」从 CPE 拉取短信。' : '尝试调整筛选条件。'}
+            />
           </div>
         ) : (
           <div className="mt-5 divide-y divide-border">
@@ -246,7 +265,7 @@ export default function SmsPage() {
                 </div>
                 <p className={`whitespace-pre-wrap text-sm leading-6 ${message.unread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>{message.content || '（无内容）'}</p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground md:justify-end">
-                  {message.unread ? <span className="h-1.5 w-1.5 rounded-full bg-brand" /> : null}
+                  {message.unread ? <Badge variant="info">未读</Badge> : <Badge variant="secondary">已读</Badge>}
                   <span>{message.date || '未知时间'}</span>
                 </div>
               </article>
@@ -254,13 +273,7 @@ export default function SmsPage() {
           </div>
         )}
       </section>
-    </div>
+    </PageShell>
   );
 }
 
-function formatSyncTime(value: string | null | undefined) {
-  if (!value) return '尚未同步';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-}

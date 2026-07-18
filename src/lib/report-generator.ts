@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db, toSqliteTimestamp } from './db';
 
 export async function generateDailyReport() {
   const now = new Date();
@@ -9,9 +9,8 @@ export async function generateDailyReport() {
   const today = new Date(`${todayStr}T00:00:00+08:00`);
   const tomorrow = new Date(today);
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-  const sqliteTimestamp = (date: Date) => date.toISOString().slice(0, 19).replace('T', ' ');
-  const todayIso = sqliteTimestamp(today);
-  const tomorrowIso = sqliteTimestamp(tomorrow);
+  const todayIso = toSqliteTimestamp(today);
+  const tomorrowIso = toSqliteTimestamp(tomorrow);
 
   // Get today's traffic data
   const todayTraffic = db.prepare(
@@ -109,10 +108,3 @@ export async function generateDailyReport() {
   };
 }
 
-export function formatBytes(bytes: number | null): string {
-  if (!bytes) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}

@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
+import { useTheme } from 'next-themes';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -24,10 +26,16 @@ ChartJS.register(
   Filler,
 );
 
+const CHART_LINE_WIDTH = 2;
+const CHART_POINT_HOVER_RADIUS = 4;
+const CHART_TENSION = 0.4;
+const DOWNLOAD_FILL_ALPHA = 18;
+const UPLOAD_FILL_ALPHA = 14;
+
 interface TrafficData {
   timestamp: string;
-  uploadBytes: number | null;
-  downloadBytes: number | null;
+  uploadBytes?: number | null;
+  downloadBytes?: number | null;
 }
 
 interface TrafficChartProps {
@@ -39,6 +47,15 @@ interface ChartTooltipContext {
   parsed: { y: number | null };
 }
 
+interface ChartThemeColors {
+  download: string;
+  upload: string;
+  muted: string;
+  border: string;
+  card: string;
+  foreground: string;
+}
+
 function readCssColor(variableName: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback;
   const value = getComputedStyle(document.documentElement)
@@ -47,95 +64,127 @@ function readCssColor(variableName: string, fallback: string): string {
   return value || fallback;
 }
 
-export default function TrafficChart({ data }: TrafficChartProps) {
-  // The API stores byte counters. Keep the chart numeric and use one fixed
-  // unit so the y-axis and tooltip always describe the plotted values.
-  const toMegabytes = (bytes: number | null) =>
+function readChartTheme(): ChartThemeColors {
+  return {
+    download: readCssColor('--chart-1', 'oklch(0.6 0.15 201)'),
+    upload: readCssColor('--chart-2', 'oklch(0.6 0.13 175)'),
+    muted: readCssColor('--muted-foreground', 'oklch(0.5 0 0)'),
+    border: readCssColor('--border', 'oklch(0.9 0 0)'),
+    card: readCssColor('--card', 'oklch(1 0 0)'),
+    foreground: readCssColor('--foreground', 'oklch(0.15 0 0)'),
+  };
+}
+
+export function TrafficChart({ data }: TrafficChartProps) {
+  const { resolvedTheme } = useTheme();
+  const [themeColors, setThemeColors] = useState<ChartThemeColors>(() => readChartTheme());
+
+  useEffect(() => {
+    // Re-read CSS variables after theme class changes on <html>.
+    const frame = window.requestAnimationFrame(() => {
+      setThemeColors(readChartTheme());
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [resolvedTheme]);
+
+  const toMegabytes = (bytes: number | null | undefined) =>
     Number(((bytes || 0) / 1024 / 1024).toFixed(2));
 
-  const downloadColor = readCssColor('--chart-1', 'oklch(0.6 0.15 201)');
-  const uploadColor = readCssColor('--chart-2', 'oklch(0.6 0.13 175)');
-  const mutedColor = readCssColor('--muted-foreground', 'oklch(0.5 0 0)');
-  const borderColor = readCssColor('--border', 'oklch(0.9 0 0)');
-
-  const chartData = {
-    labels: data.map((entry) => {
-      const date = new Date(`${entry.timestamp.replace(' ', 'T')}Z`);
-      return date.toLocaleTimeString('zh-CN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Asia/Shanghai',
-      });
-    }),
-    datasets: [
-      {
-        label: '下载',
-        data: data.map((entry) => toMegabytes(entry.downloadBytes)),
-        borderColor: downloadColor,
-        backgroundColor: `color-mix(in oklch, ${downloadColor} 18%, transparent)`,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        borderWidth: 2,
-      },
-      {
-        label: '上传',
-        data: data.map((entry) => toMegabytes(entry.uploadBytes)),
-        borderColor: uploadColor,
-        backgroundColor: `color-mix(in oklch, ${uploadColor} 14%, transparent)`,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        borderWidth: 2,
-      },
-    ],
-  };
-
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: 'index' as const,
-      intersect: false,
-    },
-    plugins: {
-      legend: {
-        position: 'top' as const,
-        labels: {
-          color: mutedColor,
-          usePointStyle: true,
-          pointStyle: 'circle' as const,
-          boxWidth: 8,
-          padding: 16,
+  const chartData = useMemo(
+    () => ({
+      labels: data.map((entry) => {
+        const date = new Date(`${entry.timestamp.replace(' ', 'T')}Z`);
+        return date.toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Asia/Shanghai',
+        });
+      }),
+      datasets: [
+        {
+          label: '下载',
+          data: data.map((entry) => toMegabytes(entry.downloadBytes)),
+          borderColor: themeColors.download,
+          backgroundColor: `color-mix(in oklch, ${themeColors.download} ${DOWNLOAD_FILL_ALPHA}%, transparent)`,
+          fill: true,
+          tension: CHART_TENSION,
+          pointRadius: 0,
+          pointHoverRadius: CHART_POINT_HOVER_RADIUS,
+          borderWidth: CHART_LINE_WIDTH,
         },
+        {
+          label: '上传',
+          data: data.map((entry) => toMegabytes(entry.uploadBytes)),
+          borderColor: themeColors.upload,
+          backgroundColor: `color-mix(in oklch, ${themeColors.upload} ${UPLOAD_FILL_ALPHA}%, transparent)`,
+          fill: true,
+          tension: CHART_TENSION,
+          pointRadius: 0,
+          pointHoverRadius: CHART_POINT_HOVER_RADIUS,
+          borderWidth: CHART_LINE_WIDTH,
+        },
+      ],
+    }),
+    [data, themeColors],
+  );
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index' as const,
+        intersect: false,
       },
-      tooltip: {
-        callbacks: {
-          label: (context: ChartTooltipContext) => {
-            return `${context.dataset.label || ''}: ${context.parsed.y ?? 0} MB`;
+      plugins: {
+        legend: {
+          position: 'top' as const,
+          labels: {
+            color: themeColors.muted,
+            usePointStyle: true,
+            pointStyle: 'circle' as const,
+            boxWidth: 8,
+            padding: 16,
+          },
+        },
+        tooltip: {
+          backgroundColor: themeColors.card,
+          titleColor: themeColors.foreground,
+          bodyColor: themeColors.foreground,
+          borderColor: themeColors.border,
+          borderWidth: 1,
+          callbacks: {
+            label: (context: ChartTooltipContext) => {
+              return `${context.dataset.label || ''}: ${context.parsed.y ?? 0} MB`;
+            },
           },
         },
       },
-    },
-    scales: {
-      x: {
-        grid: { color: `color-mix(in oklch, ${borderColor} 70%, transparent)` },
-        ticks: { color: mutedColor, maxRotation: 0 },
-      },
-      y: {
-        beginAtZero: true,
-        grid: { color: `color-mix(in oklch, ${borderColor} 70%, transparent)` },
-        ticks: { color: mutedColor },
-        title: {
-          display: true,
-          text: '流量 (MB)',
-          color: mutedColor,
+      scales: {
+        x: {
+          grid: {
+            color: `color-mix(in oklch, ${themeColors.border} 70%, transparent)`,
+          },
+          ticks: { color: themeColors.muted, maxRotation: 0 },
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: `color-mix(in oklch, ${themeColors.border} 70%, transparent)`,
+          },
+          ticks: { color: themeColors.muted },
+          title: {
+            display: true,
+            text: '流量 (MB)',
+            color: themeColors.muted,
+          },
         },
       },
-    },
-  };
+    }),
+    [themeColors],
+  );
 
   return <Line data={chartData} options={options} />;
 }
+
+export default TrafficChart;

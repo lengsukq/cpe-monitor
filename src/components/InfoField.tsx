@@ -1,0 +1,45 @@
+import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
+
+interface InfoFieldProps {
+  label: string;
+  value?: ReactNode;
+  mono?: boolean;
+  size?: 'sm' | 'md';
+  className?: string;
+}
+
+function decodeDisplayValue(value: string) {
+  return value
+    .replace(/&#40;/g, '(')
+    .replace(/&#41;/g, ')')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+export default function InfoField({
+  label,
+  value,
+  mono = false,
+  size = 'md',
+  className,
+}: InfoFieldProps) {
+  let displayValue: ReactNode = '-';
+  if (value !== null && value !== undefined && value !== '') {
+    displayValue = typeof value === 'string' ? decodeDisplayValue(value) : value;
+  }
+
+  return (
+    <div className={cn('space-y-1', className)}>
+      <p className={cn('text-muted-foreground', size === 'sm' ? 'text-xs' : 'text-sm')}>{label}</p>
+      <p className={cn(
+        'break-words font-medium',
+        mono ? 'font-mono text-sm' : '',
+        size === 'sm' ? 'text-sm' : '',
+      )}>
+        {displayValue}
+      </p>
+    </div>
+  );
+}

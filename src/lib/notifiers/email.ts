@@ -73,7 +73,8 @@ export async function testEmailConnection(config?: EmailConfig): Promise<boolean
   try {
     await createTransporter(config).verify();
     return true;
-  } catch {
+  } catch (error) {
+    console.error('Email connection test failed', error);
     return false;
   }
 }

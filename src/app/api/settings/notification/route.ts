@@ -1,47 +1,40 @@
-import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { db, initializeDatabase } from '@/lib/db';
+import {
+  ApiError,
+  ensureDatabase,
+  jsonOk,
+  parseJsonBody,
+  requireSession,
+  withApiHandler,
+} from '@/lib/api-route';
+import {
+  listNotificationConfigRows,
+  upsertNotificationConfig,
+} from '@/lib/settings-store';
 
-let dbInitialized = false;
+export const GET = withApiHandler(async () => {
+  await requireSession();
+  ensureDatabase();
+  return jsonOk(listNotificationConfigRows());
+}, '获取通知配置失败');
 
-export async function GET() {
-  try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: '未登录' }, { status: 401 });
+export const POST = withApiHandler(async (request) => {
+  await requireSession();
+  ensureDatabase();
+  const body = await parseJsonBody<{
+    type?: 'email' | 'wechat';
+    config?: unknown;
+    enabled?: boolean;
+  }>(request);
 
-    if (!dbInitialized) { initializeDatabase(); dbInitialized = true; }
-
-    const configs = db.prepare('SELECT * FROM notification_config').all();
-    return NextResponse.json(configs);
-  } catch (error) {
-    return NextResponse.json({ error: '获取通知配置失败' }, { status: 500 });
+  if (!body.type || !body.config || !['email', 'wechat'].includes(body.type)) {
+    throw new ApiError('通知配置格式不正确', 400);
   }
-}
 
-export async function POST(request: Request) {
-  try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: '未登录' }, { status: 401 });
+  upsertNotificationConfig({
+    type: body.type,
+    config: body.config,
+    enabled: body.enabled,
+  });
 
-    if (!dbInitialized) { initializeDatabase(); dbInitialized = true; }
-
-    const { type, config, enabled } = await request.json();
-    if (!type || !config || !['email', 'wechat'].includes(type)) {
-      return NextResponse.json({ error: '通知配置格式不正确' }, { status: 400 });
-    }
-    const serializedConfig = typeof config === 'string' ? config : JSON.stringify(config);
-    const existing = db.prepare('SELECT * FROM notification_config WHERE type = ?').get(type) as any;
-
-    if (existing) {
-      db.prepare('UPDATE notification_config SET config = ?, enabled = ?, updated_at = datetime("now") WHERE id = ?')
-        .run(serializedConfig, enabled !== undefined ? (enabled ? 1 : 0) : 1, existing.id);
-    } else {
-      db.prepare('INSERT INTO notification_config (type, config, enabled) VALUES (?, ?, ?)')
-        .run(type, serializedConfig, enabled !== undefined ? (enabled ? 1 : 0) : 1);
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ error: '保存通知配置失败' }, { status: 500 });
-  }
-}
+  return jsonOk({ success: true });
+}, '保存通知配置失败');

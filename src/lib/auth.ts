@@ -2,7 +2,15 @@ import { SignJWT, jwtVerify } from 'jose';
 import { hash, compare } from 'bcryptjs';
 import { cookies } from 'next/headers';
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'default-secret');
+function resolveJwtSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret) {
+    throw new Error('JWT_SECRET is required. Set it in the environment (see .env.example).');
+  }
+  return new TextEncoder().encode(secret);
+}
+
+const JWT_SECRET = resolveJwtSecret();
 
 export async function hashPassword(password: string): Promise<string> {
   return hash(password, 12);

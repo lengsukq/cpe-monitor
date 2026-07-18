@@ -25,7 +25,6 @@
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
-    "framer-motion": "^12.40.0",
     "jose": "^6.2.3",
     "lucide-react": "^1.17.0",
     "next": "16.2.6",

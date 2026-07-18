@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Callout } from '@/components/Callout';
 
 export default function LoginPage() {
   const [password, setPassword] = useState('');
@@ -42,19 +43,21 @@ export default function LoginPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
       <div className="absolute -left-32 top-1/4 h-96 w-96 rounded-full bg-brand/10 blur-3xl" />
-      <div className="absolute -right-32 bottom-1/4 h-96 w-96 rounded-full bg-brand/10 blur-3xl" />
+      <div className="absolute -right-32 bottom-1/4 h-96 w-96 rounded-full bg-info/10 blur-3xl" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/40 to-transparent" />
 
-      <Card className="relative z-10 w-full max-w-md rounded-3xl border border-border bg-card/80 shadow-xl shadow-brand/5 backdrop-blur-xl">
+      <Card className="page-enter relative z-10 w-full max-w-md border border-border bg-card/80 shadow-xl shadow-brand/5 backdrop-blur-xl">
         <CardHeader className="space-y-3 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand/70">CPE monitor</p>
-          <CardTitle className="text-3xl font-bold tracking-tight">CPEye</CardTitle>
+          <CardTitle className="bg-gradient-to-r from-brand to-info bg-clip-text text-3xl font-bold tracking-tight text-transparent">
+            CPEye
+          </CardTitle>
           <CardDescription className="text-sm leading-6">
             5G CPE 流量监控 · 告警与每日报告
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="password">管理员密码</Label>
               <Input
@@ -63,19 +66,20 @@ export default function LoginPage() {
                 placeholder="请输入密码"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-10 rounded-xl"
+                className="focus-ring h-10 rounded-xl"
                 required
+                autoComplete="current-password"
               />
             </div>
 
             {error ? (
-              <div className="rounded-xl border border-danger/25 bg-danger/10 px-3 py-2 text-center text-sm text-danger">
+              <Callout tone="danger" title="登录失败">
                 {error}
-              </div>
+              </Callout>
             ) : null}
 
             <Button type="submit" className="h-10 w-full rounded-xl" disabled={loading}>
-              {loading ? '登录中...' : '登录'}
+              {loading ? '登录中…' : '登录'}
             </Button>
           </form>
         </CardContent>

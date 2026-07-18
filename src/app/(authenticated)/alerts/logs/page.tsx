@@ -1,101 +1,105 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import PageHeader from '@/components/PageHeader';
+import { PageHeader } from '@/components/PageHeader';
+import { PageShell } from '@/components/PageShell';
+import { PageOverview } from '@/components/PageOverview';
+import { Callout } from '@/components/Callout';
+import DataTableCard from '@/components/DataTableCard';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-
-interface AlertLog {
-  id: number;
-  ruleId: number | null;
-  triggeredAt: string | null;
-  message: string | null;
-  notified: boolean | null;
-  ruleName: string | null;
-}
+import { Bell, CheckCircle2, Clock3, XCircle } from 'lucide-react';
+import { TableCell, TableHead, TableRow } from '@/components/ui/table';
+import { apiFetch } from '@/lib/client-api';
+import { formatDateTimeShanghai } from '@/lib/format';
+import type { AlertLogWithRuleName } from '@/types';
 
 export default function AlertLogsPage() {
-  const [logs, setLogs] = useState<AlertLog[]>([]);
+  const [logs, setLogs] = useState<AlertLogWithRuleName[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchLogs();
+    void fetchLogs();
   }, []);
 
-  const fetchLogs = async () => {
+  async function fetchLogs() {
+    setLoading(true);
+    setError('');
     try {
-      const res = await fetch('/api/alerts/logs');
-      const data = await res.json();
-      setLogs(data);
-    } catch (error) {
-      console.error('Failed to fetch logs:', error);
+      const data = await apiFetch<AlertLogWithRuleName[]>('/api/alerts/logs', undefined, '获取告警日志失败');
+      setLogs(Array.isArray(data) ? data : []);
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : '获取告警日志失败');
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '-';
-    const date = new Date(`${dateStr.replace(' ', 'T')}Z`);
-    return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-  };
+  }
 
   return (
-    <div className="page-enter space-y-6">
+    <PageShell>
       <PageHeader
         title="告警日志"
         description="查看历史触发记录与通知状态，便于排查规则是否按预期生效。"
       />
-
-      <Card className="card-hover">
-        <CardContent className="overflow-x-auto pt-6">
-          {loading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12" />)}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>时间</TableHead>
-                  <TableHead>规则</TableHead>
-                  <TableHead>消息</TableHead>
-                  <TableHead>通知状态</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">暂无告警记录</TableCell>
-                  </TableRow>
-                ) : (
-                  logs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell>{formatDate(log.triggeredAt)}</TableCell>
-                      <TableCell>{log.ruleName || '-'}</TableCell>
-                      <TableCell>{log.message || '-'}</TableCell>
-                      <TableCell>
-                        <Badge variant={log.notified ? 'default' : 'secondary'}>
-                          {log.notified ? '已通知' : '未通知'}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+      <PageOverview
+        eyebrow={<><Bell className="h-3.5 w-3.5" />Alerts / history</>}
+        title="触发概览"
+        description="历史触发与通知送达情况，便于排查规则与渠道是否按预期工作。"
+        items={[
+          {
+            label: '记录总数',
+            value: loading ? '…' : String(logs.length),
+            detail: '历史触发次数',
+            icon: <Bell className="h-3.5 w-3.5" />,
+          },
+          {
+            label: '已通知',
+            value: loading ? '…' : String(logs.filter((log) => log.notified).length),
+            detail: '成功发出通知',
+            icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+          },
+          {
+            label: '未通知',
+            value: loading ? '…' : String(logs.filter((log) => !log.notified).length),
+            detail: '可能静默或渠道未配置',
+            icon: <XCircle className="h-3.5 w-3.5" />,
+          },
+          {
+            label: '最近触发',
+            value: loading ? '…' : (logs[0] ? formatDateTimeShanghai(logs[0].triggeredAt) : '—'),
+            detail: logs[0]?.ruleName || '暂无记录',
+            icon: <Clock3 className="h-3.5 w-3.5" />,
+          },
+        ]}
+      />
+      {error ? <Callout tone="danger">{error}</Callout> : null}
+      <DataTableCard
+        colSpan={4}
+        loading={loading}
+        isEmpty={logs.length === 0}
+        emptyMessage="暂无告警记录"
+        columns={
+          <>
+            <TableHead>时间</TableHead>
+            <TableHead>规则</TableHead>
+            <TableHead>消息</TableHead>
+            <TableHead>通知状态</TableHead>
+          </>
+        }
+      >
+        {logs.map((log) => (
+          <TableRow key={log.id}>
+            <TableCell>{formatDateTimeShanghai(log.triggeredAt)}</TableCell>
+            <TableCell>{log.ruleName || '-'}</TableCell>
+            <TableCell>{log.message || '-'}</TableCell>
+            <TableCell>
+              <Badge variant={log.notified ? 'success' : 'secondary'}>
+                {log.notified ? '已通知' : '未通知'}
+              </Badge>
+            </TableCell>
+          </TableRow>
+        ))}
+      </DataTableCard>
+    </PageShell>
   );
 }

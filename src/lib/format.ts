@@ -3,12 +3,18 @@
  * Single source of truth for all data display formatting.
  */
 
-export function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || bytes === 0 || Number.isNaN(bytes)) {
+    return '0 B';
+  }
+  const absoluteBytes = Math.abs(bytes);
+  const base = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const unitIndex = Math.min(
+    Math.floor(Math.log(absoluteBytes) / Math.log(base)),
+    sizes.length - 1,
+  );
+  return `${parseFloat((bytes / Math.pow(base, unitIndex)).toFixed(1))} ${sizes[unitIndex]}`;
 }
 
 export function formatWithUnit(bytes: number, unit: 'MB' | 'GB'): string {
@@ -44,12 +50,12 @@ export function formatBytesFromString(bytesStr: string | undefined, inKB = false
   return formatBytes(bytes);
 }
 
-export function getSignalQuality(strength: number): { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' } | null {
+export function getSignalQuality(strength: number): { label: string; variant: 'success' | 'info' | 'warning' | 'danger' } | null {
   if (strength === 0) return null;
-  if (strength >= -70) return { label: '优秀', variant: 'default' };
-  if (strength >= -85) return { label: '良好', variant: 'secondary' };
-  if (strength >= -100) return { label: '一般', variant: 'outline' };
-  return { label: '差', variant: 'destructive' };
+  if (strength >= -70) return { label: '优秀', variant: 'success' };
+  if (strength >= -85) return { label: '良好', variant: 'info' };
+  if (strength >= -100) return { label: '一般', variant: 'warning' };
+  return { label: '差', variant: 'danger' };
 }
 
 export function getCarrier(mcc: string): string {
@@ -74,4 +80,43 @@ export function getDeviceIcon(iconType: string): string {
     tv: '📺', printer: '🖨️', camera: '📷', game: '🎮',
   };
   return map[iconType?.toLowerCase()] || '🖥️';
+}
+
+export function getUpdateStateLabel(state: string | undefined): string {
+  const map: Record<string, string> = {
+    '16': '空闲',
+    '17': '检查中',
+    '32': '有可用更新',
+    unknown: '未知',
+  };
+  return map[state || 'unknown'] || `状态 ${state}`;
+}
+
+export function formatDateTimeShanghai(value: string | Date | null | undefined): string {
+  if (!value) return '-';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+}
+
+export function formatSyncTime(value: string | null | undefined): string {
+  if (!value) return '尚未同步';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+}
+
+export function formatLocalTime(value: Date | null | undefined): string {
+  if (!value || Number.isNaN(value.getTime())) return '-';
+  return value.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+export function maskSecret(value: string): string {
+  if (!value) return '—';
+  if (value.length <= 12) return '••••••••';
+  return `${value.slice(0, 18)}…${value.slice(-6)}`;
 }

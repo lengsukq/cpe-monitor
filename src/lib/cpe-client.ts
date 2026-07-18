@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import forge from 'node-forge';
 import { db, initializeDatabase } from './db';
+import { getCpeCredentials } from './settings-store';
 
 interface CpeSession {
   sessionId: string;
@@ -816,18 +817,11 @@ export function getOrCreateCpeClient(): CpeClient {
 
   try {
     initializeDatabase();
-  } catch {}
-
-  const config = db.prepare('SELECT * FROM cpe_config LIMIT 1').get() as any;
-  const password = process.env.CPE_PASSWORD || config?.cpe_password_encrypted;
-  if (!password) {
-    throw new Error('CPE not configured');
+  } catch (error) {
+    console.error('Failed to initialize database before CPE client create', error);
   }
 
-  cachedClient = new CpeClient(
-    config?.cpe_url || process.env.CPE_DEFAULT_URL || 'http://192.168.31.1',
-    config?.cpe_username || process.env.CPE_USERNAME || 'admin',
-    password || ''
-  );
+  const credentials = getCpeCredentials();
+  cachedClient = new CpeClient(credentials.url, credentials.username, credentials.password);
   return cachedClient;
 }

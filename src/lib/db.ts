@@ -33,6 +33,16 @@ export const db = new Proxy({} as any, {
   }
 });
 
+/** Idempotent schema bootstrap. Prefer this over per-route init flags. */
+export function ensureDatabaseReady() {
+  initializeDatabase();
+}
+
+export function toSqliteTimestamp(date: Date): string {
+  // SQLite datetime('now') is stored as UTC text in `YYYY-MM-DD HH:mm:ss`.
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 export function initializeDatabase() {
   const database = getDb();
 

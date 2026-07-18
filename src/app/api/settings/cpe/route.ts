@@ -1,82 +1,46 @@
-import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { db, initializeDatabase } from '@/lib/db';
+import {
+  ApiError,
+  ensureDatabase,
+  jsonOk,
+  parseJsonBody,
+  requireSession,
+  withApiHandler,
+} from '@/lib/api-route';
 import { resetCpeClient } from '@/lib/cpe-client';
+import { getPublicCpeConfig, upsertCpeConfig } from '@/lib/settings-store';
 
-let dbInitialized = false;
+export const GET = withApiHandler(async () => {
+  await requireSession();
+  ensureDatabase();
+  return jsonOk(getPublicCpeConfig());
+}, '获取CPE配置失败');
 
-export async function GET() {
+export const POST = withApiHandler(async (request) => {
+  await requireSession();
+  ensureDatabase();
+  const body = await parseJsonBody<{
+    cpeUrl?: string;
+    cpeUsername?: string;
+    cpePassword?: string;
+  }>(request);
+
+  if (!body.cpeUrl || !body.cpeUsername) {
+    throw new ApiError('请填写 CPE 地址和用户名', 400);
+  }
+
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: '未登录' }, { status: 401 });
-    }
-
-    if (!dbInitialized) {
-      initializeDatabase();
-      dbInitialized = true;
-    }
-
-    const config = db.prepare('SELECT * FROM cpe_config LIMIT 1').get() as any;
-
-    if (config) {
-      const safeConfig = { ...config };
-      delete safeConfig.cpe_password_encrypted;
-      return NextResponse.json({
-        ...safeConfig,
-        cpe_password_set: Boolean(process.env.CPE_PASSWORD || config.cpe_password_encrypted),
-        password_source: process.env.CPE_PASSWORD ? 'env' : config.cpe_password_encrypted ? 'database' : 'unset',
-      });
-    }
-
-    return NextResponse.json({
-      cpe_url: process.env.CPE_DEFAULT_URL || 'http://192.168.31.1',
-      cpe_username: process.env.CPE_USERNAME || 'admin',
-      cpe_password_set: Boolean(process.env.CPE_PASSWORD),
-      password_source: process.env.CPE_PASSWORD ? 'env' : 'unset',
+    upsertCpeConfig({
+      cpeUrl: body.cpeUrl,
+      cpeUsername: body.cpeUsername,
+      cpePassword: body.cpePassword,
     });
   } catch (error) {
-    return NextResponse.json({ error: '获取CPE配置失败' }, { status: 500 });
+    throw new ApiError(
+      error instanceof Error ? error.message : '保存CPE配置失败',
+      400,
+    );
   }
-}
 
-export async function POST(request: Request) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: '未登录' }, { status: 401 });
-    }
-
-    if (!dbInitialized) {
-      initializeDatabase();
-      dbInitialized = true;
-    }
-
-    const { cpeUrl, cpeUsername, cpePassword } = await request.json();
-    const existing = db.prepare('SELECT * FROM cpe_config LIMIT 1').get() as any;
-
-    const password = typeof cpePassword === 'string' && cpePassword.trim() ? cpePassword.trim() : null;
-
-    if (existing) {
-      if (password) {
-        db.prepare('UPDATE cpe_config SET cpe_url = ?, cpe_username = ?, cpe_password_encrypted = ?, updated_at = datetime("now") WHERE id = ?')
-          .run(cpeUrl, cpeUsername, password, existing.id);
-      } else {
-        db.prepare('UPDATE cpe_config SET cpe_url = ?, cpe_username = ?, updated_at = datetime("now") WHERE id = ?')
-          .run(cpeUrl, cpeUsername, existing.id);
-      }
-    } else {
-      if (!password && !process.env.CPE_PASSWORD) {
-        return NextResponse.json({ error: '请先设置 CPE_PASSWORD 或输入 CPE 密码' }, { status: 400 });
-      }
-      db.prepare('INSERT INTO cpe_config (cpe_url, cpe_username, cpe_password_encrypted) VALUES (?, ?, ?)')
-        .run(cpeUrl, cpeUsername, password);
-    }
-
-    resetCpeClient();
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ error: '保存CPE配置失败' }, { status: 500 });
-  }
-}
+  resetCpeClient();
+  return jsonOk({ success: true });
+}, '保存CPE配置失败');

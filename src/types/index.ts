@@ -39,6 +39,10 @@ export interface AlertLog {
   notified: boolean | null;
 }
 
+export interface AlertLogWithRuleName extends AlertLog {
+  ruleName: string | null;
+}
+
 export interface NotificationConfig {
   id: number;
   type: 'email' | 'wechat';
@@ -109,4 +113,69 @@ export interface TrafficHistoryPoint {
   upload: number;
   download: number;
   devices: number;
+}
+
+
+export interface NetworkSnapshot {
+  connectionStatus?: string;
+  networkType?: string;
+  signalStrength?: number;
+  carrier?: string;
+  band?: string;
+  cellId?: string;
+  pci?: string | number;
+  rsrp?: string | number;
+  rsrq?: string | number;
+  sinr?: string | number;
+  rssi?: string | number;
+  nrarfcn?: string | number;
+  cellInfo?: Record<string, unknown>;
+  status?: Record<string, unknown>;
+  signal?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface DashboardOverviewResponse {
+  currentUpload: number;
+  currentDownload: number;
+  connectedDevices: number;
+  signalStrength: number;
+  connectionStatus: string;
+  updateState: string;
+  networkType: string;
+  networkSnapshot: NetworkSnapshot | null;
+  source: 'cpe' | 'database';
+  cpeError: string;
+  schedulerStatus: SchedulerStatus & { running?: boolean };
+}
+
+export interface TrafficStatsResponse {
+  CurrentUploadRate?: string;
+  CurrentDownloadRate?: string;
+  CurrentUpload?: string;
+  CurrentDownload?: string;
+  TotalUpload?: string;
+  TotalDownload?: string;
+  CurrentConnectTime?: string;
+  TotalConnectTime?: string;
+  CurrentMonthDownload?: string;
+  CurrentMonthUpload?: string;
+  [key: string]: unknown;
+}
+
+export interface DataPlanConfig {
+  StartDay?: string | number;
+  trafficmaxlimit?: string | number;
+  MonthThreshold?: string | number;
+  DayThreshold?: string | number;
+  DataLimit?: string | number;
+  [key: string]: unknown;
+}
+
+export interface SmsSyncStatusView {
+  enabled: boolean;
+  interval: number;
+  running: boolean;
+  lastSyncedAt: string | null;
+  lastError: string | null;
 }

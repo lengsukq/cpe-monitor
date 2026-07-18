@@ -8,63 +8,41 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import InfoField from '@/components/InfoField';
+import {
+  formatBytesFromString,
+  formatDurationFromString,
+  getDeviceIcon,
+} from '@/lib/format';
 
 interface DeviceDetail {
-  HostName: string;
-  IPAddress: string;
-  MACAddress: string;
-  Active: boolean;
-  UploadBytes: string;
-  DownloadBytes: string;
-  OnlineDuration: string;
-  IconType: string;
-  Frequency: string;
-  InterfaceType: string;
-  AddressSource: string;
-  AssociatedTime: string;
+  HostName?: string;
+  IPAddress?: string;
+  MACAddress?: string;
+  Active?: boolean;
+  UploadBytes?: string;
+  DownloadBytes?: string;
+  OnlineDuration?: string;
+  IconType?: string;
+  Frequency?: string;
+  InterfaceType?: string;
+  AddressSource?: string;
+  AssociatedTime?: string;
   SignalStrength?: string;
   VendorClassID?: string;
   DeviceBrands?: string;
-  [key: string]: any;
+  TxKBytes?: string;
+  RxKBytes?: string;
+  UpRate?: string;
+  DownRate?: string;
+  rssi?: string | number;
+  [key: string]: unknown;
 }
 
 interface DeviceDetailDialogProps {
   device: DeviceDetail | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-function formatBytes(bytesStr: string | undefined, inKB = false) {
-  let bytes = parseInt(bytesStr || '0');
-  if (inKB) bytes = bytes * 1024;
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
-
-function formatDuration(seconds: string | undefined) {
-  const s = parseInt(seconds || '0');
-  if (s < 60) return `${s}秒`;
-  if (s < 3600) return `${Math.floor(s / 60)}分钟`;
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return `${h}小时${m}分钟`;
-}
-
-function getDeviceIcon(iconType: string) {
-  switch (iconType?.toLowerCase()) {
-    case 'computer': return '💻';
-    case 'mobile': return '📱';
-    case 'tablet': return '📱';
-    case 'router': return '📡';
-    case 'tv': return '📺';
-    case 'printer': return '🖨️';
-    case 'camera': return '📷';
-    case 'game': return '🎮';
-    default: return '🖥️';
-  }
 }
 
 export default function DeviceDetailDialog({ device, open, onOpenChange }: DeviceDetailDialogProps) {
@@ -75,7 +53,7 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span className="text-2xl">{getDeviceIcon(device.IconType)}</span>
+            <span className="text-2xl">{getDeviceIcon(device.IconType || "")}</span>
             {device.HostName || '未知设备'}
           </DialogTitle>
         </DialogHeader>
@@ -122,11 +100,11 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-muted-foreground">上行流量</p>
-              <p className="text-sm font-medium text-info">{formatBytes(device.TxKBytes, true)}</p>
+              <p className="text-sm font-medium text-info">{formatBytesFromString(device.TxKBytes, true)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">下行流量</p>
-              <p className="text-sm font-medium text-brand">{formatBytes(device.RxKBytes, true)}</p>
+              <p className="text-sm font-medium text-brand">{formatBytesFromString(device.RxKBytes, true)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">当前上行速率</p>
@@ -144,7 +122,7 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-muted-foreground">在线时长</p>
-              <p className="text-sm">{formatDuration(device.AssociatedTime)}</p>
+              <p className="text-sm">{formatDurationFromString(device.AssociatedTime)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">设备类型</p>

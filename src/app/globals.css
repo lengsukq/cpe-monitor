@@ -4,11 +4,18 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+  Radius scale (use these utilities, avoid arbitrary values):
+  - Controls / inputs: rounded-lg | rounded-xl
+  - Cards: rounded-2xl
+  - Hero / large panels: rounded-3xl (max)
+*/
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -55,6 +62,10 @@
   --color-danger-foreground: var(--danger-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  --color-surface-hero: var(--surface-hero);
+  --color-surface-hero-foreground: var(--surface-hero-foreground);
+  --color-surface-elevated: var(--surface-elevated);
+  --shadow-card: var(--shadow-card);
 }
 
 :root {
@@ -80,7 +91,7 @@
   --muted-foreground: oklch(0.5 0 0);
   --accent: oklch(0.96 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: var(--danger);
   --border: oklch(0.9 0 0);
   --input: oklch(0.9 0 0);
   --ring: oklch(0.62 0.1 201);
@@ -99,6 +110,10 @@
   --sidebar-ring: oklch(0.708 0 0);
   --background: oklch(0.985 0.005 201);
   --foreground: oklch(0.15 0 0);
+  --surface-hero: oklch(0.28 0.05 201);
+  --surface-hero-foreground: oklch(0.98 0.01 201);
+  --surface-elevated: oklch(1 0 0);
+  --shadow-card: 0 10px 30px -18px color-mix(in oklch, var(--brand) 35%, transparent);
 }
 
 .dark {
@@ -125,7 +140,7 @@
   --muted-foreground: oklch(0.6 0 0);
   --accent: oklch(0.25 0 0);
   --accent-foreground: oklch(0.95 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --destructive: var(--danger);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 12%);
   --ring: oklch(0.62 0.12 201);
@@ -142,6 +157,10 @@
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --surface-hero: oklch(0.24 0.045 201);
+  --surface-hero-foreground: oklch(0.97 0.01 201);
+  --surface-elevated: oklch(0.22 0 0);
+  --shadow-card: 0 12px 32px -20px color-mix(in oklch, black 55%, transparent);
 }
 
 @layer base {
@@ -156,24 +175,39 @@
   }
 }
 
-/* Glass utility */
+/* Frosted surfaces (nav, overlays) */
 .glass {
-  @apply border border-border bg-card/70 backdrop-blur-xl;
+  @apply border border-border/80 bg-background/75 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60;
 }
 
-/* Shared dark hero panels (dashboard / device / sms / settings) */
+/* Shared dark hero panels (dashboard / device / sms) */
 .surface-hero {
-  @apply relative overflow-hidden rounded-[2rem] border border-brand/20 bg-[#062a31] text-white shadow-xl shadow-brand/15;
+  @apply relative overflow-hidden rounded-3xl border border-brand/20 bg-surface-hero text-surface-hero-foreground shadow-xl;
+  box-shadow: var(--shadow-card), 0 0 0 1px color-mix(in oklch, var(--brand) 12%, transparent);
 }
 
-/* Card hover feedback */
+/* Card hover feedback — subtle lift + brand ring */
 .card-hover {
-  @apply transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:ring-1 hover:ring-brand/10;
+  @apply transition-[transform,box-shadow,ring-color] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg hover:ring-1 hover:ring-brand/15;
 }
 
-/* Subtle entrance for page content */
+/* Page content entrance */
 .page-enter {
-  @apply animate-in fade-in-0 slide-in-from-bottom-2 duration-500;
+  @apply animate-in fade-in-0 slide-in-from-bottom-2 duration-300 fill-mode-both;
+}
+
+/* Optional staggered children (animation-delay only) */
+.stagger-1 {
+  animation-delay: 40ms;
+}
+.stagger-2 {
+  animation-delay: 80ms;
+}
+.stagger-3 {
+  animation-delay: 120ms;
+}
+.stagger-4 {
+  animation-delay: 160ms;
 }
 
 /* Skeleton shimmer */
@@ -197,7 +231,25 @@
   }
 }
 
-/* Focus ring helper for non-shadcn controls */
+/* Focus ring for non-shadcn controls */
 .focus-ring {
   @apply outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .card-hover,
+  .shimmer::after,
+  .stagger-1,
+  .stagger-2,
+  .stagger-3,
+  .stagger-4 {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .shimmer::after {
+    display: none;
+  }
 }

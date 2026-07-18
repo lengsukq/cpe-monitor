@@ -8,20 +8,23 @@ interface PageHeaderProps {
   actions?: ReactNode;
   icon?: ReactNode;
   className?: string;
+  bordered?: boolean;
 }
 
-export default function PageHeader({
+export function PageHeader({
   eyebrow,
   title,
   description,
   actions,
   icon,
   className,
+  bordered = false,
 }: PageHeaderProps) {
   return (
     <div
       className={cn(
         'flex flex-col gap-4 md:flex-row md:items-end md:justify-between',
+        bordered && 'border-b border-border/70 pb-6',
         className,
       )}
     >
@@ -33,7 +36,7 @@ export default function PageHeader({
         ) : null}
         <h1
           className={cn(
-            'flex items-center gap-2.5 text-3xl font-bold tracking-tight',
+            'flex min-w-0 flex-wrap items-center gap-2.5 text-xl font-bold tracking-tight sm:text-2xl md:text-3xl',
             eyebrow ? 'mt-2' : '',
           )}
         >
@@ -47,8 +50,10 @@ export default function PageHeader({
         ) : null}
       </div>
       {actions ? (
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto md:justify-end">{actions}</div>
       ) : null}
     </div>
   );
 }
+
+export default PageHeader;

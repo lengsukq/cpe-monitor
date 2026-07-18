@@ -15,51 +15,48 @@ description: >-
 ## Template
 
 ```typescript
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { db, initializeDatabase } from '@/lib/db';
+import { db } from '@/lib/db';
+import {
+  ApiError,
+  ensureDatabase,
+  jsonOk,
+  parseJsonBody,
+  requireSession,
+  withApiHandler,
+} from '@/lib/api-route';
 
 interface UpdateBody {
   enabled: boolean;
-  // …
 }
 
-export async function POST(request: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: '未登录' }, { status: 401 });
+export const POST = withApiHandler(async (request) => {
+  await requireSession();
+  ensureDatabase();
+
+  const body = await parseJsonBody<UpdateBody>(request);
+  if (typeof body.enabled !== 'boolean') {
+    throw new ApiError('参数无效', 400);
   }
 
-  try {
-    initializeDatabase();
+  db.prepare('UPDATE system_settings SET value = ? WHERE key = ?').run(
+    body.enabled ? 'true' : 'false',
+    'example_key',
+  );
 
-    const body = (await request.json()) as UpdateBody;
-    if (typeof body.enabled !== 'boolean') {
-      return NextResponse.json({ error: '参数无效' }, { status: 400 });
-    }
-
-    db.prepare('UPDATE system_settings SET value = ? WHERE key = ?').run(
-      body.enabled ? 'true' : 'false',
-      'example_key',
-    );
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('settings update failed', error);
-    return NextResponse.json({ error: '更新失败' }, { status: 500 });
-  }
-}
+  return jsonOk({ success: true });
+}, '更新失败');
 ```
 
 ## Conventions
 
 | Topic | Rule |
 |-------|------|
-| Auth | Session first on protected routes; public only for login/health as designed |
-| DB | Call `initializeDatabase()` (or shared helper) before queries |
+| Auth | `requireSession()` on protected routes; public only for login/health |
+| DB | `ensureDatabase()` (or `ensureDatabaseReady()`) before queries — no per-route `dbInitialized` flags |
 | SQL | Bound parameters only |
-| Types | Body/row interfaces; avoid bare `as any` |
-| Errors | Chinese user messages OK; correct HTTP status |
+| Types | Body/row interfaces + mappers under `src/lib/mappers/*`; avoid bare `as any` |
+| Errors | Throw `ApiError` for expected failures; `withApiHandler` maps the rest to 500 |
+| Settings | Prefer `src/lib/settings-store.ts` over inline `system_settings` SQL |
 | CPE | `getOrCreateCpeClient()` only |
 | Scheduler | Explicit `ensureSchedulerStarted` / config updates — no hidden global side effects |
 
@@ -69,6 +66,7 @@ export async function POST(request: NextRequest) {
 - `400` validation
 - `404` missing resource
 - `500` unexpected server error
+- `502` upstream/CPE failure when appropriate
 
 ## Soft fallbacks
 
@@ -77,6 +75,7 @@ When CPE is optional for a read endpoint:
 - Try CPE; on failure load SQLite history
 - Include `source` and optional `cpeError` in the payload
 - Still return `401` if session is missing
+- Hard unexpected errors must not return 200 zero-values
 
 ## After writing
 

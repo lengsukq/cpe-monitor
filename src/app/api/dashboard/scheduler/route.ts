@@ -1,57 +1,50 @@
-import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { db, initializeDatabase } from '@/lib/db';
+import {
+  ApiError,
+  ensureDatabase,
+  jsonOk,
+  parseJsonBody,
+  requireSession,
+  withApiHandler,
+} from '@/lib/api-route';
 import { startScheduler, stopScheduler, getSchedulerStatus } from '@/lib/scheduler';
+import { getSettingsMap, setSetting } from '@/lib/settings-store';
 
-let dbInitialized = false;
+export const GET = withApiHandler(async () => {
+  await requireSession();
+  ensureDatabase();
+  const settingsMap = getSettingsMap();
+  return jsonOk({
+    enabled: settingsMap.scheduler_enabled === 'true',
+    interval: parseInt(settingsMap.scheduler_interval || '60', 10),
+    running: getSchedulerStatus().running,
+  });
+}, '获取调度状态失败');
 
-export async function GET() {
-  try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: '未登录' }, { status: 401 });
+export const POST = withApiHandler(async (request) => {
+  await requireSession();
+  ensureDatabase();
+  const body = await parseJsonBody<{ enabled?: boolean; interval?: number }>(request);
+  if (typeof body.enabled !== 'boolean') {
+    throw new ApiError('参数无效', 400);
+  }
 
-    if (!dbInitialized) { initializeDatabase(); dbInitialized = true; }
+  setSetting('scheduler_enabled', String(body.enabled));
+  if (body.interval) {
+    setSetting('scheduler_interval', String(body.interval));
+  }
 
-    const settings = db.prepare('SELECT * FROM system_settings').all() as any[];
-    const settingsMap = Object.fromEntries(settings.map(s => [s.key, s.value]));
+  if (body.enabled) {
+    await startScheduler();
+  } else {
+    stopScheduler();
+  }
 
-    return NextResponse.json({
-      enabled: settingsMap['scheduler_enabled'] === 'true',
-      interval: parseInt(settingsMap['scheduler_interval'] || '60'),
+  return jsonOk({
+    success: true,
+    status: {
+      enabled: Boolean(body.enabled),
+      interval: Number(body.interval || 60),
       running: getSchedulerStatus().running,
-    });
-  } catch (error) {
-    return NextResponse.json({ error: '获取调度状态失败' }, { status: 500 });
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: '未登录' }, { status: 401 });
-
-    if (!dbInitialized) { initializeDatabase(); dbInitialized = true; }
-
-    const { enabled, interval } = await request.json();
-
-    db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)').run('scheduler_enabled', String(enabled));
-
-    if (interval) {
-      db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)').run('scheduler_interval', String(interval));
-    }
-
-    if (enabled) {
-      await startScheduler();
-    } else {
-      stopScheduler();
-    }
-
-    return NextResponse.json({
-      success: true,
-      status: { enabled: Boolean(enabled), interval: Number(interval || 60), running: getSchedulerStatus().running },
-    });
-  } catch (error) {
-    console.error('Scheduler update error:', error);
-    return NextResponse.json({ error: '更新调度设置失败' }, { status: 500 });
-  }
-}
+    },
+  });
+}, '更新调度设置失败');

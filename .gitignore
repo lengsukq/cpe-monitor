@@ -24,6 +24,17 @@
 .DS_Store
 *.pem
 
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# package managers (project uses npm + package-lock.json)
+.yarnrc.yml
+yarn.lock
+pnpm-lock.yaml
+
 # debug
 npm-debug.log*
 yarn-debug.log*

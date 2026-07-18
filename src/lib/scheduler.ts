@@ -2,9 +2,16 @@ import cron, { ScheduledTask } from 'node-cron';
 import crypto from 'crypto';
 import { db, initializeDatabase } from './db';
 import { getOrCreateCpeClient } from './cpe-client';
-import { generateDailyReport, formatBytes } from './report-generator';
+import { generateDailyReport } from './report-generator';
+import { formatBytes } from './format';
 import { sendAlertNotification, sendDailyReport, sendSmsNotification } from './notifiers/email';
 import { sendAlertWechat, sendDailyReportWechat, sendSmsWechat } from './notifiers/wechat';
+import {
+  getSettingsMap,
+  readNotificationConfig,
+  setSetting,
+} from './settings-store';
+import type { AlertRuleRow } from './mappers/alert-rule';
 
 export const SMS_SYNC_MIN_INTERVAL = 1;
 export const SMS_SYNC_MAX_INTERVAL = 1440;
@@ -31,24 +38,15 @@ let dailyTask: ScheduledTask | null = null;
 let smsSyncTask: ReturnType<typeof setInterval> | null = null;
 let smsSyncPromise: Promise<SmsSyncResult> | null = null;
 
-function getSettingsMap(): Record<string, string> {
-  const settings = db.prepare('SELECT * FROM system_settings').all() as any[];
-  return Object.fromEntries(settings.map((setting) => [setting.key, setting.value]));
-}
-
 function getSmsSyncInterval(value: string | undefined): number {
   const interval = Number(value || 15);
   if (!Number.isInteger(interval)) return 15;
   return Math.min(SMS_SYNC_MAX_INTERVAL, Math.max(SMS_SYNC_MIN_INTERVAL, interval));
 }
 
-function writeSystemSetting(key: string, value: string) {
-  db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)').run(key, value);
-}
-
 function updateSmsSyncMetadata(lastSyncedAt: string | null, lastError: string | null) {
-  if (lastSyncedAt !== null) writeSystemSetting('sms_last_sync_at', lastSyncedAt);
-  if (lastError !== null) writeSystemSetting('sms_last_sync_error', lastError);
+  if (lastSyncedAt !== null) setSetting('sms_last_sync_at', lastSyncedAt);
+  if (lastError !== null) setSetting('sms_last_sync_error', lastError);
 }
 
 export function getSmsSyncStatus(): SmsSyncStatus {
@@ -172,12 +170,6 @@ async function runScheduledSmsSync() {
   }
 }
 
-function readNotificationConfig(type: 'email' | 'wechat') {
-  const row = db.prepare('SELECT * FROM notification_config WHERE type = ? LIMIT 1').get(type) as any;
-  if (!row || !row.enabled) return null;
-  try { return JSON.parse(row.config); } catch { return null; }
-}
-
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : '短信同步失败';
 }
@@ -204,8 +196,8 @@ async function performSmsSync(): Promise<SmsSyncResult> {
     // dedicated flag also handles the case where the first successful sync is empty.
     const settings = getSettingsMap();
     const firstSync = settings.sms_initial_sync_completed !== 'true' && existingCount === 0;
-    const emailConfig = readNotificationConfig('email') as any;
-    const wechatConfig = readNotificationConfig('wechat') as any;
+    const emailConfig = readNotificationConfig('email');
+    const wechatConfig = readNotificationConfig('wechat');
     let inserted = 0;
     let updated = 0;
     let notificationsSent = 0;
@@ -254,7 +246,7 @@ async function performSmsSync(): Promise<SmsSyncResult> {
     }
 
     const syncedAt = new Date().toISOString();
-    writeSystemSetting('sms_initial_sync_completed', 'true');
+    setSetting('sms_initial_sync_completed', 'true');
     updateSmsSyncMetadata(syncedAt, '');
     console.log(`SMS sync completed: ${messages.length} messages${firstSync ? ' (initial snapshot)' : ''}`);
     return { fetched: messages.length, inserted, updated, notificationsSent, firstSync, syncedAt };
@@ -266,7 +258,7 @@ async function performSmsSync(): Promise<SmsSyncResult> {
 
 async function collectTrafficData() {
   try {
-    const cpeConfigResult = db.prepare('SELECT * FROM cpe_config LIMIT 1').get() as any;
+    const cpeConfigResult = db.prepare('SELECT id FROM cpe_config LIMIT 1').get() as { id: number } | undefined;
 
     if (!cpeConfigResult) {
       console.log('No CPE config found');
@@ -293,7 +285,7 @@ async function collectTrafficData() {
 
 async function checkAlerts() {
   try {
-    const rules = db.prepare('SELECT * FROM alert_rules WHERE enabled = 1').all() as any[];
+    const rules = db.prepare('SELECT * FROM alert_rules WHERE enabled = 1').all() as AlertRuleRow[];
 
     for (const rule of rules) {
       const shouldAlert = await evaluateRule(rule);
