@@ -40,6 +40,8 @@ export const POST = withApiHandler(async () => {
   const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
   const emailConfig = readNotificationConfig('email');
   const wechatConfig = readNotificationConfig('wechat');
+  const emailConfigured = Boolean(emailConfig);
+  const wechatConfigured = Boolean(wechatConfig?.webhookUrl);
   let emailSent = false;
   let wechatSent = false;
 
@@ -64,6 +66,8 @@ export const POST = withApiHandler(async () => {
   return jsonOk({
     ...report,
     notifications: {
+      emailConfigured,
+      wechatConfigured,
       emailSent,
       wechatSent,
     },

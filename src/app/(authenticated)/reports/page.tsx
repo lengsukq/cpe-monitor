@@ -57,7 +57,12 @@ export default function ReportsPage() {
     setError('');
     try {
       const data = await apiFetch<DailyReport & {
-        notifications?: { emailSent: boolean; wechatSent: boolean };
+        notifications?: {
+          emailConfigured: boolean;
+          wechatConfigured: boolean;
+          emailSent: boolean;
+          wechatSent: boolean;
+        };
       }>('/api/reports/daily', { method: 'POST' }, '生成报告失败');
       setPreviewReport(data);
       setIsOpen(true);
@@ -288,20 +293,30 @@ export default function ReportsPage() {
                   <div className="flex flex-wrap items-center gap-3">
                     <Mail className="h-4 w-4 text-muted-foreground" />
                     <span className="text-xs text-muted-foreground">通知发送</span>
-                    {(previewReport as any).notifications.emailSent && (
+                    {(previewReport as any).notifications.emailSent ? (
                       <Badge variant="default" className="gap-1 rounded-full bg-success/10 text-success hover:bg-success/15">
                         <CheckCircle2 className="h-3 w-3" />
                         邮件已发送
                       </Badge>
-                    )}
-                    {(previewReport as any).notifications.wechatSent && (
+                    ) : (previewReport as any).notifications.emailConfigured ? (
+                      <Badge variant="outline" className="gap-1 rounded-full text-destructive">
+                        邮件发送失败
+                      </Badge>
+                    ) : null}
+                    {(previewReport as any).notifications.wechatSent ? (
                       <Badge variant="default" className="gap-1 rounded-full bg-info/10 text-info hover:bg-info/15">
                         <CheckCircle2 className="h-3 w-3" />
                         企微已发送
                       </Badge>
-                    )}
-                    {!(previewReport as any).notifications.emailSent && !(previewReport as any).notifications.wechatSent && (
-                      <span className="text-xs text-muted-foreground/60">未配置通知渠道</span>
+                    ) : (previewReport as any).notifications.wechatConfigured ? (
+                      <Badge variant="outline" className="gap-1 rounded-full text-destructive">
+                        企微发送失败
+                      </Badge>
+                    ) : null}
+                    {!(previewReport as any).notifications.emailConfigured && !(previewReport as any).notifications.wechatConfigured && (
+                      <span className="text-xs text-muted-foreground/60">
+                        未配置通知渠道，请前往设置页配置邮件或企微通知
+                      </span>
                     )}
                   </div>
                 </div>

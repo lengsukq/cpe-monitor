@@ -137,11 +137,11 @@ export function upsertCpeConfig(input: {
   if (existing) {
     if (password) {
       db.prepare(
-        'UPDATE cpe_config SET cpe_url = ?, cpe_username = ?, cpe_password_encrypted = ?, updated_at = datetime("now") WHERE id = ?',
+        `UPDATE cpe_config SET cpe_url = ?, cpe_username = ?, cpe_password_encrypted = ?, updated_at = datetime('now') WHERE id = ?`,
       ).run(input.cpeUrl, input.cpeUsername, password, existing.id);
     } else {
       db.prepare(
-        'UPDATE cpe_config SET cpe_url = ?, cpe_username = ?, updated_at = datetime("now") WHERE id = ?',
+        `UPDATE cpe_config SET cpe_url = ?, cpe_username = ?, updated_at = datetime('now') WHERE id = ?`,
       ).run(input.cpeUrl, input.cpeUsername, existing.id);
     }
     return;
@@ -197,7 +197,7 @@ export function upsertNotificationConfig(input: {
 
   if (existing) {
     db.prepare(
-      'UPDATE notification_config SET config = ?, enabled = ?, updated_at = datetime("now") WHERE id = ?',
+      `UPDATE notification_config SET config = ?, enabled = ?, updated_at = datetime('now') WHERE id = ?`,
     ).run(serializedConfig, enabledValue, existing.id);
     return;
   }

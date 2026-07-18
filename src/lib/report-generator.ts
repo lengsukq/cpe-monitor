@@ -12,32 +12,50 @@ export async function generateDailyReport() {
   const todayIso = toSqliteTimestamp(today);
   const tomorrowIso = toSqliteTimestamp(tomorrow);
 
-  // Get today's traffic data
+  // Get today's traffic data (ordered chronologically)
   const todayTraffic = db.prepare(
-    'SELECT * FROM traffic_data WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp'
+    'SELECT * FROM traffic_data WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp ASC'
   ).all(todayIso, tomorrowIso) as any[];
 
-  // Calculate totals
+  // upload_bytes/download_bytes are CPE cumulative values.
+  // Daily total = last record - first record (delta).
   let totalUpload = 0;
   let totalDownload = 0;
+  const last = todayTraffic[todayTraffic.length - 1];
+  const first = todayTraffic[0];
+  if (todayTraffic.length >= 2 && first && last) {
+    totalUpload = Math.max(0, last.upload_bytes - first.upload_bytes);
+    totalDownload = Math.max(0, last.download_bytes - first.download_bytes);
+  } else if (todayTraffic.length === 1 && last) {
+    // Only one data point — we cannot compute delta, show 0.
+    totalUpload = 0;
+    totalDownload = 0;
+  }
+
+  // Compute hourly traffic deltas and signal averages
   let totalSignal = 0;
   let signalCount = 0;
+  let previousPoint: any = null;
   const hourlyTraffic: Record<number, number> = {};
 
   for (const data of todayTraffic) {
-    totalUpload += data.upload_bytes || 0;
-    totalDownload += data.download_bytes || 0;
-
     if (data.signal_strength) {
       totalSignal += data.signal_strength;
       signalCount++;
     }
 
-    const timestamp = new Date(`${String(data.timestamp).replace(' ', 'T')}Z`);
-    const hour = Number(new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Shanghai', hour: '2-digit', hour12: false,
-    }).format(timestamp));
-    hourlyTraffic[hour] = (hourlyTraffic[hour] || 0) + (data.download_bytes || 0) + (data.upload_bytes || 0);
+    // Compute delta from previous point for hourly breakdown
+    if (previousPoint && data.upload_bytes != null && previousPoint.upload_bytes != null) {
+      const uploadDelta = Math.max(0, data.upload_bytes - previousPoint.upload_bytes);
+      const downloadDelta = Math.max(0, data.download_bytes - previousPoint.download_bytes);
+
+      const timestamp = new Date(`${String(data.timestamp).replace(' ', 'T')}Z`);
+      const hour = Number(new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Shanghai', hour: '2-digit', hour12: false,
+      }).format(timestamp));
+      hourlyTraffic[hour] = (hourlyTraffic[hour] || 0) + uploadDelta + downloadDelta;
+    }
+    previousPoint = data;
   }
 
   // Find peak hour
@@ -50,27 +68,40 @@ export async function generateDailyReport() {
     }
   }
 
-  // Get device rankings
+  // Get device rankings — also computed via delta
+  // Use the first and last records per device within today
   const todayDevices = db.prepare(
-    'SELECT * FROM device_data WHERE timestamp >= ? AND timestamp <= ?'
+    'SELECT * FROM device_data WHERE timestamp >= ? AND timestamp <= ? ORDER BY device_mac, device_ip, timestamp ASC'
   ).all(todayIso, tomorrowIso) as any[];
 
-  const deviceMap: Record<string, any> = {};
+  const deviceFirstMap: Record<string, any> = {};
+  const deviceLastMap: Record<string, any> = {};
   for (const device of todayDevices) {
     const key = device.device_mac || device.device_ip || 'unknown';
-    if (!deviceMap[key]) {
-      deviceMap[key] = {
-        name: device.device_name || 'Unknown',
-        ip: device.device_ip || '',
-        mac: device.device_mac || '',
-        uploadBytes: 0,
-        downloadBytes: 0,
-        totalBytes: 0,
-      };
+    if (!deviceFirstMap[key]) {
+      deviceFirstMap[key] = device;
     }
-    deviceMap[key].uploadBytes += device.upload_bytes || 0;
-    deviceMap[key].downloadBytes += device.download_bytes || 0;
-    deviceMap[key].totalBytes = deviceMap[key].uploadBytes + deviceMap[key].downloadBytes;
+    deviceLastMap[key] = device;
+  }
+
+  const deviceMap: Record<string, any> = {};
+  for (const key of Object.keys(deviceLastMap)) {
+    const last = deviceLastMap[key];
+    const first = deviceFirstMap[key];
+    const uploadDelta = first && last
+      ? Math.max(0, (last.upload_bytes || 0) - (first.upload_bytes || 0))
+      : 0;
+    const downloadDelta = first && last
+      ? Math.max(0, (last.download_bytes || 0) - (first.download_bytes || 0))
+      : 0;
+    deviceMap[key] = {
+      name: last.device_name || 'Unknown',
+      ip: last.device_ip || '',
+      mac: last.device_mac || '',
+      uploadBytes: uploadDelta,
+      downloadBytes: downloadDelta,
+      totalBytes: uploadDelta + downloadDelta,
+    };
   }
 
   const topDevices = Object.values(deviceMap)
@@ -117,4 +148,3 @@ export async function generateDailyReport() {
     createdAt: null,
   };
 }
-
