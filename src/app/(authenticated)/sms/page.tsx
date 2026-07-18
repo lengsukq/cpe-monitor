@@ -189,7 +189,7 @@ export default function SmsPage() {
                 className="h-10 rounded-xl pl-9"
               />
             </div>
-            <button type="submit" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40">
+            <button type="submit" className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground sm:w-auto transition hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40">
               <Search className="h-4 w-4" />
               查询
             </button>

@@ -22,7 +22,7 @@ export default function SchedulerCard({
 }: SchedulerCardProps) {
   return (
     <Card className="card-hover">
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <CardTitle className="flex items-center gap-2">
             <Clock3 className="h-4 w-4 text-warning" />
@@ -38,7 +38,7 @@ export default function SchedulerCard({
         />
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/30 px-3 py-3">
+        <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-medium">采集频率</p>
             <p className="text-xs text-muted-foreground">

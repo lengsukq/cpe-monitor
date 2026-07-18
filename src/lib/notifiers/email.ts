@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import { render } from '@react-email/render';
 import DailyReportEmail from '@/emails/daily-report';
 import AlertNotificationEmail from '@/emails/alert-notification';
+import CollectionReportEmail from '@/emails/collection-report';
 import type { EmailConfig, DailyReport } from '@/types';
 import type { CpeSmsMessage } from '@/lib/cpe-client';
 
@@ -67,6 +68,37 @@ export async function sendSmsNotification(config: EmailConfig, sms: CpeSmsMessag
       <p style="margin-top:20px;color:#64748b;font-size:12px">由 CPE Monitor 自动同步；此通知不会发送短信。</p>
     </div>`;
   return sendEmail(config.to, `CPE 新短信 - ${sms.phone}`, emailHtml, config);
+}
+
+export interface CollectionReportData {
+  collectedDevices: number;
+  alertsTriggered: number;
+  trafficDelta: {
+    uploadBytes: number;
+    downloadBytes: number;
+  } | null;
+  signalStrength: number | null;
+  topDevices: {
+    name: string;
+    uploadBytes: number;
+    downloadBytes: number;
+  }[];
+  collectedAt: string;
+}
+
+export async function sendCollectionReport(config: EmailConfig, data: CollectionReportData) {
+  const emailHtml = await render(CollectionReportEmail({
+    collectedDevices: data.collectedDevices,
+    alertsTriggered: data.alertsTriggered,
+    trafficDelta: data.trafficDelta,
+    signalStrength: data.signalStrength,
+    topDevices: data.topDevices,
+    collectedAt: data.collectedAt,
+  }));
+  const dateStr = data.collectedAt
+    ? new Date(data.collectedAt).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
+    : '';
+  return sendEmail(config.to, `CPE 采集报告 - ${dateStr}`, emailHtml, config);
 }
 
 export async function testEmailConnection(config?: EmailConfig): Promise<boolean> {

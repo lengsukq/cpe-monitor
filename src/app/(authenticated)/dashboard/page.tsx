@@ -1,6 +1,10 @@
 'use client';
 
+import { useState } from 'react';
+import { Download } from 'lucide-react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/PageHeader';
@@ -8,6 +12,7 @@ import { Callout } from '@/components/Callout';
 import { PageShell } from '@/components/PageShell';
 import { LoadingBlock } from '@/components/LoadingBlock';
 import RefreshButton from '@/components/RefreshButton';
+import { CollectionReportDialog, type CollectionReportData } from '@/components/dashboard/CollectionReportDialog';
 import DashboardHero from '@/components/dashboard/DashboardHero';
 import StatusPillsRow from '@/components/dashboard/StatusPillsRow';
 import CellSnapshotCard from '@/components/dashboard/CellSnapshotCard';
@@ -23,6 +28,8 @@ import { formatLocalTime, formatRate } from '@/lib/format';
 
 export default function DashboardPage() {
   const data = useDashboardData();
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportData, setReportData] = useState<CollectionReportData | null>(null);
 
   if (data.loading) {
     return (
@@ -39,25 +46,48 @@ export default function DashboardPage() {
         title="仪表盘"
         description="把实时状态、流量、套餐和设备活动集中在一个可操作的监控台里。"
         actions={
-          <>
-            <div className="text-xs text-muted-foreground">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="order-last text-xs text-muted-foreground sm:order-first">
               {data.lastRefreshAt
                 ? `更新于 ${formatLocalTime(data.lastRefreshAt)}`
                 : '正在同步'}
             </div>
-            <Badge
-              variant={data.overview?.source === 'cpe' ? 'default' : 'secondary'}
-              className="rounded-full px-3 py-1"
-            >
-              {data.overview?.source === 'cpe' ? '实时 CPE 数据' : '数据库兜底数据'}
-            </Badge>
-            <RefreshButton
-              onClick={() => { void data.refreshDashboard(); }}
-              loading={data.refreshing}
-              label="刷新数据"
-              loadingLabel="刷新中"
-            />
-          </>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant={data.overview?.source === 'cpe' ? 'default' : 'secondary'}
+                className="rounded-full px-3 py-1"
+              >
+                {data.overview?.source === 'cpe' ? '实时 CPE 数据' : '数据库兜底数据'}
+              </Badge>
+              <RefreshButton
+                onClick={() => { void data.refreshDashboard(); }}
+                loading={data.refreshing}
+                label="刷新数据"
+                loadingLabel="刷新中"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={data.collecting}
+                onClick={async () => {
+                  try {
+                    const result = await data.collectNow();
+                    setReportData(result);
+                    setReportOpen(true);
+                    if (result.success) {
+                      // Refresh dashboard to show newly collected data
+                      await data.refreshDashboard();
+                    }
+                  } catch {
+                    toast.error('采集请求失败，请检查网络连接', { duration: 4000 });
+                  }
+                }}
+              >
+                <Download className="mr-1 h-4 w-4" />
+                {data.collecting ? '采集中...' : '立即采集'}
+              </Button>
+            </div>
+          </div>
         }
       />
 
@@ -142,7 +172,7 @@ export default function DashboardPage() {
         />
         <Card className="card-hover">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle>套餐用量</CardTitle>
               {data.startDate ? (
                 <Badge variant="outline">每月 {data.startDate.StartDay || 1} 号重置</Badge>
@@ -166,6 +196,12 @@ export default function DashboardPage() {
       />
 
       <QuickLinks />
+
+      <CollectionReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        data={reportData}
+      />
     </PageShell>
   );
 }

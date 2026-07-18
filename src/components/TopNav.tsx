@@ -65,7 +65,7 @@ export function TopNav() {
   }, [menuOpen]);
 
   return (
-    <header className="glass fixed left-0 right-0 top-0 z-50 border-b">
+    <header className="glass fixed left-0 right-0 top-0 z-50 border-b pt-[env(safe-area-inset-top)]">
       <div className="relative mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 lg:px-8">
         <div className="flex items-center gap-8">
           <Link

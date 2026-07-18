@@ -50,11 +50,11 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-[min(32rem,calc(100%-2rem))]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-start gap-2 pr-8">
             <span className="text-2xl">{getDeviceIcon(device.IconType || "")}</span>
-            {device.HostName || '未知设备'}
+            <span className="min-w-0 break-all">{device.HostName || '未知设备'}</span>
           </DialogTitle>
         </DialogHeader>
 
@@ -75,14 +75,14 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
           <Separator />
 
           {/* 网络信息 */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <p className="text-sm text-muted-foreground">IP 地址</p>
-              <p className="font-mono text-sm">{device.IPAddress || '-'}</p>
+              <p className="break-all font-mono text-sm">{device.IPAddress || '-'}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">MAC 地址</p>
-              <p className="font-mono text-sm">{device.MACAddress || '-'}</p>
+              <p className="break-all font-mono text-sm">{device.MACAddress || '-'}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">获取方式</p>
@@ -97,7 +97,7 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
           <Separator />
 
           {/* 流量信息 */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <p className="text-sm text-muted-foreground">上行流量</p>
               <p className="text-sm font-medium text-info">{formatBytesFromString(device.TxKBytes, true)}</p>
@@ -119,7 +119,7 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
           <Separator />
 
           {/* 时间信息 */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <p className="text-sm text-muted-foreground">在线时长</p>
               <p className="text-sm">{formatDurationFromString(device.AssociatedTime)}</p>
@@ -134,7 +134,7 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
           {(device.VendorClassID || device.DeviceBrands) && (
             <>
               <Separator />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {device.DeviceBrands && (
                   <div>
                     <p className="text-sm text-muted-foreground">品牌</p>

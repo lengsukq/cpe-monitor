@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   serverExternalPackages: ['better-sqlite3'],
   // Next.js 16 blocks cross-origin access to /_next/* in development.
   // LAN IP / hostname access needs an allowlist (localhost is allowed by default).

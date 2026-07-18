@@ -91,7 +91,7 @@ export default function AlertLogsPage() {
           <TableRow key={log.id}>
             <TableCell>{formatDateTimeShanghai(log.triggeredAt)}</TableCell>
             <TableCell>{log.ruleName || '-'}</TableCell>
-            <TableCell>{log.message || '-'}</TableCell>
+            <TableCell className="max-w-[12rem] whitespace-normal break-words sm:max-w-md">{log.message || '-'}</TableCell>
             <TableCell>
               <Badge variant={log.notified ? 'success' : 'secondary'}>
                 {log.notified ? '已通知' : '未通知'}

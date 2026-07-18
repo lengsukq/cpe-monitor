@@ -52,7 +52,7 @@ export const POST = withApiHandler(async (request) => {
   const cookieStore = await cookies();
   cookieStore.set('token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.SECURE_COOKIE === 'true',
     sameSite: 'lax',
     maxAge: 60 * 60 * 24,
     path: '/',

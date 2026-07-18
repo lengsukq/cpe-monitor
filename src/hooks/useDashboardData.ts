@@ -57,6 +57,7 @@ export function useDashboardData() {
   const [smsSync, setSmsSync] = useState<SmsSyncStatusView | null>(null);
   const [schedulerSaving, setSchedulerSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [collecting, setCollecting] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
 
   async function fetchOverview() {
@@ -198,6 +199,44 @@ export function useDashboardData() {
     }
   }
 
+  async function collectNow() {
+    setCollecting(true);
+    try {
+      const result = await apiFetch<{
+        success: boolean;
+        collectedDevices: number;
+        alertsTriggered: number;
+        error?: string;
+        trafficSnapshot: {
+          uploadBytes: number;
+          downloadBytes: number;
+          signalStrength: number;
+          collectedAt: string;
+        } | null;
+        trafficDelta: {
+          uploadBytes: number;
+          downloadBytes: number;
+        } | null;
+        topDevices: {
+          name: string;
+          uploadBytes: number;
+          downloadBytes: number;
+        }[];
+        collectedAt: string;
+      }>(
+        '/api/dashboard/collect',
+        { method: 'POST' },
+        '立即采集失败',
+      );
+      return result;
+    } catch (error) {
+      console.error('Manual collection failed', error);
+      throw error;
+    } finally {
+      setCollecting(false);
+    }
+  }
+
   useEffect(() => {
     void fetchOverview();
     void fetchTrafficHistory();
@@ -269,5 +308,7 @@ export function useDashboardData() {
     schedulerStatusLabel,
     refreshDashboard,
     updateScheduler,
+    collecting,
+    collectNow,
   };
 }

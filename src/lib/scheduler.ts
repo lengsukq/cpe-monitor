@@ -8,6 +8,7 @@ import { sendAlertNotification, sendDailyReport, sendSmsNotification } from './n
 import { sendAlertWechat, sendDailyReportWechat, sendSmsWechat } from './notifiers/wechat';
 import {
   getSettingsMap,
+  isCpeConfigured,
   readNotificationConfig,
   setSetting,
 } from './settings-store';
@@ -256,13 +257,11 @@ async function performSmsSync(): Promise<SmsSyncResult> {
   }
 }
 
-async function collectTrafficData() {
+export async function collectTrafficData(): Promise<number> {
   try {
-    const cpeConfigResult = db.prepare('SELECT id FROM cpe_config LIMIT 1').get() as { id: number } | undefined;
-
-    if (!cpeConfigResult) {
+    if (!isCpeConfigured()) {
       console.log('No CPE config found');
-      return;
+      return 0;
     }
 
     const client = getOrCreateCpeClient();
@@ -278,12 +277,15 @@ async function collectTrafficData() {
     }
 
     console.log(`Collected traffic data: ${trafficInfo.connectedDevices} devices`);
+    return trafficInfo.connectedDevices;
   } catch (error) {
     console.error('Failed to collect traffic data:', error);
+    return 0;
   }
 }
 
-async function checkAlerts() {
+export async function checkAlerts(): Promise<number> {
+  let triggeredCount = 0;
   try {
     const rules = db.prepare('SELECT * FROM alert_rules WHERE enabled = 1').all() as AlertRuleRow[];
 
@@ -317,11 +319,13 @@ async function checkAlerts() {
         }
         db.prepare('UPDATE alert_logs SET notified = ? WHERE id = ?').run(notified ? 1 : 0, log.lastInsertRowid);
         console.log(`Alert triggered: ${rule.name}`);
+        triggeredCount += 1;
       }
     }
   } catch (error) {
     console.error('Failed to check alerts:', error);
   }
+  return triggeredCount;
 }
 
 async function evaluateRule(rule: any): Promise<boolean> {

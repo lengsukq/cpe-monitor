@@ -206,7 +206,7 @@ export default function AlertsPage() {
               </Badge>
             </TableCell>
             <TableCell>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="ghost" onClick={() => openEditModal(rule)}>编辑</Button>
                 <Button
                   size="sm"
@@ -223,7 +223,7 @@ export default function AlertsPage() {
       </DataTableCard>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[min(42rem,calc(100%-2rem))]">
           <DialogHeader>
             <DialogTitle>{editingRule ? '编辑规则' : '新建规则'}</DialogTitle>
           </DialogHeader>
@@ -252,7 +252,7 @@ export default function AlertsPage() {
               </Select>
             </FieldGroup>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FieldGroup label="运算符">
                 <Select
                   value={formData.operator}
@@ -269,7 +269,7 @@ export default function AlertsPage() {
                   </SelectContent>
                 </Select>
               </FieldGroup>
-              <FieldGroup label="阈值（流量用 MB，设备用台，信号用 dBm）">
+              <FieldGroup label="阈值" hint="流量用 MB，设备用台，信号用 dBm">
                 <Input
                   type="number"
                   value={String(formData.threshold)}
@@ -292,22 +292,22 @@ export default function AlertsPage() {
               />
             </FieldGroup>
 
-            <div className="flex gap-6">
-              <div className="flex items-center gap-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="flex min-h-10 items-center gap-2">
                 <Switch
                   checked={formData.enabled}
                   onCheckedChange={(value) => setFormData({ ...formData, enabled: value })}
                 />
                 <Label>启用规则</Label>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex min-h-10 items-center gap-2">
                 <Switch
                   checked={formData.notifyEmail}
                   onCheckedChange={(value) => setFormData({ ...formData, notifyEmail: value })}
                 />
                 <Label>邮件通知</Label>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex min-h-10 items-center gap-2">
                 <Switch
                   checked={formData.notifyWechat}
                   onCheckedChange={(value) => setFormData({ ...formData, notifyWechat: value })}

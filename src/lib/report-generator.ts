@@ -82,15 +82,25 @@ export async function generateDailyReport() {
   const intervalSetting = db.prepare("SELECT value FROM system_settings WHERE key = 'scheduler_interval'").get() as { value?: string } | undefined;
   const intervalMinutes = Math.max(1, Number(intervalSetting?.value || 60));
   const expectedSamples = (24 * 60) / intervalMinutes;
-  const uptimePercent = todayTraffic.length > 0 ? Math.min(100, (todayTraffic.length / expectedSamples) * 100) : 0;
+  // uptimePercent represents data collection completeness (actual samples / expected samples)
+  // It is NOT network uptime. Low values usually mean the scheduler was recently enabled
+  // or the collection interval was recently changed.
+  const samplingRatio = todayTraffic.length > 0 ? Math.min(1, todayTraffic.length / expectedSamples) : 0;
+  const uptimePercent = Math.round(samplingRatio * 1000) / 10;
 
-  let networkQuality = '差';
-  if (avgSignal >= -70 && uptimePercent >= 95) {
-    networkQuality = '优秀';
-  } else if (avgSignal >= -85 && uptimePercent >= 85) {
-    networkQuality = '良好';
-  } else if (avgSignal >= -100 && uptimePercent >= 70) {
-    networkQuality = '一般';
+  let networkQuality = '数据不足';
+  if (todayTraffic.length >= 3) {
+    if (avgSignal >= -70 && samplingRatio >= 0.7) {
+      networkQuality = '优秀';
+    } else if (avgSignal >= -85 && samplingRatio >= 0.5) {
+      networkQuality = '良好';
+    } else if (avgSignal >= -100 && samplingRatio >= 0.3) {
+      networkQuality = '一般';
+    } else if (avgSignal < -100) {
+      networkQuality = '差';
+    } else {
+      networkQuality = '一般';
+    }
   }
 
   return {

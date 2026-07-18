@@ -54,3 +54,6 @@ next-env.d.ts
 
 # SQLite database
 /data/
+
+# Docker deploy skill (contains server credentials)
+.cursor/skills/docker-deploy/

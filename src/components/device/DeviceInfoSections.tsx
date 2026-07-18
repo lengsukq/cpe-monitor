@@ -45,7 +45,7 @@ export default function DeviceInfoSections({
           <Card className="card-hover">
             <CardHeader><CardTitle>基本信息</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 <InfoField label="产品名称" value={info.spreadname_zh || info.spreadname_en} />
                 <InfoField label="设备友好名称" value={deviceState?.FriendlyName || info.spreadname_zh} />
                 <InfoField label="厂商" value={vendor} />
@@ -68,7 +68,7 @@ export default function DeviceInfoSections({
           <Card className="card-hover">
             <CardHeader><CardTitle>软件版本</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
                 <InfoField label="固件版本" value={info.SoftwareVersion} />
                 <InfoField label="WebUI 版本" value={info.WebUIVersion} />
                 <InfoField label="硬件版本" value={info.HardwareVersion} />
@@ -86,7 +86,7 @@ export default function DeviceInfoSections({
           <Card className="card-hover">
             <CardHeader><CardTitle>网络信息</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 <InfoField label="工作模式" value={info.workmode} />
                 <InfoField label="支持模式" value={info.supportmode} />
                 <InfoField label="运营商" value={getCarrier(info.Mccmnc)} />
@@ -96,7 +96,7 @@ export default function DeviceInfoSections({
               {cell && (
                 <>
                   <Separator className="my-4" />
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
                     <InfoField label="网络类型" value={cell.networkType} />
                     {cell.band && <InfoField label="频段" value={cell.band} />}
                     {cell.cellId && <InfoField label="小区 ID" value={cell.cellId} mono />}
@@ -118,7 +118,7 @@ export default function DeviceInfoSections({
           <Card className="card-hover">
             <CardHeader><CardTitle className="flex items-center gap-2"><Radio className="h-5 w-5 text-primary" />蜂窝与 SIM 状态</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
                 <InfoField label="连接状态码" value={cell?.connectionStatus} />
                 <InfoField label="服务状态" value={formatStatusCode(cellStatus?.ServiceStatus)} />
                 <InfoField label="SIM 状态" value={formatStatusCode(cellStatus?.SimStatus)} />
@@ -139,7 +139,7 @@ export default function DeviceInfoSections({
           <Card className="card-hover">
             <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-primary" />5G 射频详细参数</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
                 <InfoField label="NR RSRP" value={signal?.nrrsrp} />
                 <InfoField label="NR RSRQ" value={signal?.nrrsrq} />
                 <InfoField label="NR RSSI" value={signal?.nrrssi} />
@@ -182,7 +182,7 @@ export default function DeviceInfoSections({
           <Card className="card-hover">
             <CardHeader><CardTitle>MAC 地址</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
                 <InfoField label="LAN MAC" value={info.MacAddress1} mono />
                 <InfoField label="MAC2" value={info.MacAddress2} mono />
                 <InfoField label="WiFi 2.4G MAC" value={info.WifiMacAddrWl0} mono />
@@ -214,7 +214,7 @@ export default function DeviceInfoSections({
           <Card className="card-hover">
             <CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />能力与服务</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
                 <InfoField label="Wi-Fi 能力" value={formatWifiCapability(deviceState?.devcap?.WIFI)} />
                 <InfoField label="USB" value={formatFlag(deviceState?.devcap?.USB, true)} />
                 <InfoField label="访客网络" value={formatFlag(deviceState?.devcap?.GuestNetwork, true)} />

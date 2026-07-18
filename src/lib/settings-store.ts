@@ -55,6 +55,31 @@ export function getCpeConfigRow(): CpeConfigRow | null {
   return (db.prepare('SELECT * FROM cpe_config LIMIT 1').get() as CpeConfigRow | undefined) || null;
 }
 
+/** Safe check — returns true if CPE password is set via either DB or env var. Never throws. */
+export function isCpeConfigured(): boolean {
+  const dbPassword = getCpeConfigRow()?.cpe_password_encrypted;
+  return Boolean(process.env.CPE_PASSWORD || dbPassword);
+}
+
+/** Safe status — returns details about CPE config source without throwing. */
+export function getCpeConfigStatus(): {
+  configured: boolean;
+  source: 'env' | 'database' | 'unset';
+  url: string;
+  username: string;
+} {
+  const config = getCpeConfigRow();
+  const hasEnvPassword = Boolean(process.env.CPE_PASSWORD);
+  const hasDbPassword = Boolean(config?.cpe_password_encrypted);
+
+  return {
+    configured: hasEnvPassword || hasDbPassword,
+    source: hasEnvPassword ? 'env' : hasDbPassword ? 'database' : 'unset',
+    url: config?.cpe_url || DEFAULT_CPE_URL,
+    username: config?.cpe_username || DEFAULT_CPE_USERNAME,
+  };
+}
+
 export function getPublicCpeConfig(): PublicCpeConfig {
   const config = getCpeConfigRow();
   if (config) {
@@ -80,6 +105,10 @@ export function getPublicCpeConfig(): PublicCpeConfig {
   };
 }
 
+/**
+ * Returns CPE credentials from env vars (CPE_PASSWORD) or DB (cpe_config table).
+ * Throws if no password is found — use isCpeConfigured() for a safe pre-check.
+ */
 export function getCpeCredentials(): { url: string; username: string; password: string } {
   const config = getCpeConfigRow();
   const password = process.env.CPE_PASSWORD || config?.cpe_password_encrypted || '';
