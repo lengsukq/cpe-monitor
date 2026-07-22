@@ -1,13 +1,14 @@
 'use client';
 
-import { Database, Save, Trash2 } from 'lucide-react';
+import { Database, Trash2 } from 'lucide-react';
 import { SettingsAccordionSection } from '@/components/settings/SettingsAccordionSection';
+import { SaveButton } from '@/components/settings/SaveButton';
 import FieldGroup from '@/components/forms/FieldGroup';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatSyncTime } from '@/lib/format';
-import type { DataRetentionForm } from '@/hooks/useSettingsPage';
+import type { DataRetentionForm } from '@/features/settings/types';
 
 interface DataRetentionSectionProps {
   open: boolean;
@@ -86,14 +87,7 @@ export function DataRetentionSection({
           <Trash2 className="mr-1.5 h-3.5 w-3.5" />
           保存并立即清理
         </Button>
-        <Button type="button" size="sm" onClick={() => onSave(false)} disabled={saving}>
-          {saving ? '保存中…' : (
-            <>
-              <Save className="mr-1.5 h-3.5 w-3.5" />
-              保存保留策略
-            </>
-          )}
-        </Button>
+        <SaveButton saving={saving} onClick={() => onSave(false)} label="保存保留策略" />
       </div>
     </SettingsAccordionSection>
   );

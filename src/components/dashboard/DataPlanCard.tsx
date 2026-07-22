@@ -1,3 +1,7 @@
+'use client';
+
+import { useMemo } from 'react';
+import DonutChart from '@/components/charts/DonutChart';
 import { formatWithUnit } from '@/lib/format';
 import type { DataPlanConfig, TrafficStatsResponse } from '@/types';
 
@@ -22,27 +26,28 @@ export default function DataPlanCard({ startDate, trafficStats }: DataPlanCardPr
   const isWarning = percent >= threshold;
   const isOver = percent >= 100;
 
-  const progressColor = isOver
+  const donutColor = isOver
     ? 'var(--danger)'
     : isWarning
       ? 'var(--warning)'
-      : 'var(--brand)';
+      : undefined; // undefined lets DonutChart use the brand palette
+
+  const segments = useMemo(() => [
+    { label: '已用', value: Math.min(usedBytes, limitBytes || usedBytes || 1), color: donutColor },
+    { label: '剩余', value: limitBytes > 0 ? remaining : 0 },
+  ], [usedBytes, limitBytes, remaining, donutColor]);
 
   return (
     <div className="fluid-card-grid min-h-[300px] items-center gap-6 [--fluid-card-min:15rem]">
       <div className="flex justify-center">
-        <div
-          className="relative size-[clamp(9rem,24vw,11rem)] rounded-full p-[clamp(14px,2vw,18px)] shadow-inner"
-          style={{
-            background: `conic-gradient(${progressColor} ${Math.min(percent, 100)}%, color-mix(in oklch, var(--muted) 88%, white) 0)`,
-          }}
-        >
-          <div className="flex size-full flex-col items-center justify-center rounded-full bg-card shadow-sm">
-            <p className={`text-3xl font-extrabold tracking-tight ${isOver ? 'text-danger' : isWarning ? 'text-warning' : 'text-brand'}`}>
-              {percent.toFixed(1)}%
-            </p>
-            <p className="mt-1 text-xs font-medium text-muted-foreground">使用率</p>
-          </div>
+        <div className="w-[clamp(11rem,26vw,13rem)]">
+          <DonutChart
+            segments={segments}
+            centerLabel={`${percent.toFixed(1)}%`}
+            centerSub="使用率"
+            height={210}
+            showLegend={false}
+          />
         </div>
       </div>
 

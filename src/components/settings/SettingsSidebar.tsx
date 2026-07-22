@@ -4,6 +4,7 @@ import {
   KeyRound,
   Mail,
   MessageSquareText,
+  Palette,
   RefreshCw,
   Wifi,
   Wrench,
@@ -13,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SettingsNav } from '@/components/settings/SettingsNav';
 import { getUpdateStateLabel } from '@/lib/format';
-import type { SettingsSectionId, UpdateStatusState } from '@/hooks/useSettingsPage';
+import type { SettingsSectionId, UpdateStatusState } from '@/features/settings/types';
 
 interface SettingsSidebarProps {
   updateStatus: UpdateStatusState | null;
@@ -37,6 +38,12 @@ export function SettingsSidebar({
           <p className="col-span-full px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             配置导航
           </p>
+          <SettingsNav
+            href="#theme-color"
+            icon={<Palette className="h-3.5 w-3.5" />}
+            label="主题色"
+            detail="外观定制"
+          />
           <SettingsNav
             href="#connection"
             icon={<Wifi className="h-3.5 w-3.5" />}

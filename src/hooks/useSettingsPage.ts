@@ -1,554 +1,73 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiFetch } from '@/lib/client-api';
+import { useCallback, useMemo, useState } from 'react';
 import { formatSyncTime, maskSecret } from '@/lib/format';
+import { useCpeSettings } from '@/features/settings/hooks/useCpeSettings';
+import { useDataRetentionSettings } from '@/features/settings/hooks/useDataRetentionSettings';
+import { useNotificationSettings } from '@/features/settings/hooks/useNotificationSettings';
+import { usePasswordSettings } from '@/features/settings/hooks/usePasswordSettings';
+import { useSmsSyncSettings } from '@/features/settings/hooks/useSmsSyncSettings';
+import { useSystemUpdate } from '@/features/settings/hooks/useSystemUpdate';
+import type { SettingsActionContext, SettingsMessage, SettingsSectionId } from '@/features/settings/types';
 
-export type SettingsSectionId = 'connection' | 'automation' | 'retention' | 'email' | 'wechat' | 'security';
-
-export interface CpeConfigForm {
-  cpeUrl: string;
-  cpeUsername: string;
-  cpePassword: string;
-}
-
-export interface EmailConfigForm {
-  smtpHost: string;
-  smtpPort: string;
-  smtpUser: string;
-  smtpPass: string;
-  from: string;
-  to: string;
-}
-
-export interface WechatConfigForm {
-  webhookUrl: string;
-}
-
-export interface PasswordFormState {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-}
-
-export interface SmsSyncConfigForm {
-  enabled: boolean;
-  interval: string;
-  running: boolean;
-  lastSyncedAt: string | null;
-  lastError: string | null;
-}
-
-export interface DataRetentionForm {
-  historyDays: string;
-  runDays: string;
-  lastCleanupAt: string | null;
-}
-
-export interface UpdateStatusState {
-  updateState?: string;
-  message?: string;
-  error?: string;
-}
-
-export interface TestResultState {
-  success: boolean;
-  message: string;
-  latency?: string;
-}
-
-interface NotificationApiRow {
-  type: string;
-  config: string;
-}
-
-interface PublicEmailApiConfig {
-  smtpHost?: string;
-  smtpPort?: string | number;
-  smtpUser?: string;
-  smtpPass?: string;
-  smtpPasswordSet?: boolean;
-  from?: string;
-  to?: string | string[];
-}
-
-interface PublicWechatApiConfig {
-  webhookUrl?: string;
-  webhookConfigured?: boolean;
-}
-
-const DEFAULT_CPE: CpeConfigForm = {
-  cpeUrl: 'http://192.168.31.1',
-  cpeUsername: 'admin',
-  cpePassword: '',
-};
-
-const DEFAULT_EMAIL: EmailConfigForm = {
-  smtpHost: '',
-  smtpPort: '587',
-  smtpUser: '',
-  smtpPass: '',
-  from: '',
-  to: '',
-};
+export type {
+  CpeConfigForm,
+  DataRetentionForm,
+  EmailConfigForm,
+  PasswordFormState,
+  SettingsSectionId,
+  SmsSyncConfigForm,
+  TestResultState,
+  UpdateStatusState,
+  WechatConfigForm,
+} from '@/features/settings/types';
 
 export function useSettingsPage() {
-  const [cpeConfig, setCpeConfig] = useState<CpeConfigForm>(DEFAULT_CPE);
-  const [emailConfig, setEmailConfig] = useState<EmailConfigForm>(DEFAULT_EMAIL);
-  const [wechatConfig, setWechatConfig] = useState<WechatConfigForm>({ webhookUrl: '' });
-  const [emailPasswordSet, setEmailPasswordSet] = useState(false);
-  const [wechatWebhookSet, setWechatWebhookSet] = useState(false);
-  const [passwordForm, setPasswordForm] = useState<PasswordFormState>({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
-  const [smsSyncConfig, setSmsSyncConfig] = useState<SmsSyncConfigForm>({
-    enabled: true,
-    interval: '15',
-    running: false,
-    lastSyncedAt: null,
-    lastError: null,
-  });
-  const [dataRetention, setDataRetention] = useState<DataRetentionForm>({
-    historyDays: '90',
-    runDays: '180',
-    lastCleanupAt: null,
-  });
-
-  const [pageLoading, setPageLoading] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<TestResultState | null>(null);
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatusState | null>(null);
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const [savingSmsSync, setSavingSmsSync] = useState(false);
-  const [savingDataRetention, setSavingDataRetention] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [message, setMessage] = useState<SettingsMessage>({ type: '', text: '' });
   const [openSection, setOpenSection] = useState<SettingsSectionId | null>(null);
-
   const collapseSection = useCallback(() => setOpenSection(null), []);
+  const onMessage = useCallback((next: SettingsMessage) => setMessage(next), []);
+  const actionContext = useMemo<SettingsActionContext>(() => ({ onMessage, onSaved: collapseSection }), [collapseSection, onMessage]);
 
-  const fetchUpdateStatus = useCallback(async () => {
-    try {
-      const data = await apiFetch<UpdateStatusState>(
-        '/api/system/update',
-        undefined,
-        '无法获取升级状态',
-      );
-      setUpdateStatus(data);
-    } catch (error) {
-      setUpdateStatus({
-        error: error instanceof Error ? error.message : '无法获取升级状态',
-      });
-    }
-  }, []);
+  const cpe = useCpeSettings(actionContext);
+  const notifications = useNotificationSettings(actionContext);
+  const sms = useSmsSyncSettings(actionContext);
+  const retention = useDataRetentionSettings(actionContext);
+  const password = usePasswordSettings(actionContext);
+  const update = useSystemUpdate();
 
-  const fetchConfigs = useCallback(async () => {
-    try {
-      const [cpeData, notifData, smsSyncData, retentionData] = await Promise.all([
-        apiFetch<Record<string, unknown>>('/api/settings/cpe', undefined, '获取CPE配置失败'),
-        apiFetch<NotificationApiRow[]>(
-          '/api/settings/notification',
-          undefined,
-          '获取通知配置失败',
-        ),
-        apiFetch<{
-          enabled?: boolean;
-          interval?: number;
-          running?: boolean;
-          lastSyncedAt?: string | null;
-          lastError?: string | null;
-        }>('/api/dashboard/sms/settings', undefined, '获取短信同步设置失败'),
-        apiFetch<{
-          historyDays?: number;
-          runDays?: number;
-          lastCleanupAt?: string | null;
-        }>('/api/settings/data-retention', undefined, '获取数据保留设置失败'),
-      ]);
+  const pageLoading = cpe.initialLoading || notifications.initialLoading || sms.initialLoading || retention.initialLoading;
+  const loading = cpe.saving || notifications.savingEmail || notifications.savingWechat || password.savingPassword;
 
-      if (cpeData.cpe_url) {
-        setCpeConfig({
-          cpeUrl: String(cpeData.cpe_url),
-          cpeUsername: String(cpeData.cpe_username || 'admin'),
-          cpePassword: '',
-        });
-      }
-
-      for (const config of notifData) {
-        if (config.type === 'email') {
-          const parsed = JSON.parse(config.config) as PublicEmailApiConfig;
-          setEmailConfig({
-            smtpHost: parsed.smtpHost || '',
-            smtpPort: String(parsed.smtpPort || 587),
-            smtpUser: parsed.smtpUser || '',
-            smtpPass: '',
-            from: parsed.from || '',
-            to: Array.isArray(parsed.to) ? parsed.to.join('\n') : parsed.to || '',
-          });
-          setEmailPasswordSet(Boolean(parsed.smtpPasswordSet));
-        } else if (config.type === 'wechat') {
-          const parsed = JSON.parse(config.config) as PublicWechatApiConfig;
-          setWechatConfig({ webhookUrl: parsed.webhookUrl || '' });
-          setWechatWebhookSet(Boolean(parsed.webhookConfigured));
-        }
-      }
-
-      setSmsSyncConfig({
-        enabled: Boolean(smsSyncData.enabled),
-        interval: String(smsSyncData.interval || 15),
-        running: Boolean(smsSyncData.running),
-        lastSyncedAt: smsSyncData.lastSyncedAt || null,
-        lastError: smsSyncData.lastError || null,
-      });
-      setDataRetention({
-        historyDays: String(retentionData.historyDays || 90),
-        runDays: String(retentionData.runDays || 180),
-        lastCleanupAt: retentionData.lastCleanupAt || null,
-      });
-    } catch (error) {
-      console.error('Failed to fetch configs:', error);
-    } finally {
-      setPageLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void Promise.allSettled([
-        fetchConfigs(),
-        fetchUpdateStatus(),
-      ]);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [fetchConfigs, fetchUpdateStatus]);
-
-  async function saveCpeConfig() {
-    setLoading(true);
-    try {
-      await apiFetch(
-        '/api/settings/cpe',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cpeConfig),
-        },
-        '保存失败',
-      );
-      setMessage({ type: 'success', text: 'CPE 配置已保存' });
-      collapseSection();
-    } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : '保存失败' });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function testCpeConnection() {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const data = await apiFetch<TestResultState>(
-        '/api/settings/cpe/test',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cpeConfig),
-        },
-        '测试请求失败',
-      );
-      setTestResult(data);
-    } catch (error) {
-      setTestResult({
-        success: false,
-        message: error instanceof Error ? error.message : '测试请求失败',
-      });
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  async function checkSystemUpdate() {
-    setCheckingUpdate(true);
-    try {
-      const data = await apiFetch<UpdateStatusState>(
-        '/api/system/update',
-        { method: 'POST' },
-        '检查更新失败',
-      );
-      setUpdateStatus(data);
-    } catch (error) {
-      setUpdateStatus({
-        error: error instanceof Error ? error.message : '检查更新请求失败',
-      });
-    } finally {
-      setCheckingUpdate(false);
-    }
-  }
-
-  async function saveEmailConfig() {
-    setLoading(true);
-    try {
-      await apiFetch(
-        '/api/settings/notification',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'email', config: emailConfig, enabled: true }),
-        },
-        '保存失败',
-      );
-      if (emailConfig.smtpPass.trim()) setEmailPasswordSet(true);
-      setEmailConfig((current) => ({ ...current, smtpPass: '' }));
-      setMessage({ type: 'success', text: '邮件配置已保存' });
-      collapseSection();
-    } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : '保存失败' });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function saveWechatConfig() {
-    setLoading(true);
-    try {
-      await apiFetch(
-        '/api/settings/notification',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'wechat', config: wechatConfig, enabled: true }),
-        },
-        '保存失败',
-      );
-      if (wechatConfig.webhookUrl.trim()) setWechatWebhookSet(true);
-      setWechatConfig({ webhookUrl: '' });
-      setMessage({ type: 'success', text: '企业微信配置已保存' });
-      collapseSection();
-    } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : '保存失败' });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function saveSmsSyncConfig() {
-    const interval = Number(smsSyncConfig.interval);
-    if (!Number.isInteger(interval) || interval < 1 || interval > 1440) {
-      setMessage({ type: 'error', text: '短信同步间隔必须是 1 到 1440 之间的整数分钟' });
-      return;
-    }
-
-    setSavingSmsSync(true);
-    try {
-      const data = await apiFetch<{
-        sync?: {
-          enabled?: boolean;
-          interval?: number;
-          running?: boolean;
-          lastSyncedAt?: string | null;
-          lastError?: string | null;
-        };
-      }>(
-        '/api/dashboard/sms/settings',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ enabled: smsSyncConfig.enabled, interval }),
-        },
-        '保存失败',
-      );
-
-      const sync = data.sync || {};
-      setSmsSyncConfig({
-        enabled: Boolean(sync.enabled),
-        interval: String(sync.interval || interval),
-        running: Boolean(sync.running),
-        lastSyncedAt: sync.lastSyncedAt || null,
-        lastError: sync.lastError || null,
-      });
-      setMessage({ type: 'success', text: '短信自动同步设置已保存' });
-      collapseSection();
-    } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : '保存失败' });
-    } finally {
-      setSavingSmsSync(false);
-    }
-  }
-
-  async function saveDataRetention(cleanupNow: boolean) {
-    const historyDays = Number(dataRetention.historyDays);
-    const runDays = Number(dataRetention.runDays);
-    if (
-      !Number.isInteger(historyDays)
-      || !Number.isInteger(runDays)
-      || historyDays < 7
-      || historyDays > 3650
-      || runDays < 7
-      || runDays > 3650
-    ) {
-      setMessage({ type: 'error', text: '数据保留天数必须是 7 到 3650 之间的整数' });
-      return;
-    }
-
-    setSavingDataRetention(true);
-    try {
-      const response = await apiFetch<{
-        config: {
-          historyDays: number;
-          runDays: number;
-          lastCleanupAt: string | null;
-        };
-        cleanup?: {
-          trafficDeleted: number;
-          devicesDeleted: number;
-          runsDeleted: number;
-          cleanedAt: string;
-        } | null;
-      }>(
-        '/api/settings/data-retention',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ historyDays, runDays, cleanupNow }),
-        },
-        '保存数据保留设置失败',
-      );
-
-      setDataRetention({
-        historyDays: String(response.config.historyDays),
-        runDays: String(response.config.runDays),
-        lastCleanupAt: response.cleanup?.cleanedAt || response.config.lastCleanupAt,
-      });
-      const cleanupSummary = response.cleanup
-        ? `，已删除 ${response.cleanup.trafficDeleted} 条流量、${response.cleanup.devicesDeleted} 条设备和 ${response.cleanup.runsDeleted} 条采集记录`
-        : '';
-      setMessage({ type: 'success', text: `数据保留策略已保存${cleanupSummary}` });
-      collapseSection();
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : '保存数据保留设置失败',
-      });
-    } finally {
-      setSavingDataRetention(false);
-    }
-  }
-
-  async function changePassword() {
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setMessage({ type: 'error', text: '两次输入的密码不一致' });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await apiFetch(
-        '/api/settings/password',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            currentPassword: passwordForm.currentPassword,
-            newPassword: passwordForm.newPassword,
-          }),
-        },
-        '修改失败',
-      );
-      setMessage({ type: 'success', text: '密码已修改' });
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      collapseSection();
-    } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : '修改失败' });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const smsState = !smsSyncConfig.enabled
-    ? '已暂停'
-    : smsSyncConfig.running
-      ? '运行中'
-      : '等待启动';
-  const emailConfigured = Boolean(emailConfig.smtpHost && emailConfig.to);
-  const wechatConfigured = wechatWebhookSet || Boolean(wechatConfig.webhookUrl);
-  const recipientCount = emailConfig.to
-    ? emailConfig.to.split(/[\n,;]+/).map((item) => item.trim()).filter(Boolean).length
-    : 0;
-
-  const overviewMeta = useMemo(
-    () => ({
-      cpeConfigured: Boolean(cpeConfig.cpeUrl),
-      cpeUrl: cpeConfig.cpeUrl,
-      smsEnabled: smsSyncConfig.enabled,
-      smsInterval: smsSyncConfig.interval,
-      smsLastSyncedAt: smsSyncConfig.lastSyncedAt,
-      smsLastError: smsSyncConfig.lastError,
-      emailConfigured,
-      emailHost: emailConfig.smtpHost,
-      recipientCount,
-      wechatConfigured,
-      wechatMasked: wechatConfig.webhookUrl
-        ? maskSecret(wechatConfig.webhookUrl)
-        : wechatWebhookSet
-          ? '已安全保存'
-          : '',
-      smsSyncLabel: formatSyncTime(smsSyncConfig.lastSyncedAt),
-    }),
-    [
-      cpeConfig.cpeUrl,
-      smsSyncConfig.enabled,
-      smsSyncConfig.interval,
-      smsSyncConfig.lastSyncedAt,
-      smsSyncConfig.lastError,
-      emailConfigured,
-      emailConfig.smtpHost,
-      recipientCount,
-      wechatConfigured,
-      wechatConfig.webhookUrl,
-      wechatWebhookSet,
-    ],
-  );
+  const overviewMeta = useMemo(() => ({
+    cpeConfigured: Boolean(cpe.cpeConfig.cpeUrl),
+    cpeUrl: cpe.cpeConfig.cpeUrl,
+    smsEnabled: sms.smsSyncConfig.enabled,
+    smsInterval: sms.smsSyncConfig.interval,
+    smsLastSyncedAt: sms.smsSyncConfig.lastSyncedAt,
+    smsLastError: sms.smsSyncConfig.lastError,
+    emailConfigured: notifications.emailConfigured,
+    emailHost: notifications.emailConfig.smtpHost,
+    recipientCount: notifications.recipientCount,
+    wechatConfigured: notifications.wechatConfigured,
+    wechatMasked: notifications.wechatConfig.webhookUrl
+      ? maskSecret(notifications.wechatConfig.webhookUrl)
+      : notifications.wechatWebhookSet ? '已安全保存' : '',
+    smsSyncLabel: formatSyncTime(sms.smsSyncConfig.lastSyncedAt),
+  }), [cpe.cpeConfig.cpeUrl, notifications, sms.smsSyncConfig]);
 
   return {
-    cpeConfig,
-    setCpeConfig,
-    emailConfig,
-    setEmailConfig,
-    wechatConfig,
-    setWechatConfig,
-    passwordForm,
-    setPasswordForm,
-    smsSyncConfig,
-    setSmsSyncConfig,
-    dataRetention,
-    setDataRetention,
+    ...cpe,
+    ...notifications,
+    ...sms,
+    ...retention,
+    ...password,
+    ...update,
     pageLoading,
     loading,
-    testing,
-    testResult,
-    updateStatus,
-    checkingUpdate,
-    savingSmsSync,
-    savingDataRetention,
     message,
     openSection,
     setOpenSection,
-    smsState,
-    emailConfigured,
-    emailPasswordSet,
-    wechatConfigured,
-    wechatWebhookSet,
-    recipientCount,
     overviewMeta,
-    saveCpeConfig,
-    testCpeConnection,
-    saveEmailConfig,
-    saveWechatConfig,
-    saveSmsSyncConfig,
-    saveDataRetention,
-    changePassword,
-    fetchUpdateStatus,
-    checkSystemUpdate,
   };
 }

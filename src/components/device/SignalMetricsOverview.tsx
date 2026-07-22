@@ -1,6 +1,10 @@
+'use client';
+
+import { motion, useReducedMotion } from 'framer-motion';
 import { Activity, RadioTower } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AnimatedCounter } from '@/components/motion';
 
 interface SignalMetricsOverviewProps {
   cell?: Record<string, unknown> | null;
@@ -130,8 +134,9 @@ function resolveMetricValue(
 }
 
 export default function SignalMetricsOverview({ cell }: SignalMetricsOverviewProps) {
+  const reduce = useReducedMotion();
   return (
-    <Card className="card-hover">
+    <Card className="shadow-card">
       <CardHeader className="gap-2">
         <CardTitle className="flex items-center gap-2">
           <RadioTower className="h-5 w-5 text-primary" />
@@ -143,15 +148,12 @@ export default function SignalMetricsOverview({ cell }: SignalMetricsOverviewPro
       </CardHeader>
       <CardContent>
         <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem]">
-          {metrics.map((metric) => {
+          {metrics.map((metric, index) => {
             const value = resolveMetricValue(cell, metric.key);
             const quality = getQuality(value, metric.thresholds);
             const score = getMetricScore(value, metric.thresholds);
-            return (
-              <div
-                key={metric.key}
-                className="min-w-0 rounded-2xl border border-border/70 bg-muted/20 p-4"
-              >
+            const cardContent = (
+              <>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -165,9 +167,15 @@ export default function SignalMetricsOverview({ cell }: SignalMetricsOverviewPro
                   <Badge variant={quality.variant}>{quality.label}</Badge>
                 </div>
                 <div className="mt-4 flex items-end gap-1.5">
-                  <span className="text-3xl font-semibold tabular-nums tracking-tight">
-                    {value ?? '—'}
-                  </span>
+                  {value === null ? (
+                    <span className="text-3xl font-semibold tabular-nums tracking-tight">—</span>
+                  ) : (
+                    <AnimatedCounter
+                      value={value}
+                      decimals={Number.isInteger(value) ? 0 : 1}
+                      className="text-3xl font-semibold tabular-nums tracking-tight"
+                    />
+                  )}
                   <span className="pb-1 text-sm text-muted-foreground">{metric.unit}</span>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -181,13 +189,30 @@ export default function SignalMetricsOverview({ cell }: SignalMetricsOverviewPro
                     </span>
                   </div>
                   <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={`h-full rounded-full transition-[width] duration-500 ${getScoreTone(score)}`}
-                      style={{ width: `${score}%` }}
+                    <motion.div
+                      className={`h-full rounded-full ${getScoreTone(score)}`}
+                      initial={reduce ? undefined : { width: 0 }}
+                      animate={{ width: `${score}%` }}
+                      transition={{ duration: 0.7, delay: 0.15 + index * 0.08, ease: 'easeOut' }}
                     />
                   </div>
                 </div>
+              </>
+            );
+            return reduce ? (
+              <div key={metric.key} className="min-w-0 rounded-2xl border border-border/70 bg-muted/20 p-4">
+                {cardContent}
               </div>
+            ) : (
+              <motion.div
+                key={metric.key}
+                className="min-w-0 rounded-2xl border border-border/70 bg-muted/20 p-4 transition-colors duration-200 hover:border-brand/20"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.07, duration: 0.35 }}
+              >
+                {cardContent}
+              </motion.div>
             );
           })}
         </div>

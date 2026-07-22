@@ -2,10 +2,10 @@
 
 import { KeyRound } from 'lucide-react';
 import { SettingsAccordionSection } from '@/components/settings/SettingsAccordionSection';
+import { SaveButton } from '@/components/settings/SaveButton';
 import FieldGroup from '@/components/forms/FieldGroup';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { PasswordFormState } from '@/hooks/useSettingsPage';
+import type { PasswordFormState } from '@/features/settings/types';
 
 interface PasswordSectionProps {
   open: boolean;
@@ -75,9 +75,7 @@ export function PasswordSection({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
         <p className="text-xs text-muted-foreground">修改成功后，新密码将用于下一次登录。</p>
-        <Button size="sm" onClick={onSave} disabled={loading}>
-          <KeyRound className="mr-1.5 h-3.5 w-3.5" />更新管理员密码
-        </Button>
+        <SaveButton saving={loading} onClick={onSave} label="更新管理员密码" />
       </div>
     </SettingsAccordionSection>
   );

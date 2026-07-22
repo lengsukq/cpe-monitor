@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ChevronDown, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,6 +41,8 @@ export function SettingsAccordionSection({
   children,
   className,
 }: SettingsAccordionSectionProps) {
+  const reduce = useReducedMotion();
+  const spring = { type: 'spring' as const, stiffness: 320, damping: 32 };
   return (
     <Card
       id={id}
@@ -83,33 +86,53 @@ export function SettingsAccordionSection({
                 修改
               </>
             )}
-            <ChevronDown
-              className={cn(
-                'ml-1 h-3.5 w-3.5 transition-transform duration-200',
-                open && 'rotate-180',
-              )}
-              aria-hidden
-            />
+            <motion.span
+              animate={{ rotate: open ? 180 : 0 }}
+              transition={reduce ? { duration: 0 } : spring}
+              className="ml-1 inline-flex"
+            >
+              <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+            </motion.span>
           </Button>
         </div>
       </div>
 
-      {!open ? (
-        <CardContent className="px-5 py-4 sm:px-6">
-          <div className="flex flex-wrap gap-x-5 gap-y-1">
-            {summary.map((row) => (
-              <div key={row.label} className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">{row.label}:</span>{' '}
-                <span className={cn(row.mono && 'font-mono')}>{row.value || '—'}</span>
+      <AnimatePresence initial={false} mode="wait">
+        {!open ? (
+          <motion.div
+            key="summary"
+            initial={reduce ? undefined : { opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={reduce ? undefined : { opacity: 0, height: 0 }}
+            transition={reduce ? { duration: 0 } : spring}
+            className="overflow-hidden"
+          >
+            <CardContent className="px-5 py-4 sm:px-6">
+              <div className="flex flex-wrap gap-x-5 gap-y-1">
+                {summary.map((row) => (
+                  <div key={row.label} className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{row.label}:</span>{' '}
+                    <span className={cn(row.mono && 'font-mono')}>{row.value || '—'}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </CardContent>
-      ) : (
-        <CardContent id={`${id}-panel`} className="space-y-4 px-5 py-5 sm:px-6">
-          {children}
-        </CardContent>
-      )}
+            </CardContent>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="editor"
+            initial={reduce ? undefined : { opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={reduce ? undefined : { opacity: 0, height: 0 }}
+            transition={reduce ? { duration: 0 } : spring}
+            className="overflow-hidden"
+          >
+            <CardContent id={`${id}-panel`} className="space-y-4 px-5 py-5 sm:px-6">
+              {children}
+            </CardContent>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Card>
   );
 }

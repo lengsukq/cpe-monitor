@@ -1,12 +1,12 @@
 'use client';
 
-import { BellRing, Save } from 'lucide-react';
+import { BellRing } from 'lucide-react';
 import { SettingsAccordionSection } from '@/components/settings/SettingsAccordionSection';
+import { SaveButton } from '@/components/settings/SaveButton';
 import FieldGroup from '@/components/forms/FieldGroup';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import type { WechatConfigForm } from '@/hooks/useSettingsPage';
+import type { WechatConfigForm } from '@/features/settings/types';
 
 interface WechatNotificationSectionProps {
   open: boolean;
@@ -72,9 +72,7 @@ export function WechatNotificationSection({
         配置后，告警与短信同步会使用已启用的通知渠道；不会向 CPE 发送短信。
       </p>
       <div className="mt-auto flex justify-end border-t border-border/60 pt-3">
-        <Button size="sm" onClick={onSave} disabled={loading}>
-          <Save className="mr-1.5 h-3.5 w-3.5" />保存企业微信配置
-        </Button>
+        <SaveButton saving={loading} onClick={onSave} label="保存企业微信配置" />
       </div>
     </SettingsAccordionSection>
   );

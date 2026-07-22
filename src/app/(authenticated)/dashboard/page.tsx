@@ -131,6 +131,7 @@ export default function DashboardPage() {
 
       <div className="fluid-card-grid gap-4 [--fluid-card-min:15rem]">
         <MetricStatCard
+          index={0}
           label="下载速率"
           value={formatBytesPerSecond(parseInt(String(data.rate.CurrentDownloadRate || '0'), 10))}
           color="text-brand"
@@ -139,6 +140,7 @@ export default function DashboardPage() {
           points={data.metricHistory.map((point) => point.downloadBps)}
         />
         <MetricStatCard
+          index={1}
           label="上传速率"
           value={formatBytesPerSecond(parseInt(String(data.rate.CurrentUploadRate || '0'), 10))}
           color="text-info"
@@ -147,6 +149,7 @@ export default function DashboardPage() {
           points={data.metricHistory.map((point) => point.uploadBps)}
         />
         <MetricStatCard
+          index={2}
           href="/device#online-devices"
           label="在线设备"
           value={`${data.overview?.connectedDevices || 0} 台`}
@@ -156,6 +159,7 @@ export default function DashboardPage() {
           points={data.metricHistory.map((point) => point.connectedDevices)}
         />
         <MetricStatCard
+          index={3}
           href="/device"
           label="信号强度"
           value={`${data.overview?.signalStrength ?? 0} dBm`}

@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useTheme } from 'next-themes';
+import { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -14,6 +13,12 @@ import {
   Legend,
   Filler,
 } from 'chart.js';
+import {
+  useChartTheme,
+  buildTooltipOptions,
+  buildLegendOptions,
+  CHART_DEFAULTS,
+} from '@/lib/chart-theme';
 
 ChartJS.register(
   CategoryScale,
@@ -26,9 +31,6 @@ ChartJS.register(
   Filler,
 );
 
-const CHART_LINE_WIDTH = 2;
-const CHART_POINT_HOVER_RADIUS = 4;
-const CHART_TENSION = 0.4;
 const DOWNLOAD_FILL_ALPHA = 18;
 const UPLOAD_FILL_ALPHA = 14;
 
@@ -44,50 +46,8 @@ interface TrafficChartProps {
   data: TrafficData[];
 }
 
-interface ChartTooltipContext {
-  dataset: { label?: string };
-  parsed: { y: number | null };
-}
-
-interface ChartThemeColors {
-  download: string;
-  upload: string;
-  muted: string;
-  border: string;
-  card: string;
-  foreground: string;
-}
-
-function readCssColor(variableName: string, fallback: string): string {
-  if (typeof window === 'undefined') return fallback;
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(variableName)
-    .trim();
-  return value || fallback;
-}
-
-function readChartTheme(): ChartThemeColors {
-  return {
-    download: readCssColor('--chart-1', 'oklch(0.6 0.15 201)'),
-    upload: readCssColor('--chart-2', 'oklch(0.6 0.13 175)'),
-    muted: readCssColor('--muted-foreground', 'oklch(0.5 0 0)'),
-    border: readCssColor('--border', 'oklch(0.9 0 0)'),
-    card: readCssColor('--card', 'oklch(1 0 0)'),
-    foreground: readCssColor('--foreground', 'oklch(0.15 0 0)'),
-  };
-}
-
 export function TrafficChart({ data }: TrafficChartProps) {
-  const { resolvedTheme } = useTheme();
-  const [themeColors, setThemeColors] = useState<ChartThemeColors>(() => readChartTheme());
-
-  useEffect(() => {
-    // Re-read CSS variables after theme class changes on <html>.
-    const frame = window.requestAnimationFrame(() => {
-      setThemeColors(readChartTheme());
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [resolvedTheme]);
+  const themeColors = useChartTheme();
 
   const toMegabitsPerSecond = (bitsPerSecond: number | null | undefined) =>
     Number(((bitsPerSecond || 0) / 1_000_000).toFixed(3));
@@ -116,24 +76,24 @@ export function TrafficChart({ data }: TrafficChartProps) {
         {
           label: '下载',
           data: data.map((entry) => toMegabitsPerSecond(entry.downloadBps)),
-          borderColor: themeColors.download,
-          backgroundColor: `color-mix(in oklch, ${themeColors.download} ${DOWNLOAD_FILL_ALPHA}%, transparent)`,
+          borderColor: themeColors.primary,
+          backgroundColor: `color-mix(in oklch, ${themeColors.primary} ${DOWNLOAD_FILL_ALPHA}%, transparent)`,
           fill: true,
-          tension: CHART_TENSION,
+          tension: CHART_DEFAULTS.tension,
           pointRadius: 0,
-          pointHoverRadius: CHART_POINT_HOVER_RADIUS,
-          borderWidth: CHART_LINE_WIDTH,
+          pointHoverRadius: CHART_DEFAULTS.pointHoverRadius,
+          borderWidth: CHART_DEFAULTS.lineWidth,
         },
         {
           label: '上传',
           data: data.map((entry) => toMegabitsPerSecond(entry.uploadBps)),
-          borderColor: themeColors.upload,
-          backgroundColor: `color-mix(in oklch, ${themeColors.upload} ${UPLOAD_FILL_ALPHA}%, transparent)`,
+          borderColor: themeColors.secondary,
+          backgroundColor: `color-mix(in oklch, ${themeColors.secondary} ${UPLOAD_FILL_ALPHA}%, transparent)`,
           fill: true,
-          tension: CHART_TENSION,
+          tension: CHART_DEFAULTS.tension,
           pointRadius: 0,
-          pointHoverRadius: CHART_POINT_HOVER_RADIUS,
-          borderWidth: CHART_LINE_WIDTH,
+          pointHoverRadius: CHART_DEFAULTS.pointHoverRadius,
+          borderWidth: CHART_DEFAULTS.lineWidth,
         },
       ],
       });
@@ -152,22 +112,12 @@ export function TrafficChart({ data }: TrafficChartProps) {
       plugins: {
         legend: {
           position: 'top' as const,
-          labels: {
-            color: themeColors.muted,
-            usePointStyle: true,
-            pointStyle: 'circle' as const,
-            boxWidth: 8,
-            padding: 16,
-          },
+          ...buildLegendOptions(themeColors),
         },
         tooltip: {
-          backgroundColor: themeColors.card,
-          titleColor: themeColors.foreground,
-          bodyColor: themeColors.foreground,
-          borderColor: themeColors.border,
-          borderWidth: 1,
+          ...buildTooltipOptions(themeColors),
           callbacks: {
-            label: (context: ChartTooltipContext) => {
+            label: (context: { dataset: { label?: string }; parsed: { y: number | null } }) => {
               return `${context.dataset.label || ''}: ${context.parsed.y ?? 0} Mbps`;
             },
           },

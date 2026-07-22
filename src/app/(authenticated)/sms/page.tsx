@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Mail, MessageSquareText, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { BarChart3, Mail, MessageSquareText, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
 import { Callout } from '@/components/Callout';
 import { PageHeader } from '@/components/PageHeader';
 import { PageShell } from '@/components/PageShell';
@@ -11,6 +12,9 @@ import {
   OverviewDonut,
   OverviewSegments,
 } from '@/components/overview/OverviewMiniCharts';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ThemedBarChart } from '@/components/charts/BarChart';
+import { ScrollReveal } from '@/components/motion';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingBlock } from '@/components/LoadingBlock';
 import { Button } from '@/components/ui/button';
@@ -55,7 +59,16 @@ function getRecentDailyCounts(messages: SmsMessage[], dayCount = 7) {
   return counts;
 }
 
+function getRecentDailyLabels(dayCount = 7) {
+  const now = Date.now();
+  return Array.from({ length: dayCount }, (_, index) => {
+    const date = new Date(now - (dayCount - 1 - index) * 24 * 60 * 60 * 1000);
+    return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+  });
+}
+
 export default function SmsPage() {
+  const reduce = useReducedMotion();
   const [messages, setMessages] = useState<SmsMessage[]>([]);
   const [total, setTotal] = useState(0);
   const [unread, setUnread] = useState(0);
@@ -143,6 +156,7 @@ export default function SmsPage() {
   const inboundCount = messages.filter((message) => message.direction === 'inbound').length;
   const outboundCount = messages.filter((message) => message.direction === 'outbound').length;
   const recentDailyCounts = getRecentDailyCounts(messages);
+  const dailyLabels = getRecentDailyLabels();
 
   return (
     <PageShell>
@@ -217,6 +231,27 @@ export default function SmsPage() {
           },
         ]}
       />
+
+      {!loading && messages.length > 0 ? (
+        <ScrollReveal>
+          <Card className="shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="metric-icon size-8 rounded-lg"><BarChart3 className="h-4 w-4" /></span>
+                近 7 天短信活跃
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ThemedBarChart
+                labels={dailyLabels}
+                series={[{ label: '短信数量', values: recentDailyCounts }]}
+                height={190}
+                formatValue={(value) => `${value} 条`}
+              />
+            </CardContent>
+          </Card>
+        </ScrollReveal>
+      ) : null}
 
       <section className="app-panel p-5 lg:p-7">
         <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
@@ -304,26 +339,36 @@ export default function SmsPage() {
             />
           </div>
         ) : (
-          <div className="mt-5 grid gap-3">
-            {visibleMessages.map((message, index) => (
-              <article key={`${message.id}-${index}`} className="group grid min-w-0 gap-4 rounded-2xl border border-border/65 bg-muted/25 p-4 transition hover:border-brand/20 hover:bg-muted/40 md:grid-cols-[minmax(0,.4fr)_minmax(0,1fr)] md:items-start xl:grid-cols-[minmax(0,.3fr)_minmax(0,1fr)_minmax(0,.25fr)]">
-                <div className="flex items-center gap-3">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${message.unread ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
-                    {message.direction === 'inbound' ? <Smartphone className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+          <motion.div className="mt-5 grid gap-3" layout={reduce ? undefined : true}>
+            <AnimatePresence mode="popLayout" initial={false}>
+              {visibleMessages.map((message, index) => (
+                <motion.article
+                  key={`${message.id}-${index}`}
+                  layout={reduce ? undefined : 'position'}
+                  initial={reduce ? undefined : { opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduce ? undefined : { opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.25, delay: reduce ? 0 : Math.min(index * 0.03, 0.3) }}
+                  className="group grid min-w-0 gap-4 rounded-2xl border border-border/65 bg-muted/25 p-4 transition-colors hover:border-brand/20 hover:bg-muted/40 md:grid-cols-[minmax(0,.4fr)_minmax(0,1fr)] md:items-start xl:grid-cols-[minmax(0,.3fr)_minmax(0,1fr)_minmax(0,.25fr)]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${message.unread ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
+                      {message.direction === 'inbound' ? <Smartphone className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{message.phone}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{message.direction === 'inbound' ? '收到' : '已发送'}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{message.phone}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{message.direction === 'inbound' ? '收到' : '已发送'}</p>
+                  <p className={`whitespace-pre-wrap text-sm leading-6 ${message.unread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>{message.content || '（无内容）'}</p>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground md:col-span-2 xl:col-span-1 xl:justify-end">
+                    {message.unread ? <Badge variant="info">未读</Badge> : <Badge variant="secondary">已读</Badge>}
+                    <span>{message.date || '未知时间'}</span>
                   </div>
-                </div>
-                <p className={`whitespace-pre-wrap text-sm leading-6 ${message.unread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>{message.content || '（无内容）'}</p>
-                <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground md:col-span-2 xl:col-span-1 xl:justify-end">
-                  {message.unread ? <Badge variant="info">未读</Badge> : <Badge variant="secondary">已读</Badge>}
-                  <span>{message.date || '未知时间'}</span>
-                </div>
-              </article>
-            ))}
-          </div>
+                </motion.article>
+              ))}
+            </AnimatePresence>
+          </motion.div>
         )}
       </section>
     </PageShell>

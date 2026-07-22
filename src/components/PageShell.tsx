@@ -1,5 +1,9 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { staggerContainer, fadeUp } from '@/components/motion';
 
 interface PageShellProps {
   children: ReactNode;
@@ -19,15 +23,30 @@ export function PageShell({
   className,
   maxWidth = 'full',
 }: PageShellProps) {
+  const reduce = useReducedMotion();
+
+  if (reduce) {
+    return (
+      <div className={cn('space-y-5 sm:space-y-6', maxWidthClass[maxWidth], className)}>
+        {children}
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={cn(
-        'page-enter space-y-5 sm:space-y-6',
-        maxWidthClass[maxWidth],
-        className,
-      )}
+    <motion.div
+      className={cn('space-y-5 sm:space-y-6', maxWidthClass[maxWidth], className)}
+      variants={staggerContainer}
+      initial="hidden"
+      animate="visible"
     >
-      {children}
-    </div>
+      {Array.isArray(children)
+        ? children.map((child, index) => (
+            <motion.div key={index} variants={fadeUp}>
+              {child}
+            </motion.div>
+          ))
+        : <motion.div variants={fadeUp}>{children}</motion.div>}
+    </motion.div>
   );
 }

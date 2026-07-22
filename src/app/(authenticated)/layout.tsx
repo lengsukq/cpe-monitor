@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
+import { AnimatePresence } from 'framer-motion';
 import { TopNav } from '@/components/TopNav';
+import { PageTransition } from '@/components/motion';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AuthenticatedLayout({
@@ -12,6 +15,7 @@ export default function AuthenticatedLayout({
 }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -74,7 +78,11 @@ export default function AuthenticatedLayout({
     <div className="min-h-screen bg-background">
       <TopNav />
       <main className="mx-auto max-w-screen-2xl px-3 pt-28 sm:px-5 lg:px-7 pb-[max(2.5rem,env(safe-area-inset-bottom))]">
-        {children}
+        <AnimatePresence mode="wait" initial={false}>
+          <PageTransition key={pathname}>
+            {children}
+          </PageTransition>
+        </AnimatePresence>
       </main>
     </div>
   );

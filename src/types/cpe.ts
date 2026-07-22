@@ -189,3 +189,46 @@ export interface CpeDevicePageResponse {
   portalSettings?: unknown;
   iocDeviceCapacity?: unknown;
 }
+
+
+export interface CpeDevice {
+  name: string;
+  ip: string;
+  mac: string;
+  online: boolean;
+  uploadBytes: number;
+  downloadBytes: number;
+  onlineDuration: number;
+  interfaceType: string;
+  frequency: string;
+  rssi: number | null;
+  raw: Record<string, unknown>;
+}
+
+export interface CpeTrafficData {
+  uploadBytes: number;
+  downloadBytes: number;
+  connectedDevices: number;
+  signalStrength: number;
+  networkType: string;
+  band: string;
+  cellId: string;
+  pci: string;
+  rsrp: number | null;
+  rsrq: number | null;
+  sinr: number | null;
+  rssi: number | null;
+  devices: CpeDevice[];
+}
+
+export interface CpeSmsMessage {
+  id: string;
+  phone: string;
+  content: string;
+  date: string;
+  status: string;
+  type: string;
+  box: string;
+  unread: boolean;
+  direction: 'inbound' | 'outbound';
+}

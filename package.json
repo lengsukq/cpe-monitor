@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0 --port 3000",
+    "dev": "next dev --hostname 0.0.0.0 --port 8010",
     "build": "next build",
     "start": "next start",
     "lint": "node node_modules/eslint/bin/eslint.js src",
@@ -20,6 +20,7 @@
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "framer-motion": "^12.42.2",
     "jose": "^6.2.3",
     "lucide-react": "^1.17.0",
     "next": "16.2.6",

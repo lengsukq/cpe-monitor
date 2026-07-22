@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { Line } from 'react-chartjs-2';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import {
   CategoryScale,
   Chart as ChartJS,
@@ -38,6 +39,7 @@ function readCssColor(variableName: string, fallback: string): string {
 
 export default function DeviceCountHistoryChart({ data }: DeviceCountHistoryChartProps) {
   const { resolvedTheme } = useTheme();
+  const { hue } = useThemeColor();
   const [colors, setColors] = useState(() => ({
     line: readCssColor('--chart-2', 'oklch(0.6 0.13 175)'),
     muted: readCssColor('--muted-foreground', 'oklch(0.5 0 0)'),
@@ -55,7 +57,7 @@ export default function DeviceCountHistoryChart({ data }: DeviceCountHistoryChar
       foreground: readCssColor('--foreground', 'oklch(0.15 0 0)'),
     }));
     return () => window.cancelAnimationFrame(frame);
-  }, [resolvedTheme]);
+  }, [resolvedTheme, hue]);
 
   const chartData = useMemo(() => ({
     labels: data.map((entry) => new Date(`${entry.timestamp.replace(' ', 'T')}Z`)

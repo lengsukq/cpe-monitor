@@ -1,12 +1,13 @@
 'use client';
 
-import { RadioTower, Save } from 'lucide-react';
+import { RadioTower } from 'lucide-react';
 import { SettingsAccordionSection } from '@/components/settings/SettingsAccordionSection';
+import { SaveButton } from '@/components/settings/SaveButton';
 import FieldGroup from '@/components/forms/FieldGroup';
 import { Callout } from '@/components/Callout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { CpeConfigForm, TestResultState } from '@/hooks/useSettingsPage';
+import type { CpeConfigForm, TestResultState } from '@/features/settings/types';
 
 interface CpeConnectionSectionProps {
   open: boolean;
@@ -79,9 +80,7 @@ export function CpeConnectionSection({
         />
       </FieldGroup>
       <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
-        <Button size="sm" onClick={onSave} disabled={loading}>
-          <Save className="mr-1.5 h-3.5 w-3.5" />保存连接配置
-        </Button>
+        <SaveButton saving={loading} onClick={onSave} label="保存连接配置" />
         <Button size="sm" variant="outline" onClick={onTest} disabled={testing}>
           <RadioTower className="mr-1.5 h-3.5 w-3.5" />
           {testing ? '正在测试…' : '测试连接'}

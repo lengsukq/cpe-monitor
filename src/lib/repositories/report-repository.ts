@@ -1,4 +1,5 @@
 import type { DailyReport } from '@/types';
+import { mapDailyReportRows, type DailyReportRow } from '@/lib/mappers/daily-report';
 import { db, ensureDatabaseReady } from '@/lib/db';
 import { toSqliteTimestamp } from '@/lib/date-time';
 
@@ -41,4 +42,13 @@ export function markDailyReportSent(reportDate: string, sentAt = new Date()): vo
   db.prepare(
     'UPDATE daily_reports SET sent_at = ? WHERE report_date = ?',
   ).run(toSqliteTimestamp(sentAt), reportDate);
+}
+
+export function listRecentDailyReports(limit = 30): DailyReport[] {
+  ensureDatabaseReady();
+  const safeLimit = Math.min(365, Math.max(1, Math.floor(limit)));
+  const rows = db.prepare(
+    'SELECT * FROM daily_reports ORDER BY report_date DESC LIMIT ?',
+  ).all(safeLimit) as DailyReportRow[];
+  return mapDailyReportRows(rows);
 }

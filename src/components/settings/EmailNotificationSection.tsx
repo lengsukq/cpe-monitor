@@ -1,13 +1,13 @@
 'use client';
 
-import { Mail, Send } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { SettingsAccordionSection } from '@/components/settings/SettingsAccordionSection';
+import { SaveButton } from '@/components/settings/SaveButton';
 import FieldGroup from '@/components/forms/FieldGroup';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { EmailConfigForm } from '@/hooks/useSettingsPage';
+import type { EmailConfigForm } from '@/features/settings/types';
 
 interface EmailNotificationSectionProps {
   open: boolean;
@@ -118,9 +118,7 @@ export function EmailNotificationSection({
         />
       </FieldGroup>
       <div className="flex justify-end border-t border-border/60 pt-3">
-        <Button size="sm" onClick={onSave} disabled={loading}>
-          <Send className="mr-1.5 h-3.5 w-3.5" />保存邮件配置
-        </Button>
+        <SaveButton saving={loading} onClick={onSave} label="保存邮件配置" />
       </div>
     </SettingsAccordionSection>
   );

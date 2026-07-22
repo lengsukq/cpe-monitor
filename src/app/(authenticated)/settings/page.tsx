@@ -18,6 +18,7 @@ import { DataRetentionSection } from '@/components/settings/DataRetentionSection
 import { EmailNotificationSection } from '@/components/settings/EmailNotificationSection';
 import { WechatNotificationSection } from '@/components/settings/WechatNotificationSection';
 import { PasswordSection } from '@/components/settings/PasswordSection';
+import { ThemeColorSection } from '@/components/settings/ThemeColorSection';
 import { useSettingsPage } from '@/hooks/useSettingsPage';
 
 export default function SettingsPage() {
@@ -134,6 +135,7 @@ export default function SettingsPage() {
         />
 
         <div className="space-y-4">
+          <ThemeColorSection />
           <CpeConnectionSection
             open={settings.openSection === 'connection'}
             onOpenChange={(open) => settings.setOpenSection(open ? 'connection' : null)}

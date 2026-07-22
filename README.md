@@ -14,11 +14,15 @@ H153 CPE 流量监控、告警通知、每日报告系统。
 - 新短信同步 - 短信持久化到本地 SQLite，默认每 15 分钟独立同步一次；支持 1–1440 分钟自定义间隔和手动同步
 - 每日报告 - 自动生成流量日报，包含设备排名、网络质量评估
 - 网页化邮件模板 - React Email 响应式 HTML 邮件
+- 主题色定制 - 10 组预设色板 + 自定义 Hue 滑杆，全站品牌色即时切换
+- 精致动效 - framer-motion 页面过渡、卡片入场、数字滚动、布局动画
+- 多维图表 - 环形图、柱状图、面积图，覆盖流量、告警、短信、报告等场景
 
 ## 技术栈
 
 - 框架: Next.js 16 (App Router)
 - UI: Base UI + TailwindCSS v4
+- 动效: framer-motion
 - 数据库: SQLite (`better-sqlite3`, WAL)
 - 数据迁移: 内置版本化 Migration (`PRAGMA user_version`)
 - 认证: JWT (jose) + bcryptjs
@@ -75,6 +79,37 @@ npm run check
 
 测试使用 Node 22 自带的 TypeScript 类型剥离和 `node:test`，不会额外启动数据库服务。核心测试覆盖时区、计数器复位、速率单位、告警目录、通知密钥加密和 Migration 幂等性。
 
+## 主题定制
+
+全站品牌色基于 oklch 色彩空间的 Hue 旋转模型：保持原有亮度/饱和度，仅替换 Hue 即可整体换色，语义色（success/warning/danger）不受影响。
+
+- **预设色板**：青蓝（默认 Hue 201）、靛蓝、紫罗兰、品红、珊瑚、琥珀、翡翠、薄荷、天蓝、玫红
+- **自定义 Hue**：0–360° 滑杆实时预览，渐变轨道直观选色
+- **持久化**：保存在 localStorage（`cpeye-theme-hue`），无需后端改动，刷新后自动恢复
+- **入口**：设置页「主题色」区块，或顶部导航调色板按钮快捷切换
+- **图表联动**：Chart.js 组件读取 CSS 变量，切换主题色后图表自动跟随重绘
+
+核心实现：`src/lib/theme-colors.ts`（预设与派生调色板）、`src/hooks/useThemeColor.ts`、`src/components/ThemeColorProvider.tsx`。
+
+## 动效体系
+
+基于 framer-motion 的统一动效层，所有动效均尊重 `prefers-reduced-motion` 设置，自动降级为无动画。
+
+- **动效原语**：`src/components/motion/` 提供 PageTransition、MotionCard、ScrollReveal、AnimatedCounter、StaggerGroup 等可复用组件
+- **页面过渡**：AnimatePresence + pathname key，路由切换时淡入淡出
+- **逐页动效**：登录页光斑漂浮、仪表盘数字滚动、设备表格行级入场、短信列表布局动画、告警卡片 layout 动画、设置区块 spring 展开
+- **导航**：TopNav active 指示器 layoutId 滑动、移动端菜单 spring 展开
+- **表单**：统一 focus 态（brand 色边框 + 光环）、按钮 active 缩放、保存成功绿色 check 微反馈、错误提示滑入
+- **滚动条**：WebKit + Firefox 细滚动条美化，圆角半透明拇指块
+
+## 图表
+
+基于 Chart.js + react-chartjs-2，通过共享主题层自动响应 dark/light 和自定义 Hue。
+
+- **共享主题**：`src/lib/chart-theme.ts` 提供 `useChartTheme()` hook（监听主题切换 + MutationObserver 响应 Hue 变化）和 tooltip/图例/坐标轴统一配置
+- **通用组件**：`src/components/charts/` 包含 DonutChart（环形图 + 中心文字）、BarChart（圆角柱状 + 渐变填充）、AreaChart（渐变面积图）
+- **页面覆盖**：仪表盘套餐用量环形图、告警规则分布环形图 + 启用状态柱状图、报告页 14 天流量趋势 + 网络质量评分、短信页 7 日活跃柱状图、设备页信号/设备数历史曲线
+
 流量与设备历史默认保留 90 天，采集运行记录默认保留 180 天。可在「系统设置 → 数据保留」修改，并选择立即清理；正常采集后最多每 12 小时自动清理一次过期记录。
 
 ## 项目结构
@@ -91,19 +126,27 @@ src/
 │   └── login/               # 登录页
 ├── lib/
 │   ├── auth.ts              # JWT 认证
-│   ├── cpe-client.ts        # CPE 客户端
+│   ├── theme-colors.ts      # 主题色预设与 Hue 派生调色板
+│   ├── chart-theme.ts       # 图表共享主题与 useChartTheme
+│   ├── cpe-client.ts        # 稳定 CPE Facade 与实例管理
+│   ├── cpe-client-core.ts   # CPE 会话与端点客户端
+│   ├── cpe-http.ts          # 请求超时与传输
+│   ├── cpe-crypto.ts        # 登录证明、RSA 与短信解密
 │   ├── cpe-protocol.ts      # XML 协议、转义和认证错误识别
 │   ├── db.ts                # SQLite 连接与版本化 Migration
 │   ├── date-time.ts         # UTC/Asia-Shanghai 时间边界
 │   ├── traffic-units.ts     # 流量计数器和速率单位
 │   ├── alert-metrics.ts     # 告警指标单一目录
 │   ├── notification-config.ts # 通知密钥安全序列化
-│   ├── repositories/        # 数据访问边界
+│   ├── repositories/        # 告警、监控、短信、设置和日报数据访问边界
 │   ├── scheduler.ts         # 定时任务
 │   ├── report-generator.ts  # 报告生成
 │   └── notifiers/           # 通知模块
 ├── emails/                  # React Email 模板
-├── components/              # 组件
+├── components/              # 共享组件
+│   ├── motion/              # framer-motion 动效原语
+│   └── charts/              # 通用图表组件 (Donut/Bar/Area)
+├── features/                # 告警、日报和设置 feature-local 模块
 └── types/                   # API 与 CPE 响应类型
 ```
 

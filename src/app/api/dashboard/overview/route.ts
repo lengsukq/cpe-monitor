@@ -1,20 +1,12 @@
-import { db } from '@/lib/db';
-import { ensureDatabase, jsonOk, requireSession, withApiHandler } from '@/lib/api-route';
+import { jsonOk, requireSession, withApiHandler } from '@/lib/api-route';
 import { ensureSchedulerStarted, getSchedulerStatus } from '@/lib/scheduler';
 import { getOrCreateCpeClient } from '@/lib/cpe-client';
 import { getSettingsMap } from '@/lib/settings-store';
 import { getCollectionHealth } from '@/lib/collection-health';
-
-interface TrafficDataRow {
-  upload_bytes: number | null;
-  download_bytes: number | null;
-  connected_devices: number | null;
-  signal_strength: number | null;
-}
+import { findLatestTrafficOverview } from '@/lib/repositories/monitoring-repository';
 
 export const GET = withApiHandler(async () => {
   await requireSession();
-  ensureDatabase();
   await ensureSchedulerStarted();
 
   let settingsMap: Record<string, string> = {};
@@ -70,14 +62,12 @@ export const GET = withApiHandler(async () => {
       ? error.message
       : 'CPE 登录失败，请检查设备地址、网络连接和密码。';
     try {
-      const latestTraffic = db.prepare(
-        'SELECT * FROM traffic_data ORDER BY timestamp DESC LIMIT 1',
-      ).all() as TrafficDataRow[];
-      if (latestTraffic[0]) {
-        currentUpload = latestTraffic[0].upload_bytes || 0;
-        currentDownload = latestTraffic[0].download_bytes || 0;
-        connectedDevices = latestTraffic[0].connected_devices || 0;
-        signalStrength = latestTraffic[0].signal_strength || 0;
+      const latestTraffic = findLatestTrafficOverview();
+      if (latestTraffic) {
+        currentUpload = latestTraffic.upload_bytes || 0;
+        currentDownload = latestTraffic.download_bytes || 0;
+        connectedDevices = latestTraffic.connected_devices || 0;
+        signalStrength = latestTraffic.signal_strength || 0;
       }
     } catch (fallbackError) {
       console.error('Overview database fallback failed', fallbackError);

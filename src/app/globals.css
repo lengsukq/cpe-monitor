@@ -311,3 +311,77 @@
     display: none;
   }
 }
+
+/* ─── Custom scrollbars ─────────────────────────────────────────── */
+
+/* WebKit (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: color-mix(in oklch, var(--muted-foreground) 26%, transparent);
+  transition: background 0.2s;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--muted-foreground) 42%, transparent);
+}
+::-webkit-scrollbar-thumb:active {
+  background: color-mix(in oklch, var(--brand) 55%, transparent);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 26%, transparent) transparent;
+}
+
+/* ─── Hue slider (theme color picker) ───────────────────────────── */
+
+.hue-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--hue-track, linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red));
+  outline: none;
+  cursor: pointer;
+  border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+}
+.hue-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: white;
+  border: 3px solid color-mix(in oklch, var(--foreground) 70%, transparent);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.hue-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 12px rgb(0 0 0 / 30%);
+}
+.hue-slider::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+.hue-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: white;
+  border: 3px solid color-mix(in oklch, var(--foreground) 70%, transparent);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+  cursor: pointer;
+}
+.hue-slider:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 40%, transparent);
+}

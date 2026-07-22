@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { Line } from 'react-chartjs-2';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import {
   CategoryScale,
   Chart as ChartJS,
@@ -78,12 +79,13 @@ function formatLabel(timestamp: string, showDate: boolean): string {
 
 export default function SignalHistoryChart({ data }: SignalHistoryChartProps) {
   const { resolvedTheme } = useTheme();
+  const { hue } = useThemeColor();
   const [colors, setColors] = useState<ThemeColors>(() => readThemeColors());
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setColors(readThemeColors()));
     return () => window.cancelAnimationFrame(frame);
-  }, [resolvedTheme]);
+  }, [resolvedTheme, hue]);
 
   const chartData = useMemo(() => {
     const first = data[0]?.timestamp;

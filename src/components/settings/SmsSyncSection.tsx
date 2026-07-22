@@ -1,15 +1,15 @@
 'use client';
 
-import { MessageSquareText, Save } from 'lucide-react';
+import { MessageSquareText } from 'lucide-react';
 import { SettingsAccordionSection } from '@/components/settings/SettingsAccordionSection';
+import { SaveButton } from '@/components/settings/SaveButton';
 import FieldGroup from '@/components/forms/FieldGroup';
 import { Callout } from '@/components/Callout';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { formatSyncTime } from '@/lib/format';
-import type { SmsSyncConfigForm } from '@/hooks/useSettingsPage';
+import type { SmsSyncConfigForm } from '@/features/settings/types';
 
 interface SmsSyncSectionProps {
   open: boolean;
@@ -78,9 +78,7 @@ export function SmsSyncSection({
         <Callout tone="warning">上次同步失败：{smsSyncConfig.lastError}</Callout>
       ) : null}
       <div className="flex justify-end border-t border-border/60 pt-3">
-        <Button size="sm" onClick={onSave} disabled={savingSmsSync}>
-          {savingSmsSync ? '保存中…' : <><Save className="mr-1.5 h-3.5 w-3.5" />保存自动化设置</>}
-        </Button>
+        <SaveButton saving={savingSmsSync} onClick={onSave} label="保存自动化设置" />
       </div>
     </SettingsAccordionSection>
   );

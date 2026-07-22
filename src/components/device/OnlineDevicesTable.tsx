@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,6 +70,7 @@ export default function OnlineDevicesTable({
   error,
   onSelect,
 }: OnlineDevicesTableProps) {
+  const reduce = useReducedMotion();
   const [keyword, setKeyword] = useState('');
   const [connectionFilter, setConnectionFilter] = useState<ConnectionFilter>('all');
   const [sortMode, setSortMode] = useState<SortMode>('download');
@@ -177,11 +179,14 @@ export default function OnlineDevicesTable({
               {visibleDevices.map((device, index) => {
                 const signal = getSignalValue(device);
                 return (
-                  <button
+                  <motion.button
                     key={device.MACAddress || index}
                     type="button"
                     onClick={() => onSelect(device)}
-                    className="w-full rounded-2xl border border-border/70 bg-muted/20 p-4 text-left transition-colors hover:bg-muted/40"
+                    initial={reduce ? undefined : { opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(index * 0.04, 0.35), duration: 0.3 }}
+                    className="w-full rounded-2xl border border-border/70 bg-muted/20 p-4 text-left transition-colors hover:border-brand/20 hover:bg-muted/40"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -204,7 +209,7 @@ export default function OnlineDevicesTable({
                     <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground">
                       {device.MACAddress || '-'}
                     </p>
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
@@ -227,8 +232,11 @@ export default function OnlineDevicesTable({
                   {visibleDevices.map((device, index) => {
                     const signal = getSignalValue(device);
                     return (
-                      <TableRow
+                      <motion.tr
                         key={device.MACAddress || index}
+                        initial={reduce ? undefined : { opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: Math.min(index * 0.035, 0.35), duration: 0.28 }}
                         className="cursor-pointer transition-colors hover:bg-muted/50"
                         onClick={() => onSelect(device)}
                       >
@@ -247,7 +255,7 @@ export default function OnlineDevicesTable({
                             {device.Active ? '在线' : '离线'}
                           </Badge>
                         </TableCell>
-                      </TableRow>
+                      </motion.tr>
                     );
                   })}
                 </TableBody>
