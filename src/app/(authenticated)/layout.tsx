@@ -32,8 +32,8 @@ export default function AuthenticatedLayout({
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="glass fixed left-0 right-0 top-0 z-50 border-b pt-[env(safe-area-inset-top)]">
-          <div className="mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 lg:px-8">
+        <div className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5 lg:px-7">
+          <div className="glass mx-auto flex h-[76px] max-w-screen-2xl items-center justify-between rounded-3xl px-4 shadow-card">
             <div className="flex items-center gap-6">
               <Skeleton className="h-6 w-20 rounded-lg" />
               <div className="hidden gap-2 md:flex">
@@ -48,7 +48,7 @@ export default function AuthenticatedLayout({
             </div>
           </div>
         </div>
-        <main className="mx-auto max-w-screen-2xl px-4 pb-10 pt-24 sm:px-6 lg:px-8">
+        <main className="mx-auto max-w-screen-2xl px-3 pb-10 pt-28 sm:px-5 lg:px-7">
           <div className="space-y-6">
             <div className="space-y-3">
               <Skeleton className="h-4 w-28 rounded-lg" />
@@ -73,7 +73,7 @@ export default function AuthenticatedLayout({
   return (
     <div className="min-h-screen bg-background">
       <TopNav />
-      <main className="mx-auto max-w-screen-2xl px-4 pt-24 sm:px-6 lg:px-8 pb-[max(2.5rem,env(safe-area-inset-bottom))]">
+      <main className="mx-auto max-w-screen-2xl px-3 pt-28 sm:px-5 lg:px-7 pb-[max(2.5rem,env(safe-area-inset-bottom))]">
         {children}
       </main>
     </div>

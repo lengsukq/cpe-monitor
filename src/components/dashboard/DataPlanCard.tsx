@@ -22,43 +22,64 @@ export default function DataPlanCard({ startDate, trafficStats }: DataPlanCardPr
   const isWarning = percent >= threshold;
   const isOver = percent >= 100;
 
+  const progressColor = isOver
+    ? 'var(--danger)'
+    : isWarning
+      ? 'var(--warning)'
+      : 'var(--brand)';
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="grid min-h-[300px] items-center gap-6 md:grid-cols-[170px_minmax(0,1fr)]">
+      <div className="flex justify-center">
+        <div
+          className="relative size-44 rounded-full p-[18px] shadow-inner"
+          style={{
+            background: `conic-gradient(${progressColor} ${Math.min(percent, 100)}%, color-mix(in oklch, var(--muted) 88%, white) 0)`,
+          }}
+        >
+          <div className="flex size-full flex-col items-center justify-center rounded-full bg-card shadow-sm">
+            <p className={`text-3xl font-extrabold tracking-tight ${isOver ? 'text-danger' : isWarning ? 'text-warning' : 'text-brand'}`}>
+              {percent.toFixed(1)}%
+            </p>
+            <p className="mt-1 text-xs font-medium text-muted-foreground">使用率</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="min-w-0 space-y-5">
         <div>
-          <p className="text-sm text-muted-foreground">已用 / 总量</p>
-          <p className="text-2xl font-bold">
+          <p className="text-sm font-medium text-muted-foreground">已用 / 总量</p>
+          <p className="mt-2 break-words text-2xl font-extrabold tracking-tight">
             <span className={isOver ? 'text-danger' : isWarning ? 'text-warning' : 'text-brand'}>
               {formatWithUnit(usedBytes, 'GB')}
             </span>
             <span className="text-base font-normal text-muted-foreground"> / {formatWithUnit(limitBytes, 'GB')}</span>
           </p>
+          <p className="mt-2 text-sm text-muted-foreground">剩余 {formatWithUnit(remaining, 'GB')}</p>
         </div>
-        <div className="text-right">
-          <p className={`text-2xl font-bold ${isOver ? 'text-danger' : isWarning ? 'text-warning' : 'text-brand'}`}>
-            {percent.toFixed(1)}%
-          </p>
-          <p className="text-sm text-muted-foreground">剩余 {formatWithUnit(remaining, 'GB')}</p>
+
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-2xl bg-muted/45 p-3">
+            <p className="text-xs text-muted-foreground">日阈值</p>
+            <p className="mt-1 font-bold">{startDate.DayThreshold || 90}%</p>
+          </div>
+          <div className="rounded-2xl bg-muted/45 p-3">
+            <p className="text-xs text-muted-foreground">月阈值</p>
+            <p className="mt-1 font-bold">{startDate.MonthThreshold || 90}%</p>
+          </div>
+          <div className="rounded-2xl bg-muted/45 p-3">
+            <p className="text-xs text-muted-foreground">套餐</p>
+            <p className="mt-1 truncate font-bold" title={String(startDate.DataLimit || '-')}>
+              {startDate.DataLimit || '-'}
+            </p>
+          </div>
         </div>
-      </div>
-      <div className="h-3 w-full rounded-full bg-muted">
-        <div
-          className={`h-3 rounded-full transition-all duration-500 ${isOver ? 'bg-danger' : isWarning ? 'bg-warning' : 'bg-brand'}`}
-          style={{ width: `${Math.min(percent, 100)}%` }}
-        />
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm">
-        <div>
-          <p className="text-muted-foreground">日阈值</p>
-          <p className="font-medium">{startDate.DayThreshold || 90}%</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground">月阈值</p>
-          <p className="font-medium">{startDate.MonthThreshold || 90}%</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground">套餐</p>
-          <p className="font-medium">{startDate.DataLimit || '-'}</p>
+
+        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-danger' : isWarning ? 'bg-warning' : 'bg-brand'}`}
+            style={{ width: `${Math.min(percent, 100)}%` }}
+          />
         </div>
       </div>
     </div>

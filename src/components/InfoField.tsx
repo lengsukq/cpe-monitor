@@ -31,10 +31,10 @@ export default function InfoField({
   }
 
   return (
-    <div className={cn('space-y-1', className)}>
-      <p className={cn('text-muted-foreground', size === 'sm' ? 'text-xs' : 'text-sm')}>{label}</p>
+    <div className={cn('space-y-1 rounded-2xl border border-border/55 bg-muted/30 p-3', className)}>
+      <p className={cn('font-medium text-muted-foreground', size === 'sm' ? 'text-xs' : 'text-sm')}>{label}</p>
       <p className={cn(
-        'break-words font-medium',
+        'break-words font-semibold text-foreground',
         mono ? 'font-mono text-sm' : '',
         size === 'sm' ? 'text-sm' : '',
       )}>

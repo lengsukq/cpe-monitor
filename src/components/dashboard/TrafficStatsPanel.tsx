@@ -1,3 +1,4 @@
+import { ChartNoAxesCombined } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,7 +23,10 @@ export default function TrafficStatsPanel({
     <Card className="card-hover">
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle>流量统计</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <span className="metric-icon size-9 rounded-xl"><ChartNoAxesCombined className="h-4 w-4" /></span>
+            流量统计
+          </CardTitle>
           <div className="flex gap-1">
             <Button size="sm" variant={unit === 'MB' ? 'default' : 'outline'} onClick={() => onUnitChange('MB')}>
               MB
@@ -35,7 +39,7 @@ export default function TrafficStatsPanel({
       </CardHeader>
       <CardContent>
         {trafficStats ? (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <InfoField label="本次下载" value={formatWithUnit(parseInt(String(rate.CurrentDownload || '0'), 10), unit)} />
             <InfoField label="本次上传" value={formatWithUnit(parseInt(String(rate.CurrentUpload || '0'), 10), unit)} />
             <InfoField label="累计下载" value={formatWithUnit(parseInt(String(rate.TotalDownload || '0'), 10), unit)} />

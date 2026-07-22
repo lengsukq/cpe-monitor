@@ -42,7 +42,7 @@ export default function DeviceInfoSections({
   return (
     <>
           {/* Basic Info */}
-          <Card className="card-hover">
+          <Card id="device-system" className="card-hover scroll-mt-32">
             <CardHeader><CardTitle>基本信息</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
@@ -83,7 +83,7 @@ export default function DeviceInfoSections({
           </Card>
 
           {/* Network */}
-          <Card className="card-hover">
+          <Card id="device-cellular" className="card-hover scroll-mt-32">
             <CardHeader><CardTitle>网络信息</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
@@ -164,7 +164,7 @@ export default function DeviceInfoSections({
           </Card>
 
           {/* Identifiers */}
-          <Card className="card-hover">
+          <Card id="device-identifiers" className="card-hover scroll-mt-32">
             <CardHeader><CardTitle>标识信息</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -211,7 +211,7 @@ export default function DeviceInfoSections({
           </Card>
 
           {/* Capabilities and service endpoints */}
-          <Card className="card-hover">
+          <Card id="device-capabilities" className="card-hover scroll-mt-32">
             <CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />能力与服务</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
@@ -232,7 +232,7 @@ export default function DeviceInfoSections({
           </Card>
 
           {/* Keep every endpoint field inspectable, even when a future firmware adds fields. */}
-          <Card className="card-hover">
+          <Card id="device-raw" className="card-hover scroll-mt-32">
             <CardHeader><CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-primary" />原始接口数据</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">以下内容来自设备接口原始响应，用于核对固件新增字段。</p>

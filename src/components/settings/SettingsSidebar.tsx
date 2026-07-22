@@ -31,8 +31,8 @@ export function SettingsSidebar({
   onCheckUpdate,
 }: SettingsSidebarProps) {
   return (
-    <aside className="space-y-3 lg:sticky lg:top-24">
-      <Card className="overflow-hidden border-border/70 bg-card/80 shadow-sm">
+    <aside className="space-y-4 lg:sticky lg:top-28">
+      <Card className="overflow-hidden">
         <CardContent className="p-2">
           <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             配置导航
@@ -82,7 +82,7 @@ export function SettingsSidebar({
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden border-warning/20 shadow-sm">
+      <Card className="overflow-hidden border-warning/20">
         <CardHeader className="space-y-0 p-2.5 pb-1">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">

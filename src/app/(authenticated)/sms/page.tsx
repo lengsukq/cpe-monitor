@@ -87,7 +87,8 @@ export default function SmsPage() {
   }
 
   useEffect(() => {
-    loadMessages();
+    const timer = window.setTimeout(() => { void loadMessages(); }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   function applyQuery(event: FormEvent<HTMLFormElement>) {
@@ -125,6 +126,7 @@ export default function SmsPage() {
         eyebrow="CPE / message channel"
         title="短信收件箱"
         description="短信会同步到本地数据库并保留完整内容。此页面只读，不会调用发送、删除或标记已读接口。"
+        icon={<MessageSquareText className="h-6 w-6" />}
         actions={
           <Button size="sm" variant="outline" onClick={() => { void syncAndLoadMessages(); }} disabled={loading || syncing}>
             <RefreshCw className={loading || syncing ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
@@ -165,7 +167,7 @@ export default function SmsPage() {
         ]}
       />
 
-      <section className="rounded-3xl border border-border bg-card/80 p-5 shadow-sm lg:p-7">
+      <section className="app-panel p-5 lg:p-7">
         <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-tight">最近短信</h2>
@@ -251,9 +253,9 @@ export default function SmsPage() {
             />
           </div>
         ) : (
-          <div className="mt-5 divide-y divide-border">
+          <div className="mt-5 grid gap-3">
             {visibleMessages.map((message, index) => (
-              <article key={`${message.id}-${index}`} className="group grid gap-4 py-5 md:grid-cols-[minmax(150px,0.3fr)_minmax(0,1fr)_150px] md:items-start">
+              <article key={`${message.id}-${index}`} className="group grid gap-4 rounded-2xl border border-border/65 bg-muted/25 p-4 transition hover:border-brand/20 hover:bg-muted/40 md:grid-cols-[minmax(150px,0.3fr)_minmax(0,1fr)_150px] md:items-start">
                 <div className="flex items-center gap-3">
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${message.unread ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
                     {message.direction === 'inbound' ? <Smartphone className="h-4 w-4" /> : <Mail className="h-4 w-4" />}

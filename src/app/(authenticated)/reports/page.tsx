@@ -18,6 +18,17 @@ import { apiFetch } from '@/lib/client-api';
 import { formatBytes } from '@/lib/format';
 import type { DailyReport, DeviceRanking } from '@/types';
 
+interface ReportNotifications {
+  emailConfigured: boolean;
+  wechatConfigured: boolean;
+  emailSent: boolean;
+  wechatSent: boolean;
+}
+
+interface DailyReportPreview extends DailyReport {
+  notifications?: ReportNotifications;
+}
+
 function getQualityVariant(quality: string | null) {
   switch (quality) {
     case '优秀': return 'success' as const;
@@ -31,14 +42,10 @@ function getQualityVariant(quality: string | null) {
 
 export default function ReportsPage() {
   const [reports, setReports] = useState<DailyReport[]>([]);
-  const [previewReport, setPreviewReport] = useState<DailyReport | null>(null);
+  const [previewReport, setPreviewReport] = useState<DailyReportPreview | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    void fetchReports();
-  }, []);
 
   async function fetchReports() {
     setLoading(true);
@@ -53,17 +60,19 @@ export default function ReportsPage() {
     }
   }
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void fetchReports(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   async function generatePreview() {
     setError('');
     try {
-      const data = await apiFetch<DailyReport & {
-        notifications?: {
-          emailConfigured: boolean;
-          wechatConfigured: boolean;
-          emailSent: boolean;
-          wechatSent: boolean;
-        };
-      }>('/api/reports/daily', { method: 'POST' }, '生成报告失败');
+      const data = await apiFetch<DailyReportPreview>(
+        '/api/reports/daily',
+        { method: 'POST' },
+        '生成报告失败',
+      );
       setPreviewReport(data);
       setIsOpen(true);
 
@@ -92,8 +101,10 @@ export default function ReportsPage() {
   return (
     <PageShell>
       <PageHeader
+        eyebrow="CPE / report center"
         title="每日报告"
         description="汇总每日流量、峰值时段、网络质量与设备使用排名，便于回顾历史运行情况。"
+        icon={<TrendingUp className="h-6 w-6" />}
         actions={<Button onClick={() => { void generatePreview(); }}>生成今日预览</Button>}
       />
 
@@ -288,32 +299,32 @@ export default function ReportsPage() {
               </div>
 
               {/* Notification status */}
-              {(previewReport as any)?.notifications && (
-                <div className="rounded-lg border bg-card p-4">
+              {previewReport.notifications && (
+                <div className="rounded-2xl border border-border/70 bg-muted/25 p-4">
                   <div className="flex flex-wrap items-center gap-3">
                     <Mail className="h-4 w-4 text-muted-foreground" />
                     <span className="text-xs text-muted-foreground">通知发送</span>
-                    {(previewReport as any).notifications.emailSent ? (
+                    {previewReport.notifications.emailSent ? (
                       <Badge variant="default" className="gap-1 rounded-full bg-success/10 text-success hover:bg-success/15">
                         <CheckCircle2 className="h-3 w-3" />
                         邮件已发送
                       </Badge>
-                    ) : (previewReport as any).notifications.emailConfigured ? (
+                    ) : previewReport.notifications.emailConfigured ? (
                       <Badge variant="outline" className="gap-1 rounded-full text-destructive">
                         邮件发送失败
                       </Badge>
                     ) : null}
-                    {(previewReport as any).notifications.wechatSent ? (
+                    {previewReport.notifications.wechatSent ? (
                       <Badge variant="default" className="gap-1 rounded-full bg-info/10 text-info hover:bg-info/15">
                         <CheckCircle2 className="h-3 w-3" />
                         企微已发送
                       </Badge>
-                    ) : (previewReport as any).notifications.wechatConfigured ? (
+                    ) : previewReport.notifications.wechatConfigured ? (
                       <Badge variant="outline" className="gap-1 rounded-full text-destructive">
                         企微发送失败
                       </Badge>
                     ) : null}
-                    {!(previewReport as any).notifications.emailConfigured && !(previewReport as any).notifications.wechatConfigured && (
+                    {!previewReport.notifications.emailConfigured && !previewReport.notifications.wechatConfigured && (
                       <span className="text-xs text-muted-foreground/60">
                         未配置通知渠道，请前往设置页配置邮件或企微通知
                       </span>

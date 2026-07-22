@@ -3,26 +3,36 @@ import IdentityTile from '@/components/device/IdentityTile';
 import { getCarrier } from '@/lib/format';
 
 interface DeviceIdentityHeroProps {
-  info: Record<string, any>;
-  cell?: Record<string, any> | null;
+  info: {
+    spreadname_zh?: string;
+    spreadname_en?: string;
+    DeviceName?: string;
+    Mccmnc?: string;
+    Msisdn?: string;
+    Iccid?: string;
+  };
+  cell?: {
+    networkType?: string;
+    cellId?: string;
+  } | null;
 }
 
 export default function DeviceIdentityHero({ info, cell }: DeviceIdentityHeroProps) {
   return (
-    <section className="surface-hero px-6 py-7 lg:px-8">
-      <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-brand/20 blur-3xl" />
-      <div className="absolute bottom-0 left-1/3 h-24 w-72 rounded-full bg-brand/10 blur-3xl" />
+    <section className="app-panel relative overflow-hidden px-6 py-7 lg:px-8">
+      <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-brand/10 blur-3xl" />
+      <div className="absolute bottom-0 left-1/3 h-24 w-72 rounded-full bg-info/5 blur-3xl" />
       <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-brand/80">
             <Router className="h-4 w-4" />
             CPE identity console
           </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-foreground">
             {info.spreadname_zh || info.spreadname_en || info.DeviceName}
           </h2>
-          <p className="mt-2 text-sm text-white/70">
-            {getCarrier(info.Mccmnc)} · {cell?.networkType || '网络状态读取中'} · {info.DeviceName}
+          <p className="mt-2 text-sm text-muted-foreground">
+            {getCarrier(String(info.Mccmnc || ''))} · {cell?.networkType || '网络状态读取中'} · {info.DeviceName}
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[620px]">

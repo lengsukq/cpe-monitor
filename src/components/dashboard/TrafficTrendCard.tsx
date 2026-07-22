@@ -19,9 +19,9 @@ export default function TrafficTrendCard({
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle>实时速率趋势</CardTitle>
+            <CardTitle className="text-lg">流量趋势</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              根据相邻采集点的流量增量计算平均上下行速率。
+              根据相邻采集点的增量计算平均上下行速率，不直接使用累计计数器。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -30,6 +30,7 @@ export default function TrafficTrendCard({
                 key={range}
                 size="sm"
                 variant={timeRange === range ? 'default' : 'outline'}
+                className="rounded-full px-3"
                 onClick={() => onTimeRangeChange(range)}
               >
                 {range}
@@ -39,7 +40,7 @@ export default function TrafficTrendCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-56 sm:h-72 md:h-80">
+        <div className="h-64 sm:h-80 xl:h-[360px]">
           <TrafficChart data={data} />
         </div>
       </CardContent>

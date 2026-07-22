@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, DownloadCloud, Gauge, PackageOpen, RadioTower, UploadCloud, UsersRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,6 @@ import StatusPillsRow from '@/components/dashboard/StatusPillsRow';
 import CellSnapshotCard from '@/components/dashboard/CellSnapshotCard';
 import SchedulerCard from '@/components/dashboard/SchedulerCard';
 import MetricStatCard from '@/components/dashboard/MetricStatCard';
-import SignalStrengthCard from '@/components/dashboard/SignalStrengthCard';
 import DataPlanCard from '@/components/dashboard/DataPlanCard';
 import TrafficStatsPanel from '@/components/dashboard/TrafficStatsPanel';
 import TrafficTrendCard from '@/components/dashboard/TrafficTrendCard';
@@ -31,6 +30,12 @@ export default function DashboardPage() {
   const data = useDashboardData();
   const [reportOpen, setReportOpen] = useState(false);
   const [reportData, setReportData] = useState<CollectionReportData | null>(null);
+  const signalBadgeVariant = (
+    data.signalQuality?.variant === 'success'
+      || data.signalQuality?.variant === 'info'
+      || data.signalQuality?.variant === 'warning'
+      || data.signalQuality?.variant === 'danger'
+  ) ? data.signalQuality.variant : 'secondary';
 
   if (data.loading) {
     return (
@@ -44,8 +49,9 @@ export default function DashboardPage() {
     <PageShell>
       <PageHeader
         eyebrow="CPE / live console"
-        title="仪表盘"
+        title="网络仪表盘"
         description="把实时状态、流量、套餐和设备活动集中在一个可操作的监控台里。"
+        icon={<Gauge className="h-6 w-6" />}
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             <div className="order-last text-xs text-muted-foreground sm:order-first">
@@ -92,20 +98,6 @@ export default function DashboardPage() {
         }
       />
 
-      <DashboardHero
-        isConnected={data.isConnected}
-        source={data.overview?.source}
-        connectedDevices={data.overview?.connectedDevices || 0}
-        cellId={data.cell.cellId}
-        networkType={data.cell.networkType || data.overview?.networkType}
-        carrierCode={String(data.deviceSnapshot?.deviceInformation?.Mccmnc || '')}
-        signalStrength={data.overview?.signalStrength}
-        signalLabel={data.signalQuality?.label}
-        smsSyncLabel={data.smsSyncLabel}
-        smsSyncDetail={data.smsSyncDetail}
-        deviceName={data.deviceName}
-      />
-
       {data.overviewError ? (
         <Callout tone="warning" title="CPE 登录/连接失败">{data.overviewError}</Callout>
       ) : null}
@@ -137,7 +129,91 @@ export default function DashboardPage() {
         collectionHealthStatus={data.overview?.collectionHealth?.status || 'never'}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricStatCard
+          label="下载速率"
+          value={formatRate(parseInt(String(data.rate.CurrentDownloadRate || '0'), 10))}
+          color="text-brand"
+          icon={<DownloadCloud className="h-5 w-5" />}
+          hint="实时下行"
+          points={data.metricHistory.map((point) => point.downloadBps)}
+        />
+        <MetricStatCard
+          label="上传速率"
+          value={formatRate(parseInt(String(data.rate.CurrentUploadRate || '0'), 10))}
+          color="text-info"
+          icon={<UploadCloud className="h-5 w-5" />}
+          hint="实时上行"
+          points={data.metricHistory.map((point) => point.uploadBps)}
+        />
+        <MetricStatCard
+          href="/device#online-devices"
+          label="在线设备"
+          value={`${data.overview?.connectedDevices || 0} 台`}
+          color="text-success"
+          icon={<UsersRound className="h-5 w-5" />}
+          hint="点击查看终端列表"
+          points={data.metricHistory.map((point) => point.connectedDevices)}
+        />
+        <MetricStatCard
+          href="/device"
+          label="信号强度"
+          value={`${data.overview?.signalStrength ?? 0} dBm`}
+          color="text-warning"
+          icon={<RadioTower className="h-5 w-5" />}
+          hint="蜂窝网络信号"
+          badge={data.signalQuality ? (
+            <Badge variant={signalBadgeVariant}>{data.signalQuality.label}</Badge>
+          ) : null}
+          points={data.metricHistory.map((point) => point.rsrp ?? point.signalStrength)}
+        />
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,.75fr)]">
+        <TrafficTrendCard
+          timeRange={data.timeRange}
+          onTimeRangeChange={data.setTimeRange}
+          data={data.trafficHistory}
+        />
+        <Card className="card-hover">
+          <CardHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <span className="metric-icon size-9 rounded-xl"><PackageOpen className="h-4 w-4" /></span>
+                套餐用量
+              </CardTitle>
+              {data.startDate ? (
+                <Badge variant="outline">每月 {data.startDate.StartDay || 1} 号重置</Badge>
+              ) : null}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {data.startDate && data.trafficStats ? (
+              <DataPlanCard startDate={data.startDate} trafficStats={data.trafficStats} />
+            ) : (
+              <Skeleton className="h-64 rounded-3xl" />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <NetworkHistoryGrid data={data.trafficHistory} />
+
+      <DashboardHero
+        isConnected={data.isConnected}
+        source={data.overview?.source}
+        connectedDevices={data.overview?.connectedDevices || 0}
+        cellId={data.cell.cellId}
+        networkType={data.cell.networkType || data.overview?.networkType}
+        carrierCode={String(data.deviceSnapshot?.deviceInformation?.Mccmnc || '')}
+        signalStrength={data.overview?.signalStrength}
+        signalLabel={data.signalQuality?.label}
+        smsSyncLabel={data.smsSyncLabel}
+        smsSyncDetail={data.smsSyncDetail}
+        deviceName={data.deviceName}
+      />
+
+      <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
         <CellSnapshotCard
           networkType={data.overview?.networkType}
           connectionStatus={data.overview?.connectionStatus}
@@ -157,61 +233,11 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricStatCard
-          label="下载速率"
-          value={formatRate(parseInt(String(data.rate.CurrentDownloadRate || '0'), 10))}
-          color="text-brand"
-        />
-        <MetricStatCard
-          label="上传速率"
-          value={formatRate(parseInt(String(data.rate.CurrentUploadRate || '0'), 10))}
-          color="text-info"
-        />
-        <MetricStatCard
-          href="/device#online-devices"
-          label="在线设备"
-          value={`${data.overview?.connectedDevices || 0} 台`}
-          color="text-success"
-        />
-        <SignalStrengthCard
-          signalStrength={data.overview?.signalStrength}
-          signalQuality={data.signalQuality}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <TrafficStatsPanel
-          trafficStats={data.trafficStats}
-          unit={data.unit}
-          onUnitChange={data.setUnit}
-        />
-        <Card className="card-hover">
-          <CardHeader>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle>套餐用量</CardTitle>
-              {data.startDate ? (
-                <Badge variant="outline">每月 {data.startDate.StartDay || 1} 号重置</Badge>
-              ) : null}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {data.startDate && data.trafficStats ? (
-              <DataPlanCard startDate={data.startDate} trafficStats={data.trafficStats} />
-            ) : (
-              <Skeleton className="h-32" />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <TrafficTrendCard
-        timeRange={data.timeRange}
-        onTimeRangeChange={data.setTimeRange}
-        data={data.trafficHistory}
+      <TrafficStatsPanel
+        trafficStats={data.trafficStats}
+        unit={data.unit}
+        onUnitChange={data.setUnit}
       />
-
-      <NetworkHistoryGrid data={data.trafficHistory} />
 
       <QuickLinks />
 

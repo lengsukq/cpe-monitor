@@ -44,20 +44,20 @@ export function SettingsAccordionSection({
     <Card
       id={id}
       className={cn(
-        'scroll-mt-24 overflow-hidden border-border/70 shadow-sm transition-shadow duration-200',
+        'scroll-mt-32 overflow-hidden transition-shadow duration-200',
         open && 'ring-1 ring-brand/15',
         className,
       )}
     >
-      <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-2.5 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4 border-b border-border/60 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-muted text-foreground">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand">
               {icon}
             </span>
             {eyebrow}
           </p>
-          <h3 className="mt-1 text-base font-medium tracking-tight">{title}</h3>
+          <h3 className="mt-2 text-lg font-semibold tracking-tight">{title}</h3>
           {description ? (
             <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
           ) : null}
@@ -95,7 +95,7 @@ export function SettingsAccordionSection({
       </div>
 
       {!open ? (
-        <CardContent className="px-4 py-3">
+        <CardContent className="px-5 py-4 sm:px-6">
           <div className="flex flex-wrap gap-x-5 gap-y-1">
             {summary.map((row) => (
               <div key={row.label} className="text-xs text-muted-foreground">
@@ -106,7 +106,7 @@ export function SettingsAccordionSection({
           </div>
         </CardContent>
       ) : (
-        <CardContent id={`${id}-panel`} className="space-y-3.5 px-4 py-4">
+        <CardContent id={`${id}-panel`} className="space-y-4 px-5 py-5 sm:px-6">
           {children}
         </CardContent>
       )}

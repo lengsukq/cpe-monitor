@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { RadioTower, ShieldCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -41,13 +42,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4 sm:p-6">
       <div className="absolute -left-32 top-1/4 h-96 w-96 rounded-full bg-brand/10 blur-3xl" />
       <div className="absolute -right-32 bottom-1/4 h-96 w-96 rounded-full bg-info/10 blur-3xl" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/40 to-transparent" />
 
-      <Card className="page-enter relative z-10 w-full max-w-md border border-border bg-card/80 shadow-xl shadow-brand/5 backdrop-blur-xl">
+      <Card className="page-enter relative z-10 w-full max-w-md border-white/80 bg-card/90 backdrop-blur-xl dark:border-border">
         <CardHeader className="space-y-3 text-center">
+          <span className="mx-auto inline-flex size-14 items-center justify-center rounded-2xl bg-brand text-primary-foreground shadow-lg shadow-brand/20">
+            <RadioTower className="h-6 w-6" />
+          </span>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand/70">CPE monitor</p>
           <CardTitle className="bg-gradient-to-r from-brand to-info bg-clip-text text-3xl font-bold tracking-tight text-transparent">
             CPEye
@@ -55,6 +59,10 @@ export default function LoginPage() {
           <CardDescription className="text-sm leading-6">
             5G CPE 流量监控 · 告警与每日报告
           </CardDescription>
+          <div className="mx-auto flex w-fit items-center gap-1.5 rounded-full bg-success/10 px-3 py-1.5 text-xs font-semibold text-success">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            本地管理控制台
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-5">

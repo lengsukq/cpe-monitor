@@ -1,3 +1,4 @@
+import { RadioTower, UsersRound } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { TrafficHistoryPoint } from '@/hooks/useDashboardData';
 import DeviceCountHistoryChart from './DeviceCountHistoryChart';
@@ -30,10 +31,13 @@ export default function NetworkHistoryGrid({ data }: NetworkHistoryGridProps) {
   ));
 
   return (
-    <div className="grid gap-6 xl:grid-cols-2">
+    <div className="grid gap-5 xl:grid-cols-2">
       <Card className="card-hover">
         <CardHeader>
-          <CardTitle>信号质量趋势</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <span className="metric-icon size-9 rounded-xl text-warning"><RadioTower className="h-4 w-4" /></span>
+            信号质量趋势
+          </CardTitle>
           <p className="text-sm text-muted-foreground">
             同时观察覆盖强度与链路质量，缺失采样点不会自动补零。
           </p>
@@ -51,7 +55,10 @@ export default function NetworkHistoryGrid({ data }: NetworkHistoryGridProps) {
 
       <Card className="card-hover">
         <CardHeader>
-          <CardTitle>在线设备趋势</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <span className="metric-icon size-9 rounded-xl text-success"><UsersRound className="h-4 w-4" /></span>
+            在线设备趋势
+          </CardTitle>
           <p className="text-sm text-muted-foreground">
             使用阶梯曲线展示采集时刻的在线终端数量变化。
           </p>

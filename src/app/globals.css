@@ -92,8 +92,8 @@
   --accent: oklch(0.96 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: var(--danger);
-  --border: oklch(0.9 0 0);
-  --input: oklch(0.9 0 0);
+  --border: oklch(0.91 0.012 210);
+  --input: oklch(0.91 0.012 210);
   --ring: oklch(0.62 0.1 201);
   --chart-1: oklch(0.6 0.15 201);
   --chart-2: oklch(0.6 0.13 175);
@@ -108,12 +108,12 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(0.985 0.005 201);
-  --foreground: oklch(0.15 0 0);
+  --background: oklch(0.972 0.018 205);
+  --foreground: oklch(0.2 0.015 220);
   --surface-hero: oklch(0.28 0.05 201);
   --surface-hero-foreground: oklch(0.98 0.01 201);
   --surface-elevated: oklch(1 0 0);
-  --shadow-card: 0 10px 30px -18px color-mix(in oklch, var(--brand) 35%, transparent);
+  --shadow-card: 0 18px 50px -32px color-mix(in oklch, var(--brand) 42%, transparent), 0 2px 10px -6px color-mix(in oklch, var(--foreground) 15%, transparent);
 }
 
 .dark {
@@ -168,7 +168,11 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at 8% 0%, color-mix(in oklch, var(--brand) 7%, transparent), transparent 28rem),
+      radial-gradient(circle at 92% 8%, color-mix(in oklch, var(--info) 6%, transparent), transparent 26rem);
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;
@@ -177,7 +181,7 @@
 
 /* Frosted surfaces (nav, overlays) */
 .glass {
-  @apply border border-border/80 bg-background/75 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60;
+  @apply border border-white/70 bg-white/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/75 dark:border-border dark:bg-background/80;
 }
 
 /* Shared dark hero panels (dashboard / device / sms) */
@@ -188,7 +192,31 @@
 
 /* Card hover feedback — subtle lift + brand ring */
 .card-hover {
-  @apply transition-[transform,box-shadow,ring-color] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg hover:ring-1 hover:ring-brand/15;
+  @apply transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-brand/20;
+  box-shadow: var(--shadow-card);
+}
+
+.app-panel {
+  @apply rounded-3xl border border-white/80 bg-card shadow-card dark:border-border;
+}
+
+.metric-panel {
+  @apply relative overflow-hidden rounded-3xl border border-white/80 bg-card p-5 shadow-card dark:border-border;
+}
+
+.metric-icon {
+  @apply inline-flex size-10 items-center justify-center rounded-2xl bg-brand/10 text-brand;
+}
+
+.page-header-panel {
+  @apply rounded-3xl border border-white/80 bg-card p-5 shadow-card dark:border-border sm:p-6;
+}
+
+.soft-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--border) 58%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--border) 58%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
 /* Page content entrance */

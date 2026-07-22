@@ -18,10 +18,6 @@ export default function AlertLogsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    void fetchLogs();
-  }, []);
-
   async function fetchLogs() {
     setLoading(true);
     setError('');
@@ -35,11 +31,18 @@ export default function AlertLogsPage() {
     }
   }
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void fetchLogs(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   return (
     <PageShell>
       <PageHeader
+        eyebrow="CPE / alert history"
         title="告警日志"
         description="查看历史触发记录与通知状态，便于排查规则是否按预期生效。"
+        icon={<Clock3 className="h-6 w-6" />}
       />
       <PageOverview
         eyebrow={<><Bell className="h-3.5 w-3.5" />Alerts / history</>}

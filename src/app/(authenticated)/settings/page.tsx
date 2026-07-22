@@ -19,14 +19,14 @@ export default function SettingsPage() {
 
   if (settings.pageLoading) {
     return (
-      <PageShell maxWidth="6xl">
+      <PageShell>
         <LoadingBlock />
       </PageShell>
     );
   }
 
   return (
-    <PageShell maxWidth="6xl" className="space-y-4">
+    <PageShell className="space-y-5">
       <PageHeader
         eyebrow="System control"
         title="系统设置"
@@ -40,7 +40,7 @@ export default function SettingsPage() {
         </Callout>
       ) : null}
 
-      <div className="grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
         <SettingsSidebar
           updateStatus={settings.updateStatus}
           checkingUpdate={settings.checkingUpdate}

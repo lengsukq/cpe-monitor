@@ -167,8 +167,10 @@ export default function AlertsPage() {
   return (
     <PageShell>
       <PageHeader
+        eyebrow="CPE / alert center"
         title="告警规则"
         description="为区间流量、平均速率、射频质量、设备数量和采集失败设定阈值。"
+        icon={<Bell className="h-6 w-6" />}
         actions={<Button onClick={openCreateModal}>新建规则</Button>}
       />
 

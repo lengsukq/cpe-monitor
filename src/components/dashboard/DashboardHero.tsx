@@ -38,7 +38,7 @@ export default function DashboardHero({
       actions={
         <Link
           href="/device"
-          className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/15"
+          className="inline-flex w-fit items-center gap-1.5 rounded-2xl border border-border bg-muted/45 px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-muted"
         >
           查看设备详情
           <ArrowRight className="h-3.5 w-3.5" />
@@ -82,7 +82,7 @@ export default function DashboardHero({
         },
       ]}
       footer={
-        <p className="relative mt-4 truncate text-[10px] text-white/50 sm:text-xs">
+        <p className="relative mt-4 truncate text-[10px] text-muted-foreground sm:text-xs">
           设备型号：{deviceName || '-'} · 每 5 秒自动刷新实时状态
         </p>
       }

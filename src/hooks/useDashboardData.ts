@@ -56,6 +56,7 @@ function getSnapshotValue(source: Record<string, unknown> | undefined, keys: str
 export function useDashboardData() {
   const [overview, setOverview] = useState<DashboardOverviewResponse | null>(null);
   const [trafficHistory, setTrafficHistory] = useState<TrafficHistoryPoint[]>([]);
+  const [liveMetricHistory, setLiveMetricHistory] = useState<TrafficHistoryPoint[]>([]);
   const [timeRange, setTimeRange] = useState('24h');
   const [loading, setLoading] = useState(true);
   const [trafficStats, setTrafficStats] = useState<TrafficStatsResponse | null>(null);
@@ -70,7 +71,7 @@ export function useDashboardData() {
   const [collecting, setCollecting] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
 
-  async function fetchOverview() {
+  async function fetchOverview(): Promise<DashboardOverviewResponse | null> {
     try {
       const data = await apiFetch<DashboardOverviewResponse>(
         '/api/dashboard/overview',
@@ -80,11 +81,13 @@ export function useDashboardData() {
       setOverview(data);
       setOverviewError(data.cpeError || '');
       setLastRefreshAt(new Date());
+      return data;
     } catch (error) {
       console.error(error);
       setOverviewError(
         error instanceof Error ? error.message : '无法获取实时状态，正在显示兜底数据',
       );
+      return null;
     } finally {
       setLoading(false);
     }
@@ -103,7 +106,7 @@ export function useDashboardData() {
     }
   }
 
-  async function fetchTrafficStats() {
+  async function fetchTrafficStats(): Promise<TrafficStatsResponse | null> {
     try {
       const data = await apiFetch<TrafficStatsResponse>(
         '/api/dashboard/traffic-stats',
@@ -112,12 +115,46 @@ export function useDashboardData() {
       );
       setTrafficStats(data);
       setDataError('');
+      return data;
     } catch (error) {
       console.error(error);
       setDataError(
         error instanceof Error ? error.message : 'CPE 登录失败，无法获取流量统计。',
       );
+      return null;
     }
+  }
+
+  async function fetchLiveMetrics() {
+    const [overviewResult, trafficResult] = await Promise.all([
+      fetchOverview(),
+      fetchTrafficStats(),
+    ]);
+
+    if (!overviewResult && !trafficResult) return;
+
+    const uploadBytesPerSecond = Number.parseFloat(
+      String(trafficResult?.CurrentUploadRate || '0'),
+    );
+    const downloadBytesPerSecond = Number.parseFloat(
+      String(trafficResult?.CurrentDownloadRate || '0'),
+    );
+
+    const point: TrafficHistoryPoint = {
+      timestamp: new Date().toISOString(),
+      uploadBps: Number.isFinite(uploadBytesPerSecond)
+        ? uploadBytesPerSecond * 8
+        : 0,
+      downloadBps: Number.isFinite(downloadBytesPerSecond)
+        ? downloadBytesPerSecond * 8
+        : 0,
+      connectedDevices: overviewResult?.connectedDevices,
+      signalStrength: overviewResult?.signalStrength,
+      rsrp: overviewResult?.signalStrength,
+      networkType: overviewResult?.networkType || null,
+    };
+
+    setLiveMetricHistory((current) => [...current.slice(-71), point]);
   }
 
   async function fetchStartDate() {
@@ -165,9 +202,8 @@ export function useDashboardData() {
   async function refreshDashboard() {
     setRefreshing(true);
     await Promise.allSettled([
-      fetchOverview(),
+      fetchLiveMetrics(),
       fetchTrafficHistory(),
-      fetchTrafficStats(),
       fetchStartDate(),
       fetchDeviceSnapshot(),
       fetchSmsSyncStatus(),
@@ -248,24 +284,30 @@ export function useDashboardData() {
   }
 
   useEffect(() => {
-    void fetchOverview();
-    void fetchTrafficHistory();
-    void fetchTrafficStats();
-    void fetchStartDate();
-    void fetchDeviceSnapshot();
-    void fetchSmsSyncStatus();
+    const initialTimer = window.setTimeout(() => {
+      void fetchLiveMetrics();
+      void fetchTrafficHistory();
+      void fetchStartDate();
+      void fetchDeviceSnapshot();
+      void fetchSmsSyncStatus();
+    }, 0);
 
-    const intervalId = setInterval(() => {
-      void fetchOverview();
-      void fetchTrafficStats();
+    const intervalId = window.setInterval(() => {
+      void fetchLiveMetrics();
     }, 5000);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(intervalId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    void fetchTrafficHistory(timeRange);
+    const timer = window.setTimeout(() => {
+      void fetchTrafficHistory(timeRange);
+    }, 0);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRange]);
 
@@ -289,10 +331,14 @@ export function useDashboardData() {
     : overview?.schedulerStatus?.enabled
       ? `每 ${overview.schedulerStatus.interval} 分钟`
       : '未启用';
+  const metricHistory = liveMetricHistory.length >= 2
+    ? liveMetricHistory
+    : trafficHistory;
 
   return {
     overview,
     trafficHistory,
+    metricHistory,
     timeRange,
     setTimeRange,
     loading,

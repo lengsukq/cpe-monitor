@@ -22,7 +22,7 @@ export function PageShell({
   return (
     <div
       className={cn(
-        'page-enter space-y-6',
+        'page-enter space-y-5 sm:space-y-6',
         maxWidthClass[maxWidth],
         className,
       )}

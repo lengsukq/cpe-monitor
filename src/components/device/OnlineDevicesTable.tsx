@@ -107,7 +107,7 @@ export default function OnlineDevicesTable({
   }, [connectionFilter, devices, keyword, sortMode]);
 
   return (
-    <Card id="online-devices" className="card-hover scroll-mt-24">
+    <Card id="online-devices" className="card-hover scroll-mt-32">
       <CardHeader className="gap-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
