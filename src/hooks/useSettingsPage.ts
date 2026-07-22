@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { formatSyncTime, maskSecret } from '@/lib/format';
 
-export type SettingsSectionId = 'connection' | 'automation' | 'email' | 'wechat' | 'security';
+export type SettingsSectionId = 'connection' | 'automation' | 'retention' | 'email' | 'wechat' | 'security';
 
 export interface CpeConfigForm {
   cpeUrl: string;
@@ -37,6 +37,12 @@ export interface SmsSyncConfigForm {
   running: boolean;
   lastSyncedAt: string | null;
   lastError: string | null;
+}
+
+export interface DataRetentionForm {
+  historyDays: string;
+  runDays: string;
+  lastCleanupAt: string | null;
 }
 
 export interface UpdateStatusState {
@@ -82,6 +88,11 @@ export function useSettingsPage() {
     lastSyncedAt: null,
     lastError: null,
   });
+  const [dataRetention, setDataRetention] = useState<DataRetentionForm>({
+    historyDays: '90',
+    runDays: '180',
+    lastCleanupAt: null,
+  });
 
   const [pageLoading, setPageLoading] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -90,6 +101,7 @@ export function useSettingsPage() {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatusState | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [savingSmsSync, setSavingSmsSync] = useState(false);
+  const [savingDataRetention, setSavingDataRetention] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [openSection, setOpenSection] = useState<SettingsSectionId | null>(null);
 
@@ -112,7 +124,7 @@ export function useSettingsPage() {
 
   const fetchConfigs = useCallback(async () => {
     try {
-      const [cpeData, notifData, smsSyncData] = await Promise.all([
+      const [cpeData, notifData, smsSyncData, retentionData] = await Promise.all([
         apiFetch<Record<string, unknown>>('/api/settings/cpe', undefined, '获取CPE配置失败'),
         apiFetch<Array<{ type: string; config: string }>>(
           '/api/settings/notification',
@@ -126,6 +138,11 @@ export function useSettingsPage() {
           lastSyncedAt?: string | null;
           lastError?: string | null;
         }>('/api/dashboard/sms/settings', undefined, '获取短信同步设置失败'),
+        apiFetch<{
+          historyDays?: number;
+          runDays?: number;
+          lastCleanupAt?: string | null;
+        }>('/api/settings/data-retention', undefined, '获取数据保留设置失败'),
       ]);
 
       if (cpeData.cpe_url) {
@@ -150,6 +167,11 @@ export function useSettingsPage() {
         running: Boolean(smsSyncData.running),
         lastSyncedAt: smsSyncData.lastSyncedAt || null,
         lastError: smsSyncData.lastError || null,
+      });
+      setDataRetention({
+        historyDays: String(retentionData.historyDays || 90),
+        runDays: String(retentionData.runDays || 180),
+        lastCleanupAt: retentionData.lastCleanupAt || null,
       });
     } catch (error) {
       console.error('Failed to fetch configs:', error);
@@ -312,6 +334,65 @@ export function useSettingsPage() {
     }
   }
 
+  async function saveDataRetention(cleanupNow: boolean) {
+    const historyDays = Number(dataRetention.historyDays);
+    const runDays = Number(dataRetention.runDays);
+    if (
+      !Number.isInteger(historyDays)
+      || !Number.isInteger(runDays)
+      || historyDays < 7
+      || historyDays > 3650
+      || runDays < 7
+      || runDays > 3650
+    ) {
+      setMessage({ type: 'error', text: '数据保留天数必须是 7 到 3650 之间的整数' });
+      return;
+    }
+
+    setSavingDataRetention(true);
+    try {
+      const response = await apiFetch<{
+        config: {
+          historyDays: number;
+          runDays: number;
+          lastCleanupAt: string | null;
+        };
+        cleanup?: {
+          trafficDeleted: number;
+          devicesDeleted: number;
+          runsDeleted: number;
+          cleanedAt: string;
+        } | null;
+      }>(
+        '/api/settings/data-retention',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ historyDays, runDays, cleanupNow }),
+        },
+        '保存数据保留设置失败',
+      );
+
+      setDataRetention({
+        historyDays: String(response.config.historyDays),
+        runDays: String(response.config.runDays),
+        lastCleanupAt: response.cleanup?.cleanedAt || response.config.lastCleanupAt,
+      });
+      const cleanupSummary = response.cleanup
+        ? `，已删除 ${response.cleanup.trafficDeleted} 条流量、${response.cleanup.devicesDeleted} 条设备和 ${response.cleanup.runsDeleted} 条采集记录`
+        : '';
+      setMessage({ type: 'success', text: `数据保留策略已保存${cleanupSummary}` });
+      collapseSection();
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : '保存数据保留设置失败',
+      });
+    } finally {
+      setSavingDataRetention(false);
+    }
+  }
+
   async function changePassword() {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setMessage({ type: 'error', text: '两次输入的密码不一致' });
@@ -393,6 +474,8 @@ export function useSettingsPage() {
     setPasswordForm,
     smsSyncConfig,
     setSmsSyncConfig,
+    dataRetention,
+    setDataRetention,
     pageLoading,
     loading,
     testing,
@@ -400,6 +483,7 @@ export function useSettingsPage() {
     updateStatus,
     checkingUpdate,
     savingSmsSync,
+    savingDataRetention,
     message,
     openSection,
     setOpenSection,
@@ -413,6 +497,7 @@ export function useSettingsPage() {
     saveEmailConfig,
     saveWechatConfig,
     saveSmsSyncConfig,
+    saveDataRetention,
     changePassword,
     fetchUpdateStatus,
     checkSystemUpdate,

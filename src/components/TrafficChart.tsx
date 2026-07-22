@@ -36,6 +36,8 @@ interface TrafficData {
   timestamp: string;
   uploadBytes?: number | null;
   downloadBytes?: number | null;
+  uploadBps?: number | null;
+  downloadBps?: number | null;
 }
 
 interface TrafficChartProps {
@@ -87,23 +89,33 @@ export function TrafficChart({ data }: TrafficChartProps) {
     return () => window.cancelAnimationFrame(frame);
   }, [resolvedTheme]);
 
-  const toMegabytes = (bytes: number | null | undefined) =>
-    Number(((bytes || 0) / 1024 / 1024).toFixed(2));
+  const toMegabitsPerSecond = (bitsPerSecond: number | null | undefined) =>
+    Number(((bitsPerSecond || 0) / 1_000_000).toFixed(3));
 
   const chartData = useMemo(
-    () => ({
+    () => {
+      const firstTimestamp = data[0]?.timestamp;
+      const lastTimestamp = data[data.length - 1]?.timestamp;
+      const spanMs = firstTimestamp && lastTimestamp
+        ? new Date(`${lastTimestamp.replace(' ', 'T')}Z`).getTime()
+          - new Date(`${firstTimestamp.replace(' ', 'T')}Z`).getTime()
+        : 0;
+
+      return ({
       labels: data.map((entry) => {
         const date = new Date(`${entry.timestamp.replace(' ', 'T')}Z`);
-        return date.toLocaleTimeString('zh-CN', {
+        return date.toLocaleString('zh-CN', {
+          month: spanMs > 24 * 60 * 60 * 1000 ? '2-digit' : undefined,
+          day: spanMs > 24 * 60 * 60 * 1000 ? '2-digit' : undefined,
           hour: '2-digit',
-          minute: '2-digit',
+          minute: spanMs <= 7 * 24 * 60 * 60 * 1000 ? '2-digit' : undefined,
           timeZone: 'Asia/Shanghai',
         });
       }),
       datasets: [
         {
           label: '下载',
-          data: data.map((entry) => toMegabytes(entry.downloadBytes)),
+          data: data.map((entry) => toMegabitsPerSecond(entry.downloadBps)),
           borderColor: themeColors.download,
           backgroundColor: `color-mix(in oklch, ${themeColors.download} ${DOWNLOAD_FILL_ALPHA}%, transparent)`,
           fill: true,
@@ -114,7 +126,7 @@ export function TrafficChart({ data }: TrafficChartProps) {
         },
         {
           label: '上传',
-          data: data.map((entry) => toMegabytes(entry.uploadBytes)),
+          data: data.map((entry) => toMegabitsPerSecond(entry.uploadBps)),
           borderColor: themeColors.upload,
           backgroundColor: `color-mix(in oklch, ${themeColors.upload} ${UPLOAD_FILL_ALPHA}%, transparent)`,
           fill: true,
@@ -124,7 +136,8 @@ export function TrafficChart({ data }: TrafficChartProps) {
           borderWidth: CHART_LINE_WIDTH,
         },
       ],
-    }),
+      });
+    },
     [data, themeColors],
   );
 
@@ -155,7 +168,7 @@ export function TrafficChart({ data }: TrafficChartProps) {
           borderWidth: 1,
           callbacks: {
             label: (context: ChartTooltipContext) => {
-              return `${context.dataset.label || ''}: ${context.parsed.y ?? 0} MB`;
+              return `${context.dataset.label || ''}: ${context.parsed.y ?? 0} Mbps`;
             },
           },
         },
@@ -175,7 +188,7 @@ export function TrafficChart({ data }: TrafficChartProps) {
           ticks: { color: themeColors.muted },
           title: {
             display: true,
-            text: '流量 (MB)',
+            text: '平均速率 (Mbps)',
             color: themeColors.muted,
           },
         },

@@ -1,4 +1,4 @@
-import { Activity, RefreshCw, Wifi } from 'lucide-react';
+import { Activity, DatabaseZap, RefreshCw, Wifi } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import StatusPill from '@/components/dashboard/StatusPill';
 
@@ -8,6 +8,8 @@ interface StatusPillsRowProps {
   updateState?: string;
   schedulerLabel: string;
   schedulerRunning: boolean;
+  collectionHealthLabel: string;
+  collectionHealthStatus: 'healthy' | 'failed' | 'stale' | 'never' | 'disabled';
 }
 
 export default function StatusPillsRow({
@@ -16,10 +18,20 @@ export default function StatusPillsRow({
   updateState,
   schedulerLabel,
   schedulerRunning,
+  collectionHealthLabel,
+  collectionHealthStatus,
 }: StatusPillsRowProps) {
+  const collectionTone = collectionHealthStatus === 'healthy'
+    ? 'success'
+    : collectionHealthStatus === 'failed'
+      ? 'danger'
+      : collectionHealthStatus === 'stale'
+        ? 'warning'
+        : 'muted';
+
   return (
     <Card className="card-hover bg-gradient-to-br from-card/90 to-card/50">
-      <CardContent className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-3 sm:gap-3 sm:p-4">
+      <CardContent className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2 sm:gap-3 sm:p-4 xl:grid-cols-4">
         <StatusPill
           icon={<Wifi className="h-4 w-4" />}
           label="蜂窝连接"
@@ -37,6 +49,12 @@ export default function StatusPillsRow({
           label="定时采集"
           value={schedulerLabel}
           tone={schedulerRunning ? 'success' : 'muted'}
+        />
+        <StatusPill
+          icon={<DatabaseZap className="h-4 w-4" />}
+          label="采集健康"
+          value={collectionHealthLabel}
+          tone={collectionTone}
         />
       </CardContent>
     </Card>

@@ -8,6 +8,7 @@ import { LoadingBlock } from '@/components/LoadingBlock';
 import { SettingsSidebar } from '@/components/settings/SettingsSidebar';
 import { CpeConnectionSection } from '@/components/settings/CpeConnectionSection';
 import { SmsSyncSection } from '@/components/settings/SmsSyncSection';
+import { DataRetentionSection } from '@/components/settings/DataRetentionSection';
 import { EmailNotificationSection } from '@/components/settings/EmailNotificationSection';
 import { WechatNotificationSection } from '@/components/settings/WechatNotificationSection';
 import { PasswordSection } from '@/components/settings/PasswordSection';
@@ -68,6 +69,14 @@ export default function SettingsPage() {
             smsState={settings.smsState}
             savingSmsSync={settings.savingSmsSync}
             onSave={() => { void settings.saveSmsSyncConfig(); }}
+          />
+          <DataRetentionSection
+            open={settings.openSection === 'retention'}
+            onOpenChange={(open) => settings.setOpenSection(open ? 'retention' : null)}
+            value={settings.dataRetention}
+            onChange={settings.setDataRetention}
+            saving={settings.savingDataRetention}
+            onSave={(cleanupNow) => { void settings.saveDataRetention(cleanupNow); }}
           />
           <EmailNotificationSection
             open={settings.openSection === 'email'}

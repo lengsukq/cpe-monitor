@@ -10,6 +10,7 @@ import DeviceIdentityHero from '@/components/device/DeviceIdentityHero';
 import CapabilitySummaryRow from '@/components/device/CapabilitySummaryRow';
 import DeviceInfoSections from '@/components/device/DeviceInfoSections';
 import OnlineDevicesTable from '@/components/device/OnlineDevicesTable';
+import SignalMetricsOverview from '@/components/device/SignalMetricsOverview';
 import { useDevicePage } from '@/hooks/useDevicePage';
 import { getDisplayValue } from '@/lib/device-display';
 
@@ -64,6 +65,7 @@ export default function DevicePage() {
             wlanDbho={wlanDbho}
             topology={topology}
           />
+          <SignalMetricsOverview cell={cell} />
           <DeviceInfoSections
             info={info}
             deviceState={deviceState}

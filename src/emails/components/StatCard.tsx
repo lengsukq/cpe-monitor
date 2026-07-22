@@ -1,58 +1,82 @@
 import { Section, Text } from '@react-email/components';
+import { emailTheme } from './Layout';
 
 interface StatCardProps {
   title: string;
   value: string;
   icon?: string;
   accentColor?: string;
+  detail?: string;
 }
 
-export default function StatCard({ title, value, icon, accentColor = '#2c7a9e' }: StatCardProps) {
+export default function StatCard({
+  title,
+  value,
+  icon,
+  accentColor = emailTheme.brand,
+  detail,
+}: StatCardProps) {
   return (
     <Section
       style={{
-        background: '#f7fafc',
+        minHeight: '112px',
+        backgroundColor: emailTheme.surfaceMuted,
+        border: `1px solid ${emailTheme.borderSoft}`,
         borderRadius: '12px',
-        padding: '20px 12px',
-        textAlign: 'center',
-        border: '1px solid #e8f0f5',
+        padding: '15px 14px',
       }}
     >
-      {icon && (
-        <Text
-          style={{
-            fontSize: '24px',
-            margin: '0 0 8px 0',
-            lineHeight: '1',
-          }}
-        >
-          {icon}
-        </Text>
-      )}
-      <Text
-        style={{
-          color: '#6b7a88',
-          fontSize: '12px',
-          margin: '0 0 4px 0',
-          fontWeight: 500,
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-        }}
-      >
-        {title}
-      </Text>
+      <table role="presentation" style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <tbody>
+          <tr>
+            <td style={{ verticalAlign: 'top' }}>
+              <Text
+                style={{
+                  color: emailTheme.muted,
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '.45px',
+                  lineHeight: '1.3',
+                  margin: 0,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {title}
+              </Text>
+            </td>
+            {icon ? (
+              <td style={{ width: '1%', paddingLeft: '8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <span style={{ fontSize: '18px', lineHeight: '1' }}>{icon}</span>
+              </td>
+            ) : null}
+          </tr>
+        </tbody>
+      </table>
       <Text
         style={{
           color: accentColor,
-          fontSize: '22px',
+          fontSize: '23px',
           fontWeight: 800,
-          margin: '0',
+          letterSpacing: '-0.45px',
           lineHeight: '1.2',
-          letterSpacing: '-0.3px',
+          margin: '10px 0 0',
+          wordBreak: 'break-word',
         }}
       >
         {value}
       </Text>
+      {detail ? (
+        <Text
+          style={{
+            color: emailTheme.subtle,
+            fontSize: '10px',
+            lineHeight: '1.45',
+            margin: '7px 0 0',
+          }}
+        >
+          {detail}
+        </Text>
+      ) : null}
     </Section>
   );
 }

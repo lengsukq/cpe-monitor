@@ -43,6 +43,27 @@ export function toSqliteTimestamp(date: Date): string {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+interface SchemaDatabase {
+  prepare: (sql: string) => {
+    all: (...params: unknown[]) => unknown[];
+  };
+  exec: (sql: string) => void;
+}
+
+function ensureColumn(
+  database: SchemaDatabase,
+  tableName: string,
+  columnName: string,
+  definition: string,
+) {
+  const columns = database.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{
+    name: string;
+  }>;
+  if (!columns.some((column) => column.name === columnName)) {
+    database.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
+}
+
 export function initializeDatabase() {
   const database = getDb();
 
@@ -73,6 +94,28 @@ export function initializeDatabase() {
   `);
 
   database.exec(`
+    CREATE TABLE IF NOT EXISTS cpe_sessions (
+      profile_key TEXT PRIMARY KEY,
+      cpe_url TEXT NOT NULL,
+      cpe_username TEXT NOT NULL,
+      encrypted_payload TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS collection_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      started_at TEXT DEFAULT (datetime('now')),
+      completed_at TEXT,
+      status TEXT NOT NULL DEFAULT 'running',
+      source TEXT NOT NULL DEFAULT 'scheduler',
+      connected_devices INTEGER DEFAULT 0,
+      error_message TEXT
+    )
+  `);
+
+  database.exec(`
     CREATE TABLE IF NOT EXISTS notification_config (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
@@ -93,6 +136,20 @@ export function initializeDatabase() {
     )
   `);
 
+  ensureColumn(database, 'traffic_data', 'collection_id', 'INTEGER REFERENCES collection_runs(id)');
+  ensureColumn(database, 'traffic_data', 'delta_upload_bytes', 'INTEGER');
+  ensureColumn(database, 'traffic_data', 'delta_download_bytes', 'INTEGER');
+  ensureColumn(database, 'traffic_data', 'upload_bps', 'REAL');
+  ensureColumn(database, 'traffic_data', 'download_bps', 'REAL');
+  ensureColumn(database, 'traffic_data', 'network_type', 'TEXT');
+  ensureColumn(database, 'traffic_data', 'band', 'TEXT');
+  ensureColumn(database, 'traffic_data', 'cell_id', 'TEXT');
+  ensureColumn(database, 'traffic_data', 'pci', 'TEXT');
+  ensureColumn(database, 'traffic_data', 'rsrp', 'REAL');
+  ensureColumn(database, 'traffic_data', 'rsrq', 'REAL');
+  ensureColumn(database, 'traffic_data', 'sinr', 'REAL');
+  ensureColumn(database, 'traffic_data', 'rssi', 'REAL');
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS device_data (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,6 +161,37 @@ export function initializeDatabase() {
       download_bytes INTEGER,
       online_duration INTEGER
     )
+  `);
+
+  ensureColumn(database, 'device_data', 'collection_id', 'INTEGER REFERENCES collection_runs(id)');
+  ensureColumn(database, 'device_data', 'delta_upload_bytes', 'INTEGER');
+  ensureColumn(database, 'device_data', 'delta_download_bytes', 'INTEGER');
+  ensureColumn(database, 'device_data', 'upload_bps', 'REAL');
+  ensureColumn(database, 'device_data', 'download_bps', 'REAL');
+  ensureColumn(database, 'device_data', 'active', 'INTEGER DEFAULT 1');
+  ensureColumn(database, 'device_data', 'interface_type', 'TEXT');
+  ensureColumn(database, 'device_data', 'frequency', 'TEXT');
+  ensureColumn(database, 'device_data', 'rssi', 'REAL');
+  ensureColumn(database, 'device_data', 'raw_json', 'TEXT');
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_traffic_data_timestamp
+    ON traffic_data (timestamp)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_traffic_data_collection
+    ON traffic_data (collection_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_device_data_mac_timestamp
+    ON device_data (device_mac, timestamp)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_device_data_collection
+    ON device_data (collection_id)
   `);
 
   database.exec(`
@@ -189,6 +277,9 @@ export function initializeDatabase() {
   stmt.run('sms_initial_sync_completed', 'false');
   stmt.run('sms_last_sync_at', '');
   stmt.run('sms_last_sync_error', '');
+  stmt.run('history_retention_days', '90');
+  stmt.run('collection_run_retention_days', '180');
+  stmt.run('history_last_cleanup_at', '');
 
   console.log('SQLite database initialized');
 }

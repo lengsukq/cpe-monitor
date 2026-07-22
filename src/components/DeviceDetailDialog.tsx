@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import InfoField from '@/components/InfoField';
+import DeviceHistoryPanel from '@/components/device/DeviceHistoryPanel';
 import {
   formatBytesFromString,
   formatDurationFromString,
@@ -50,7 +50,7 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[min(32rem,calc(100%-2rem))]">
+      <DialogContent className="max-h-[90vh] max-w-[min(52rem,calc(100%-2rem))] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-start gap-2 pr-8">
             <span className="text-2xl">{getDeviceIcon(device.IconType || "")}</span>
@@ -150,6 +150,22 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
               </div>
             </>
           )}
+
+          {device.MACAddress ? (
+            <>
+              <Separator />
+              <DeviceHistoryPanel key={device.MACAddress} mac={device.MACAddress} />
+            </>
+          ) : null}
+
+          <details className="rounded-2xl border border-border/70 bg-muted/20">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+              查看 CPE 原始终端数据
+            </summary>
+            <pre className="max-h-64 overflow-auto border-t border-border/70 p-4 text-xs leading-5 text-muted-foreground">
+              {JSON.stringify(device, null, 2)}
+            </pre>
+          </details>
         </div>
       </DialogContent>
     </Dialog>

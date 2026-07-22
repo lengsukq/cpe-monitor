@@ -22,6 +22,45 @@ interface AlertRuleWriteBody {
   cooldownMinutes?: number;
 }
 
+const METRIC_TYPES = new Set<AlertRule['metricType']>([
+  'traffic_up',
+  'traffic_down',
+  'upload_rate',
+  'download_rate',
+  'devices',
+  'signal',
+  'rsrp',
+  'rsrq',
+  'sinr',
+  'rssi',
+  'collection_failures',
+]);
+
+const OPERATORS = new Set<AlertRule['operator']>(['>', '<', '>=', '<=']);
+
+function validateRuleBody(body: AlertRuleWriteBody) {
+  if (!body.name?.trim() || body.name.trim().length > 100) {
+    throw new ApiError('规则名称不能为空且不能超过 100 个字符', 400);
+  }
+  if (!METRIC_TYPES.has(body.metricType)) {
+    throw new ApiError('不支持的监控指标', 400);
+  }
+  if (!OPERATORS.has(body.operator)) {
+    throw new ApiError('不支持的运算符', 400);
+  }
+  if (!Number.isFinite(body.threshold)) {
+    throw new ApiError('阈值必须是有效数字', 400);
+  }
+  if (
+    body.cooldownMinutes !== undefined
+    && (!Number.isInteger(body.cooldownMinutes)
+      || body.cooldownMinutes < 1
+      || body.cooldownMinutes > 10080)
+  ) {
+    throw new ApiError('冷却时间必须是 1 到 10080 之间的整数分钟', 400);
+  }
+}
+
 export const GET = withApiHandler(async () => {
   await requireSession();
   ensureDatabase();
@@ -33,11 +72,12 @@ export const POST = withApiHandler(async (request) => {
   await requireSession();
   ensureDatabase();
   const body = await parseJsonBody<AlertRuleWriteBody>(request);
+  validateRuleBody(body);
 
   db.prepare(
     'INSERT INTO alert_rules (name, metric_type, threshold, operator, enabled, notify_email, notify_wechat, cooldown_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
   ).run(
-    body.name,
+    body.name.trim(),
     body.metricType,
     body.threshold,
     body.operator,
@@ -58,18 +98,19 @@ export const PUT = withApiHandler(async (request) => {
   if (!body.id) {
     throw new ApiError('缺少规则ID', 400);
   }
+  validateRuleBody(body);
 
   db.prepare(
     'UPDATE alert_rules SET name=?, metric_type=?, threshold=?, operator=?, enabled=?, notify_email=?, notify_wechat=?, cooldown_minutes=? WHERE id=?',
   ).run(
-    body.name,
+    body.name.trim(),
     body.metricType,
     body.threshold,
     body.operator,
     body.enabled ? 1 : 0,
     body.notifyEmail ? 1 : 0,
     body.notifyWechat ? 1 : 0,
-    body.cooldownMinutes,
+    body.cooldownMinutes || 30,
     body.id,
   );
 

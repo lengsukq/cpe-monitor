@@ -1,9 +1,64 @@
 import { db, toSqliteTimestamp } from './db';
+import type { DailyReport, DeviceRanking } from '@/types';
 
-export async function generateDailyReport() {
+interface TrafficReportRow {
+  timestamp: string;
+  upload_bytes: number | null;
+  download_bytes: number | null;
+  delta_upload_bytes: number | null;
+  delta_download_bytes: number | null;
+  upload_bps: number | null;
+  download_bps: number | null;
+  connected_devices: number | null;
+  signal_strength: number | null;
+  network_type: string | null;
+  band: string | null;
+  rsrp: number | null;
+  rsrq: number | null;
+  sinr: number | null;
+  rssi: number | null;
+}
+
+interface DeviceReportRow {
+  timestamp: string;
+  device_name: string | null;
+  device_ip: string | null;
+  device_mac: string | null;
+  upload_bytes: number | null;
+  download_bytes: number | null;
+  delta_upload_bytes: number | null;
+  delta_download_bytes: number | null;
+}
+
+function average(values: Array<number | null | undefined>): number | null {
+  const available = values.filter((value): value is number => (
+    typeof value === 'number' && Number.isFinite(value)
+  ));
+  if (available.length === 0) return null;
+  return available.reduce((total, value) => total + value, 0) / available.length;
+}
+
+function getCounterDelta(current: number | null, previous: number | null | undefined): number {
+  if (current === null || previous === null || previous === undefined || current < previous) return 0;
+  return current - previous;
+}
+
+function getLocalHour(timestamp: string): number {
+  const date = new Date(`${timestamp.replace(' ', 'T')}Z`);
+  return Number(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai',
+    hour: '2-digit',
+    hour12: false,
+  }).format(date));
+}
+
+export async function generateDailyReport(): Promise<DailyReport> {
   const now = new Date();
   const dateFormatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   });
   const todayStr = dateFormatter.format(now);
   const today = new Date(`${todayStr}T00:00:00+08:00`);
@@ -12,127 +67,160 @@ export async function generateDailyReport() {
   const todayIso = toSqliteTimestamp(today);
   const tomorrowIso = toSqliteTimestamp(tomorrow);
 
-  // Get today's traffic data (ordered chronologically)
   const todayTraffic = db.prepare(
-    'SELECT * FROM traffic_data WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp ASC'
-  ).all(todayIso, tomorrowIso) as any[];
+    `SELECT
+       timestamp,
+       upload_bytes,
+       download_bytes,
+       delta_upload_bytes,
+       delta_download_bytes,
+       upload_bps,
+       download_bps,
+       connected_devices,
+       signal_strength,
+       network_type,
+       band,
+       rsrp,
+       rsrq,
+       sinr,
+       rssi
+     FROM traffic_data
+     WHERE timestamp >= ? AND timestamp < ?
+     ORDER BY timestamp ASC`,
+  ).all(todayIso, tomorrowIso) as TrafficReportRow[];
 
-  // upload_bytes/download_bytes are CPE cumulative values.
-  // Daily total = last record - first record (delta).
   let totalUpload = 0;
   let totalDownload = 0;
-  const last = todayTraffic[todayTraffic.length - 1];
-  const first = todayTraffic[0];
-  if (todayTraffic.length >= 2 && first && last) {
-    totalUpload = Math.max(0, last.upload_bytes - first.upload_bytes);
-    totalDownload = Math.max(0, last.download_bytes - first.download_bytes);
-  } else if (todayTraffic.length === 1 && last) {
-    // Only one data point — we cannot compute delta, show 0.
-    totalUpload = 0;
-    totalDownload = 0;
-  }
-
-  // Compute hourly traffic deltas and signal averages
-  let totalSignal = 0;
-  let signalCount = 0;
-  let previousPoint: any = null;
+  let previousTraffic: TrafficReportRow | undefined;
   const hourlyTraffic: Record<number, number> = {};
+  const networkTypes = new Set<string>();
+  const bands = new Set<string>();
 
-  for (const data of todayTraffic) {
-    if (data.signal_strength) {
-      totalSignal += data.signal_strength;
-      signalCount++;
-    }
-
-    // Compute delta from previous point for hourly breakdown
-    if (previousPoint && data.upload_bytes != null && previousPoint.upload_bytes != null) {
-      const uploadDelta = Math.max(0, data.upload_bytes - previousPoint.upload_bytes);
-      const downloadDelta = Math.max(0, data.download_bytes - previousPoint.download_bytes);
-
-      const timestamp = new Date(`${String(data.timestamp).replace(' ', 'T')}Z`);
-      const hour = Number(new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Shanghai', hour: '2-digit', hour12: false,
-      }).format(timestamp));
-      hourlyTraffic[hour] = (hourlyTraffic[hour] || 0) + uploadDelta + downloadDelta;
-    }
-    previousPoint = data;
+  for (const row of todayTraffic) {
+    const uploadDelta = row.delta_upload_bytes
+      ?? getCounterDelta(row.upload_bytes, previousTraffic?.upload_bytes);
+    const downloadDelta = row.delta_download_bytes
+      ?? getCounterDelta(row.download_bytes, previousTraffic?.download_bytes);
+    totalUpload += uploadDelta;
+    totalDownload += downloadDelta;
+    const hour = getLocalHour(row.timestamp);
+    hourlyTraffic[hour] = (hourlyTraffic[hour] || 0) + uploadDelta + downloadDelta;
+    if (row.network_type?.trim()) networkTypes.add(row.network_type.trim());
+    if (row.band?.trim()) bands.add(row.band.trim());
+    previousTraffic = row;
   }
 
-  // Find peak hour
-  let peakHour = 0;
-  let maxTraffic = 0;
-  for (const [hour, traffic] of Object.entries(hourlyTraffic)) {
-    if (traffic > maxTraffic) {
-      maxTraffic = traffic;
-      peakHour = parseInt(hour);
+  let peakHour: number | null = null;
+  let peakTrafficBytes = 0;
+  for (const [hour, bytes] of Object.entries(hourlyTraffic)) {
+    if (bytes > peakTrafficBytes) {
+      peakTrafficBytes = bytes;
+      peakHour = Number(hour);
     }
   }
 
-  // Get device rankings — also computed via delta
-  // Use the first and last records per device within today
   const todayDevices = db.prepare(
-    'SELECT * FROM device_data WHERE timestamp >= ? AND timestamp <= ? ORDER BY device_mac, device_ip, timestamp ASC'
-  ).all(todayIso, tomorrowIso) as any[];
+    `SELECT
+       timestamp,
+       device_name,
+       device_ip,
+       device_mac,
+       upload_bytes,
+       download_bytes,
+       delta_upload_bytes,
+       delta_download_bytes
+     FROM device_data
+     WHERE timestamp >= ? AND timestamp < ?
+     ORDER BY device_mac, device_ip, timestamp ASC`,
+  ).all(todayIso, tomorrowIso) as DeviceReportRow[];
 
-  const deviceFirstMap: Record<string, any> = {};
-  const deviceLastMap: Record<string, any> = {};
-  for (const device of todayDevices) {
-    const key = device.device_mac || device.device_ip || 'unknown';
-    if (!deviceFirstMap[key]) {
-      deviceFirstMap[key] = device;
-    }
-    deviceLastMap[key] = device;
-  }
-
-  const deviceMap: Record<string, any> = {};
-  for (const key of Object.keys(deviceLastMap)) {
-    const last = deviceLastMap[key];
-    const first = deviceFirstMap[key];
-    const uploadDelta = first && last
-      ? Math.max(0, (last.upload_bytes || 0) - (first.upload_bytes || 0))
-      : 0;
-    const downloadDelta = first && last
-      ? Math.max(0, (last.download_bytes || 0) - (first.download_bytes || 0))
-      : 0;
-    deviceMap[key] = {
-      name: last.device_name || 'Unknown',
-      ip: last.device_ip || '',
-      mac: last.device_mac || '',
-      uploadBytes: uploadDelta,
-      downloadBytes: downloadDelta,
-      totalBytes: uploadDelta + downloadDelta,
+  const deviceMap = new Map<string, DeviceRanking & {
+    previousUpload: number | null;
+    previousDownload: number | null;
+  }>();
+  for (const row of todayDevices) {
+    const key = row.device_mac || row.device_ip || `unknown-${row.device_name || 'device'}`;
+    const current = deviceMap.get(key) || {
+      name: row.device_name || '未知设备',
+      ip: row.device_ip || '',
+      mac: row.device_mac || key,
+      uploadBytes: 0,
+      downloadBytes: 0,
+      totalBytes: 0,
+      previousUpload: null,
+      previousDownload: null,
     };
+    const uploadDelta = row.delta_upload_bytes
+      ?? getCounterDelta(row.upload_bytes, current.previousUpload);
+    const downloadDelta = row.delta_download_bytes
+      ?? getCounterDelta(row.download_bytes, current.previousDownload);
+    current.name = row.device_name || current.name;
+    current.ip = row.device_ip || current.ip;
+    current.mac = row.device_mac || current.mac;
+    current.uploadBytes += uploadDelta;
+    current.downloadBytes += downloadDelta;
+    current.totalBytes = current.uploadBytes + current.downloadBytes;
+    current.previousUpload = row.upload_bytes;
+    current.previousDownload = row.download_bytes;
+    deviceMap.set(key, current);
   }
 
-  const topDevices = Object.values(deviceMap)
-    .sort((a: any, b: any) => b.totalBytes - a.totalBytes)
+  const topDevices = Array.from(deviceMap.values())
+    .map((device) => ({
+      name: device.name,
+      ip: device.ip,
+      mac: device.mac,
+      uploadBytes: device.uploadBytes,
+      downloadBytes: device.downloadBytes,
+      totalBytes: device.totalBytes,
+    }))
+    .sort((left, right) => right.totalBytes - left.totalBytes)
     .slice(0, 10);
 
-  // Calculate network quality
-  const avgSignal = signalCount > 0 ? Math.round(totalSignal / signalCount) : 0;
-  const intervalSetting = db.prepare("SELECT value FROM system_settings WHERE key = 'scheduler_interval'").get() as { value?: string } | undefined;
+  const intervalSetting = db.prepare(
+    "SELECT value FROM system_settings WHERE key = 'scheduler_interval'",
+  ).get() as { value?: string } | undefined;
   const intervalMinutes = Math.max(1, Number(intervalSetting?.value || 60));
-  const expectedSamples = (24 * 60) / intervalMinutes;
-  // uptimePercent represents data collection completeness (actual samples / expected samples)
-  // It is NOT network uptime. Low values usually mean the scheduler was recently enabled
-  // or the collection interval was recently changed.
-  const samplingRatio = todayTraffic.length > 0 ? Math.min(1, todayTraffic.length / expectedSamples) : 0;
+  const expectedSamples = Math.ceil((24 * 60) / intervalMinutes);
+  const samplingRatio = expectedSamples > 0
+    ? Math.min(1, todayTraffic.length / expectedSamples)
+    : 0;
   const uptimePercent = Math.round(samplingRatio * 1000) / 10;
 
+  const collectionCounts = db.prepare(
+    `SELECT status, COUNT(*) AS count
+     FROM collection_runs
+     WHERE COALESCE(completed_at, started_at) >= ?
+       AND COALESCE(completed_at, started_at) < ?
+     GROUP BY status`,
+  ).all(todayIso, tomorrowIso) as Array<{ status: string; count: number }>;
+  const countByStatus = Object.fromEntries(
+    collectionCounts.map((row) => [row.status, Number(row.count || 0)]),
+  );
+  const alertCountRow = db.prepare(
+    `SELECT COUNT(*) AS count
+     FROM alert_logs
+     WHERE triggered_at >= ? AND triggered_at < ?`,
+  ).get(todayIso, tomorrowIso) as { count: number } | undefined;
+
+  const avgSignalValue = average(todayTraffic.map((row) => row.signal_strength));
+  const avgRsrp = average(todayTraffic.map((row) => row.rsrp));
+  const avgRsrq = average(todayTraffic.map((row) => row.rsrq));
+  const avgSinr = average(todayTraffic.map((row) => row.sinr));
+  const avgRssi = average(todayTraffic.map((row) => row.rssi));
+  const qualitySignal = avgRsrp ?? avgSignalValue;
+
   let networkQuality = '数据不足';
-  if (todayTraffic.length >= 3) {
-    if (avgSignal >= -70 && samplingRatio >= 0.7) {
-      networkQuality = '优秀';
-    } else if (avgSignal >= -85 && samplingRatio >= 0.5) {
-      networkQuality = '良好';
-    } else if (avgSignal >= -100 && samplingRatio >= 0.3) {
-      networkQuality = '一般';
-    } else if (avgSignal < -100) {
-      networkQuality = '差';
-    } else {
-      networkQuality = '一般';
-    }
+  if (todayTraffic.length >= 3 && qualitySignal !== null) {
+    if (qualitySignal >= -80 && samplingRatio >= 0.7) networkQuality = '优秀';
+    else if (qualitySignal >= -95 && samplingRatio >= 0.5) networkQuality = '良好';
+    else if (qualitySignal >= -105 && samplingRatio >= 0.3) networkQuality = '一般';
+    else networkQuality = '差';
   }
+
+  const connectedValues = todayTraffic
+    .map((row) => row.connected_devices)
+    .filter((value): value is number => typeof value === 'number');
 
   return {
     id: 0,
@@ -141,10 +229,29 @@ export async function generateDailyReport() {
     totalDownload,
     peakHour,
     topDevices,
-    avgSignal,
+    avgSignal: avgSignalValue === null ? null : Math.round(avgSignalValue),
     uptimePercent,
     networkQuality,
     sentAt: null,
     createdAt: null,
+    sampleCount: todayTraffic.length,
+    expectedSamples,
+    successfulCollections: countByStatus.success || 0,
+    failedCollections: countByStatus.failed || 0,
+    alertCount: Number(alertCountRow?.count || 0),
+    peakTrafficBytes,
+    peakDownloadBps: Math.max(0, ...todayTraffic.map((row) => row.download_bps || 0)),
+    peakUploadBps: Math.max(0, ...todayTraffic.map((row) => row.upload_bps || 0)),
+    averageDevices: connectedValues.length > 0
+      ? connectedValues.reduce((total, value) => total + value, 0) / connectedValues.length
+      : 0,
+    maxDevices: Math.max(0, ...connectedValues),
+    avgRsrp,
+    avgRsrq,
+    avgSinr,
+    avgRssi,
+    networkTypes: Array.from(networkTypes),
+    bands: Array.from(bands),
+    generatedAt: now.toISOString(),
   };
 }

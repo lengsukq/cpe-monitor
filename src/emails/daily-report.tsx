@@ -1,10 +1,13 @@
 import { Section, Text } from '@react-email/components';
-import Layout from './components/Layout';
+import Layout, { emailTheme } from './components/Layout';
 import Header from './components/Header';
 import StatCard from './components/StatCard';
 import DeviceTable from './components/DeviceTable';
 import QualityBadge from './components/QualityBadge';
 import Footer from './components/Footer';
+import SectionHeading from './components/SectionHeading';
+import StatusBadge from './components/StatusBadge';
+import InfoTable from './components/InfoTable';
 import type { DailyReport } from '@/types';
 import { formatBytes } from '@/lib/format';
 
@@ -12,180 +15,227 @@ interface DailyReportEmailProps {
   data: DailyReport;
 }
 
-function SignalMeter({ value }: { value: number }) {
-  const bars = Math.min(5, Math.max(0, Math.round((value + 120) / 25)));
-  const colorOptions = ['#ef4444', '#ef4444', '#eab308', '#22c55e', '#22c55e'];
+function formatBitsPerSecond(value: number | null | undefined): string {
+  const bps = Math.max(0, value || 0);
+  if (bps >= 1_000_000_000) return `${(bps / 1_000_000_000).toFixed(2)} Gbps`;
+  if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(2)} Mbps`;
+  if (bps >= 1_000) return `${(bps / 1_000).toFixed(1)} Kbps`;
+  return `${Math.round(bps)} bps`;
+}
 
-  const cells = Array.from({ length: 5 }, (_, i) => {
-    const filled = i < bars;
-    return `<td style="padding:0 2px 0 0">
-      <div style="width:8px;height:${8 + i * 4}px;border-radius:2px 2px 0 0;background:${filled ? colorOptions[i] : '#e2e8f0'};transition:background 0.3s"></div>
-    </td>`;
-  }).join('');
+function formatMetric(value: number | null | undefined, unit: string): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  return `${value.toFixed(1)} ${unit}`;
+}
 
-  return `<table style="border-collapse:collapse;display:inline-block">${cells}</table>`;
+function formatGeneratedAt(value: string | undefined): string {
+  if (!value) return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+}
+
+function getQualityTone(quality: string | null) {
+  if (quality === '优秀' || quality === '良好') return 'success' as const;
+  if (quality === '差') return 'danger' as const;
+  if (quality === '一般') return 'warning' as const;
+  return 'neutral' as const;
 }
 
 export default function DailyReportEmail({ data }: DailyReportEmailProps) {
   const topDevices = Array.isArray(data.topDevices) ? data.topDevices : [];
+  const totalTraffic = (data.totalDownload || 0) + (data.totalUpload || 0);
+  const peakWindow = data.peakHour === null
+    ? '暂无数据'
+    : `${String(data.peakHour).padStart(2, '0')}:00 – ${String((data.peakHour + 1) % 24).padStart(2, '0')}:00`;
+  const generatedAt = formatGeneratedAt(data.generatedAt);
+  const summaryTone = (data.failedCollections || 0) > 0 || (data.alertCount || 0) > 0
+    ? 'warning'
+    : getQualityTone(data.networkQuality);
+  const summaryColors = summaryTone === 'danger'
+    ? {
+        background: emailTheme.dangerSoft,
+        border: '#fecaca',
+        title: emailTheme.danger,
+        body: '#8f3f38',
+      }
+    : summaryTone === 'warning'
+      ? {
+          background: emailTheme.warningSoft,
+          border: '#fed7aa',
+          title: emailTheme.warning,
+          body: '#8b5a2b',
+        }
+      : summaryTone === 'neutral'
+        ? {
+            background: emailTheme.surfaceMuted,
+            border: emailTheme.border,
+            title: emailTheme.muted,
+            body: emailTheme.subtle,
+          }
+        : {
+            background: emailTheme.successSoft,
+            border: '#bbf7d0',
+            title: emailTheme.success,
+            body: '#3f6e4e',
+          };
 
   return (
-    <Layout>
+    <Layout preview={`${data.reportDate}：总流量 ${formatBytes(totalTraffic)}，网络质量 ${data.networkQuality || '数据不足'}`}>
       <Header
-        title="CPE 流量日报"
-        subtitle={`${data.reportDate} · 网络运行概览`}
+        title="CPE 网络运行日报"
+        subtitle={`${data.reportDate} · 流量、采集、设备与射频质量汇总`}
+        status={data.networkQuality || '数据不足'}
+        tone={getQualityTone(data.networkQuality)}
       />
 
-      {/* 今日概览 - 三栏卡片 */}
-      <Section style={{ padding: '28px 28px 8px 28px' }}>
-        <Text
-          style={{
-            fontSize: '16px',
-            fontWeight: 700,
-            color: '#1a2a36',
-            margin: '0 0 16px 0',
-            letterSpacing: '-0.2px',
-          }}
-        >
-          今日概览
-        </Text>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <tr>
-            <td style={{ width: '33.33%', paddingRight: '6px' }}>
-              <StatCard title="总下载" value={formatBytes(data.totalDownload)} icon="⬇️" accentColor="#2c7a9e" />
-            </td>
-            <td style={{ width: '33.33%', padding: '0 6px' }}>
-              <StatCard title="总上传" value={formatBytes(data.totalUpload)} icon="⬆️" accentColor="#3b8db0" />
-            </td>
-            <td style={{ width: '33.33%', paddingLeft: '6px' }}>
-              <StatCard title="在线设备" value={`${topDevices.length} 台`} icon="📱" accentColor="#5bb8d9" />
-            </td>
-          </tr>
-        </table>
-      </Section>
-
-      {/* 流量峰值时段 */}
-      <Section style={{ padding: '12px 28px 4px 28px' }}>
+      <Section style={{ padding: '26px 30px 0' }}>
         <table
+          role="presentation"
           style={{
             width: '100%',
-            borderCollapse: 'collapse',
-            background: 'linear-gradient(135deg, #f0f7fb 0%, #e8f0f5 100%)',
-            borderRadius: '10px',
-            border: '1px solid #dce8f0',
+            borderCollapse: 'separate',
+            borderSpacing: 0,
+            backgroundColor: summaryColors.background,
+            border: `1px solid ${summaryColors.border}`,
+            borderRadius: '12px',
           }}
         >
-          <tr>
-            <td style={{ padding: '14px 18px' }}>
-              <table style={{ borderCollapse: 'collapse' }}>
-                <tr>
-                  <td style={{ verticalAlign: 'middle', paddingRight: '12px', fontSize: '20px', lineHeight: '1' }}>
-                    ⏰
-                  </td>
-                  <td style={{ verticalAlign: 'middle' }}>
-                    <span style={{ fontSize: '12px', color: '#6b7a88', fontWeight: 500 }}>
-                      流量峰值时段
-                    </span>
-                    <br />
-                    <span style={{ fontSize: '16px', color: '#1a2a36', fontWeight: 700 }}>
-                      {data.peakHour !== null ? `${String(data.peakHour).padStart(2, '0')}:00 – ${String(data.peakHour + 1).padStart(2, '0')}:00` : '暂无数据'}
-                    </span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+          <tbody>
+            <tr>
+              <td style={{ padding: '15px 17px' }}>
+                <Text style={{ color: summaryColors.title, fontSize: '14px', fontWeight: 800, margin: 0 }}>
+                  {(data.failedCollections || 0) > 0
+                    ? `今日有 ${data.failedCollections} 次采集失败`
+                    : (data.alertCount || 0) > 0
+                      ? `今日触发 ${data.alertCount} 条告警`
+                      : '今日采集运行正常'}
+                </Text>
+                <Text style={{ color: summaryColors.body, fontSize: '11px', lineHeight: '1.6', margin: '5px 0 0' }}>
+                  实际采集 {data.sampleCount || 0} 个样本，数据完整率 {data.uptimePercent?.toFixed(1) || '0.0'}%，共记录 {topDevices.length} 台活跃设备。
+                </Text>
+              </td>
+            </tr>
+          </tbody>
         </table>
       </Section>
 
-      {/* 设备排名 */}
-      <Section style={{ padding: '16px 28px' }}>
-        <Text
-          style={{
-            fontSize: '16px',
-            fontWeight: 700,
-            color: '#1a2a36',
-            margin: '0 0 14px 0',
-            letterSpacing: '-0.2px',
-          }}
-        >
-          设备使用排名
-        </Text>
+      <Section style={{ padding: '24px 30px 0' }}>
+        <SectionHeading title="今日流量概览" description="每日流量按采集区间增量累计，可正确处理 CPE 计数器清零。" />
+        <table role="presentation" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            <tr>
+              <td style={{ width: '50%', padding: '0 6px 6px 0' }}>
+                <StatCard title="总下载" value={formatBytes(data.totalDownload)} icon="↓" detail={`峰值速率 ${formatBitsPerSecond(data.peakDownloadBps)}`} />
+              </td>
+              <td style={{ width: '50%', padding: '0 0 6px 6px' }}>
+                <StatCard title="总上传" value={formatBytes(data.totalUpload)} icon="↑" detail={`峰值速率 ${formatBitsPerSecond(data.peakUploadBps)}`} />
+              </td>
+            </tr>
+            <tr>
+              <td style={{ width: '50%', padding: '6px 6px 0 0' }}>
+                <StatCard title="总流量" value={formatBytes(totalTraffic)} icon="↕" detail={`峰值小时流量 ${formatBytes(data.peakTrafficBytes || 0)}`} />
+              </td>
+              <td style={{ width: '50%', padding: '6px 0 0 6px' }}>
+                <StatCard title="设备规模" value={`${data.maxDevices || 0} 台`} icon="▦" detail={`平均在线 ${(data.averageDevices || 0).toFixed(1)} 台`} />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
+
+      <Section style={{ padding: '24px 30px 0' }}>
+        <SectionHeading
+          title="采集与告警运行"
+          description="完整率反映实际采集样本与按调度间隔计算的预期样本比例。"
+          trailing={<StatusBadge tone={summaryTone}>{data.uptimePercent?.toFixed(1) || '0.0'}%</StatusBadge>}
+        />
+        <table role="presentation" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            <tr>
+              <td style={{ width: '50%', paddingRight: '6px', verticalAlign: 'top' }}>
+                <InfoTable rows={[
+                  { label: '实际样本', value: `${data.sampleCount || 0} 个`, emphasis: true },
+                  { label: '预期样本', value: `${data.expectedSamples || 0} 个` },
+                  { label: '成功采集', value: `${data.successfulCollections || 0} 次` },
+                  { label: '失败采集', value: `${data.failedCollections || 0} 次` },
+                ]} />
+              </td>
+              <td style={{ width: '50%', paddingLeft: '6px', verticalAlign: 'top' }}>
+                <InfoTable rows={[
+                  { label: '数据完整率', value: `${data.uptimePercent?.toFixed(1) || '0.0'}%`, emphasis: true },
+                  { label: '告警次数', value: `${data.alertCount || 0} 条` },
+                  { label: '峰值时段', value: peakWindow },
+                  { label: '峰值小时流量', value: formatBytes(data.peakTrafficBytes || 0) },
+                ]} />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
+
+      <Section style={{ padding: '24px 30px 0' }}>
+        <SectionHeading
+          title="网络与射频质量"
+          description="射频均值基于当日有效采样计算，缺失指标不会按 0 参与平均。"
+          trailing={<QualityBadge quality={data.networkQuality || '数据不足'} />}
+        />
+        <table role="presentation" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            <tr>
+              <td style={{ width: '50%', paddingRight: '6px', verticalAlign: 'top' }}>
+                <InfoTable rows={[
+                  { label: '平均 RSRP', value: formatMetric(data.avgRsrp, 'dBm'), emphasis: true },
+                  { label: '平均 RSRQ', value: formatMetric(data.avgRsrq, 'dB') },
+                  { label: '平均 SINR', value: formatMetric(data.avgSinr, 'dB') },
+                  { label: '平均 RSSI', value: formatMetric(data.avgRssi, 'dBm') },
+                ]} />
+              </td>
+              <td style={{ width: '50%', paddingLeft: '6px', verticalAlign: 'top' }}>
+                <InfoTable rows={[
+                  { label: '兼容信号均值', value: data.avgSignal === null ? '—' : `${data.avgSignal} dBm` },
+                  { label: '网络制式', value: data.networkTypes?.length ? data.networkTypes.join(' / ') : '—', emphasis: true },
+                  { label: '使用频段', value: data.bands?.length ? data.bands.join(' / ') : '—' },
+                  { label: '质量评级', value: data.networkQuality || '数据不足' },
+                ]} />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
+
+      <Section style={{ padding: '24px 30px 0' }}>
+        <SectionHeading
+          title="设备流量排名"
+          description="按当日区间流量累计排序，最多展示 10 台设备。"
+          trailing={<StatusBadge>{topDevices.length} 台</StatusBadge>}
+        />
         {topDevices.length > 0 ? (
           <DeviceTable devices={topDevices} />
         ) : (
-          <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', border: '1px dashed #dce8f0', borderRadius: '12px' }}>
-            暂无设备数据
-          </div>
+          <Text style={emptyStateStyle}>今日暂无可用于排名的设备流量数据。</Text>
         )}
       </Section>
 
-      {/* 分隔线 */}
-      <div style={{ height: '1px', background: '#e8f0f5', margin: '0 28px' }} />
-
-      {/* 网络质量评估 */}
-      <Section style={{ padding: '20px 28px' }}>
-        <Text
-          style={{
-            fontSize: '16px',
-            fontWeight: 700,
-            color: '#1a2a36',
-            margin: '0 0 16px 0',
-            letterSpacing: '-0.2px',
-          }}
-        >
-          网络质量评估
+      <Section style={{ padding: '22px 30px 30px' }}>
+        <Text style={{ color: emailTheme.subtle, fontSize: '10px', lineHeight: '1.6', margin: 0, textAlign: 'center' }}>
+          网络质量评级综合参考 RSRP 或兼容信号均值及数据完整率。日报中的完整率不是运营商网络可用率。
         </Text>
-
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <tr>
-            {/* Quality badge column */}
-            <td style={{ verticalAlign: 'top', width: '50%', paddingRight: '10px' }}>
-              <QualityBadge quality={data.networkQuality || '未知'} />
-            </td>
-            {/* Signal meter column */}
-            <td style={{ verticalAlign: 'top', width: '50%', paddingLeft: '10px', textAlign: 'right' }}>
-              {data.avgSignal !== null && (
-                <div style={{ display: 'inline-block' }}>
-                  <div dangerouslySetInnerHTML={{ __html: SignalMeter({ value: data.avgSignal }) }} />
-                </div>
-              )}
-            </td>
-          </tr>
-        </table>
-
-        {/* Detail metrics */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '16px' }}>
-          <tr>
-            <td style={{ padding: '10px 14px', background: '#f7fafc', borderRadius: '8px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tr>
-                  <td style={{ padding: '4px 0', color: '#6b7a88', fontSize: '13px' }}>平均信号强度</td>
-                  <td style={{ padding: '4px 0', textAlign: 'right', color: '#1a2a36', fontSize: '13px', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                    {data.avgSignal || 0} dBm
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '4px 0', color: '#6b7a88', fontSize: '13px', borderTop: '1px solid #e8f0f5' }}>数据完整率</td>
-                  <td style={{ padding: '4px 0', textAlign: 'right', color: '#1a2a36', fontSize: '13px', fontWeight: 600, fontVariantNumeric: 'tabular-nums', borderTop: '1px solid #e8f0f5' }}>
-                    {data.uptimePercent?.toFixed(1) || 0}%
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-
-        {/* 完整率说明 */}
-        <div style={{ marginTop: '8px', fontSize: '10px', color: '#aab8c4', lineHeight: '1.5', textAlign: 'center' }}>
-          数据完整率 = 实际采集次数 ÷ 预期采集次数（基于调度间隔计算）。
-          {data.uptimePercent !== null && data.uptimePercent < 70 && (
-            <> 若刚开启调度器，完整率偏低属正常现象。</>
-          )}
-        </div>
       </Section>
 
-      <Footer />
+      <Footer generatedAt={generatedAt} note="日报由当日 SQLite 采集历史聚合生成，数据以 CPE 实际返回和成功写入的采样为准。" />
     </Layout>
   );
 }
+
+const emptyStateStyle: React.CSSProperties = {
+  padding: '20px',
+  margin: 0,
+  backgroundColor: emailTheme.surfaceMuted,
+  border: `1px dashed ${emailTheme.border}`,
+  borderRadius: '12px',
+  color: emailTheme.muted,
+  fontSize: '12px',
+  lineHeight: '1.6',
+  textAlign: 'center',
+};

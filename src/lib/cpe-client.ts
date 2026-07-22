@@ -1,15 +1,15 @@
 import crypto from 'crypto';
 import forge from 'node-forge';
-import { db, initializeDatabase } from './db';
+import { initializeDatabase } from './db';
 import { getCpeCredentials } from './settings-store';
+import {
+  clearCpeSession,
+  loadCpeSession,
+  saveCpeSession,
+  type PersistedCpeSession,
+} from './cpe-session-store';
 
-interface CpeSession {
-  sessionId: string;
-  token: string;
-  rsae: string;
-  rsan: string;
-  loginTime: number;
-}
+type CpeSession = PersistedCpeSession;
 
 interface CpeDevice {
   name: string;
@@ -19,6 +19,10 @@ interface CpeDevice {
   uploadBytes: number;
   downloadBytes: number;
   onlineDuration: number;
+  interfaceType: string;
+  frequency: string;
+  rssi: number | null;
+  raw: Record<string, unknown>;
 }
 
 interface CpeTrafficData {
@@ -26,6 +30,14 @@ interface CpeTrafficData {
   downloadBytes: number;
   connectedDevices: number;
   signalStrength: number;
+  networkType: string;
+  band: string;
+  cellId: string;
+  pci: string;
+  rsrp: number | null;
+  rsrq: number | null;
+  sinr: number | null;
+  rssi: number | null;
   devices: CpeDevice[];
 }
 
@@ -41,7 +53,8 @@ export interface CpeSmsMessage {
   direction: 'inbound' | 'outbound';
 }
 
-const SESSION_TTL = 10 * 60 * 1000; // 10 minutes
+const SESSION_PERSIST_INTERVAL = 5 * 60 * 1000;
+const RECENT_LOGIN_GUARD_MS = 5 * 1000;
 
 export class CpeClient {
   private baseUrl: string;
@@ -51,16 +64,33 @@ export class CpeClient {
   private loginPromise: Promise<boolean> | null = null;
   private requestQueue: Promise<void> = Promise.resolve();
   private lastLoginError = '';
+  private lastSessionPersistAt = 0;
 
   constructor(baseUrl: string, username: string, password: string) {
     this.baseUrl = baseUrl;
     this.username = username;
     this.password = password;
+    this.session = loadCpeSession(baseUrl, username);
+    this.lastSessionPersistAt = this.session?.lastUsedAt || 0;
   }
 
   private isSessionValid(): boolean {
-    if (!this.session) return false;
-    return Date.now() - this.session.loginTime < SESSION_TTL;
+    return Boolean(this.session);
+  }
+
+  private persistSession(force = false) {
+    if (!this.session) return;
+    const now = Date.now();
+    this.session.lastUsedAt = now;
+    if (!force && now - this.lastSessionPersistAt < SESSION_PERSIST_INTERVAL) return;
+    saveCpeSession(this.baseUrl, this.username, this.session);
+    this.lastSessionPersistAt = now;
+  }
+
+  private invalidateSession() {
+    this.session = null;
+    this.lastSessionPersistAt = 0;
+    clearCpeSession();
   }
 
   private generateNonce(): string {
@@ -79,9 +109,23 @@ export class CpeClient {
     }
   }
 
-  private async relogin(): Promise<boolean> {
+  private async relogin(staleSessionId?: string): Promise<boolean> {
     return this.withRequestLock(async () => {
-      this.session = null;
+      if (
+        staleSessionId
+        && this.session
+        && this.session.sessionId !== staleSessionId
+      ) {
+        return true;
+      }
+      if (
+        !staleSessionId
+        && this.session
+        && Date.now() - this.session.authenticatedAt < RECENT_LOGIN_GUARD_MS
+      ) {
+        return true;
+      }
+      this.invalidateSession();
       return this.login();
     });
   }
@@ -166,9 +210,9 @@ export class CpeClient {
       });
 
       const challengeText = await challengeResp.text();
-      let salt = this.decodeHtmlEntities(this.extractValue(challengeText, 'salt') || '');
-      let iterations = parseInt(this.extractValue(challengeText, 'iterations') || '1000');
-      let serverNonce = this.decodeHtmlEntities(this.extractValue(challengeText, 'servernonce') || '');
+      const salt = this.decodeHtmlEntities(this.extractValue(challengeText, 'salt') || '');
+      const iterations = parseInt(this.extractValue(challengeText, 'iterations') || '1000');
+      const serverNonce = this.decodeHtmlEntities(this.extractValue(challengeText, 'servernonce') || '');
 
       if (!salt || !serverNonce) {
         this.lastLoginError = 'CPE 登录质询返回异常，请检查用户名或设备固件接口。';
@@ -225,13 +269,16 @@ export class CpeClient {
         const newSessionMatch = newCookies.match(/SessionID=([^;]+)/);
         const newSessionId = newSessionMatch ? newSessionMatch[1] : sessionId;
 
+        const now = Date.now();
         this.session = {
           sessionId: newSessionId,
           token,
           rsae,
           rsan,
-          loginTime: Date.now(),
+          authenticatedAt: now,
+          lastUsedAt: now,
         };
+        this.persistSession(true);
         return true;
       }
 
@@ -246,7 +293,10 @@ export class CpeClient {
   }
 
   async ensureLogin(): Promise<boolean> {
-    if (this.isSessionValid()) return true;
+    if (this.isSessionValid()) {
+      this.persistSession();
+      return true;
+    }
     // Several dashboard requests can arrive at the same time. Reuse one
     // in-flight login so we do not invalidate competing sessions.
     if (!this.loginPromise) {
@@ -304,6 +354,13 @@ export class CpeClient {
     return match ? this.decodeHtmlEntities(match[1]).trim() : '';
   }
 
+  private isAuthenticationFailure(status: number, text: string): boolean {
+    if (status === 401 || status === 403) return true;
+    if (/<title>[^<]*(登录|login)/i.test(text)) return true;
+    const errorCode = this.extractXmlTag(text, 'code');
+    return ['125001', '125002', '125003'].includes(errorCode);
+  }
+
   private async refreshTokenUnlocked(): Promise<void> {
     if (!this.session) return;
     const sessionId = this.session.sessionId;
@@ -327,6 +384,7 @@ export class CpeClient {
     }
     if (token && this.session?.sessionId === sessionId) {
       this.session.token = this.decodeHtmlEntities(token).substring(32);
+      this.persistSession(true);
     }
   }
 
@@ -338,7 +396,11 @@ export class CpeClient {
     return forge.util.bytesToHex(publicKey.encrypt(forge.util.encodeUtf8(base64), 'RSA-OAEP'));
   }
 
-  private async postWithSession(path: string, body: string, contentType: string): Promise<{ status: number; text: string }> {
+  private async postWithSession(
+    path: string,
+    body: string,
+    contentType: string,
+  ): Promise<{ status: number; text: string; sessionId: string }> {
     const session = this.session;
     if (!session) throw new Error('CPE session is not available');
     const response = await fetch(`${this.baseUrl}${path}`, {
@@ -354,7 +416,11 @@ export class CpeClient {
       },
       body,
     });
-    return { status: response.status, text: await response.text() };
+    return {
+      status: response.status,
+      text: await response.text(),
+      sessionId: session.sessionId,
+    };
   }
 
   private async apiPostEncrypted(
@@ -389,8 +455,8 @@ export class CpeClient {
     });
 
     const { result, firstNonce, secondNonce } = encryptedAttempt;
-    if (retry && (result.status === 401 || result.status === 403)) {
-      const ok = await this.relogin();
+    if (retry && this.isAuthenticationFailure(result.status, result.text)) {
+      const ok = await this.relogin(result.sessionId);
       if (!ok) throw new Error(this.getLastLoginError());
       return this.apiPostEncrypted(path, data, encryptPhone, false);
     }
@@ -399,12 +465,8 @@ export class CpeClient {
     }
 
     const xml = result.text;
-    if (retry && /<title>[^<]*(登录|login)/i.test(xml)) {
-      const ok = await this.relogin();
-      if (!ok) throw new Error(this.getLastLoginError());
-      return this.apiPostEncrypted(path, data, encryptPhone, false);
-    }
     if (/<error[\s>]/i.test(xml)) return '';
+    this.persistSession();
 
     const encrypted = this.extractXmlTag(xml, 'pwd');
     const hash = this.extractXmlTag(xml, 'hash');
@@ -450,12 +512,15 @@ export class CpeClient {
           '_ResponseSource': 'Broswer',
         },
       });
-      return { status: resp.status, text: await resp.text() };
+      return {
+        status: resp.status,
+        text: await resp.text(),
+        sessionId: session.sessionId,
+      };
     });
 
-    // If unauthorized, re-login once
-    if (retry && (result.status === 401 || result.status === 403)) {
-      const ok = await this.relogin();
+    if (retry && this.isAuthenticationFailure(result.status, result.text)) {
+      const ok = await this.relogin(result.sessionId);
       if (!ok) throw new Error(this.getLastLoginError());
 
       return this.apiGet(path, false); // retry once after renewal
@@ -463,11 +528,7 @@ export class CpeClient {
 
     if (result.status < 200 || result.status >= 300) throw new Error(`API request failed: ${result.status}`);
 
-    if (retry && /<title>[^<]*(登录|login)/i.test(result.text)) {
-      const ok = await this.relogin();
-      if (!ok) throw new Error(this.getLastLoginError());
-      return this.apiGet(path, false);
-    }
+    this.persistSession();
     try { return JSON.parse(result.text); } catch { return result.text; }
   }
 
@@ -480,8 +541,8 @@ export class CpeClient {
       return this.postWithSession(path, body, contentType);
     });
 
-    if (retry && (result.status === 401 || result.status === 403)) {
-      const ok = await this.relogin();
+    if (retry && this.isAuthenticationFailure(result.status, result.text)) {
+      const ok = await this.relogin(result.sessionId);
       if (!ok) throw new Error(this.getLastLoginError());
 
       return this.apiPost(path, body, contentType, false);
@@ -489,6 +550,7 @@ export class CpeClient {
 
     if (result.status < 200 || result.status >= 300) throw new Error(`API request failed: ${result.status}`);
 
+    this.persistSession();
     try { return JSON.parse(result.text); } catch { return result.text; }
   }
 
@@ -738,6 +800,11 @@ export class CpeClient {
     return match ? Number(match[0]) : 0;
   }
 
+  private parseOptionalSignalValue(value: unknown): number | null {
+    const match = String(value ?? '').match(/-?\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : null;
+  }
+
   private async getHostInfoRaw(retry = true): Promise<any[]> {
     const data = await this.apiGet('/api/system/HostInfo');
     if (retry && (!Array.isArray(data) || data.length === 0)) {
@@ -762,6 +829,10 @@ export class CpeClient {
         uploadBytes: (txKBytes || parseInt(host.UploadBytes || '0', 10)) * 1024,
         downloadBytes: (rxKBytes || parseInt(host.DownloadBytes || '0', 10)) * 1024,
         onlineDuration: parseInt(host.AssociatedTime || host.OnlineDuration || '0', 10),
+        interfaceType: host.InterfaceType || '',
+        frequency: host.Frequency || '',
+        rssi: this.parseOptionalSignalValue(host.rssi || host.SignalStrength),
+        raw: host,
       });
     }
     return { devices };
@@ -789,6 +860,14 @@ export class CpeClient {
       downloadBytes: parseInt(trafficStats?.CurrentDownload || String(totalDownload), 10) || 0,
       connectedDevices: onlineDevices.length,
       signalStrength,
+      networkType: String(networkSnapshot.networkType || ''),
+      band: String(networkSnapshot.band || ''),
+      cellId: String(networkSnapshot.cellId || ''),
+      pci: String(networkSnapshot.pci || ''),
+      rsrp: this.parseOptionalSignalValue(networkSnapshot.rsrp),
+      rsrq: this.parseOptionalSignalValue(networkSnapshot.rsrq),
+      sinr: this.parseOptionalSignalValue(networkSnapshot.sinr),
+      rssi: this.parseOptionalSignalValue(networkSnapshot.rssi),
       devices: onlineDevices,
     };
   }
@@ -803,10 +882,12 @@ export function getCpeClient(): CpeClient | null {
 
 export function resetCpeClient() {
   cachedClient = null;
+  clearCpeSession();
 }
 
 export function initCpeClient(url: string, username: string, password: string): CpeClient {
   if (!cachedClient || cachedClient['baseUrl'] !== url || cachedClient['username'] !== username || cachedClient['password'] !== password) {
+    if (cachedClient) clearCpeSession();
     cachedClient = new CpeClient(url, username, password);
   }
   return cachedClient;

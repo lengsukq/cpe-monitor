@@ -1,8 +1,9 @@
 import { db } from '@/lib/db';
-import { ensureDatabase, jsonError, jsonOk, requireSession, withApiHandler } from '@/lib/api-route';
+import { ensureDatabase, jsonOk, requireSession, withApiHandler } from '@/lib/api-route';
 import { ensureSchedulerStarted, getSchedulerStatus } from '@/lib/scheduler';
 import { getOrCreateCpeClient } from '@/lib/cpe-client';
 import { getSettingsMap } from '@/lib/settings-store';
+import { getCollectionHealth } from '@/lib/collection-health';
 
 interface TrafficDataRow {
   upload_bytes: number | null;
@@ -28,6 +29,10 @@ export const GET = withApiHandler(async () => {
     interval: parseInt(settingsMap.scheduler_interval || '60', 10),
     running: getSchedulerStatus().running,
   };
+  const collectionHealth = getCollectionHealth({
+    schedulerEnabled: schedulerStatus.enabled,
+    intervalMinutes: schedulerStatus.interval,
+  });
 
   let currentUpload = 0;
   let currentDownload = 0;
@@ -91,5 +96,6 @@ export const GET = withApiHandler(async () => {
     source,
     cpeError,
     schedulerStatus,
+    collectionHealth,
   });
 }, '获取仪表盘概览失败');

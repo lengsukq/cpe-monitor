@@ -22,6 +22,7 @@ import SignalStrengthCard from '@/components/dashboard/SignalStrengthCard';
 import DataPlanCard from '@/components/dashboard/DataPlanCard';
 import TrafficStatsPanel from '@/components/dashboard/TrafficStatsPanel';
 import TrafficTrendCard from '@/components/dashboard/TrafficTrendCard';
+import NetworkHistoryGrid from '@/components/dashboard/NetworkHistoryGrid';
 import QuickLinks from '@/components/dashboard/QuickLinks';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { formatLocalTime, formatRate } from '@/lib/format';
@@ -113,12 +114,27 @@ export default function DashboardPage() {
         <Callout tone="warning" title="部分实时数据不可用">{data.dataError}</Callout>
       ) : null}
 
+      {data.overview?.collectionHealth?.status === 'failed' ? (
+        <Callout tone="danger" title="最近一次采集失败">
+          {data.overview.collectionHealth.detail}
+          {data.overview.collectionHealth.consecutiveFailures > 1
+            ? `，已连续失败 ${data.overview.collectionHealth.consecutiveFailures} 次`
+            : ''}
+        </Callout>
+      ) : data.overview?.collectionHealth?.status === 'stale' ? (
+        <Callout tone="warning" title="采集数据已过期">
+          {data.overview.collectionHealth.detail}，请检查定时任务或手动执行一次采集。
+        </Callout>
+      ) : null}
+
       <StatusPillsRow
         isConnected={data.isConnected}
         updateLabel={data.updateLabel}
         updateState={data.overview?.updateState}
         schedulerLabel={data.schedulerStatusLabel}
         schedulerRunning={Boolean(data.overview?.schedulerStatus?.running)}
+        collectionHealthLabel={data.overview?.collectionHealth?.label || '未知'}
+        collectionHealthStatus={data.overview?.collectionHealth?.status || 'never'}
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
@@ -194,6 +210,8 @@ export default function DashboardPage() {
         onTimeRangeChange={data.setTimeRange}
         data={data.trafficHistory}
       />
+
+      <NetworkHistoryGrid data={data.trafficHistory} />
 
       <QuickLinks />
 

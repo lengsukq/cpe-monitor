@@ -1,5 +1,3 @@
-import { Section, Text } from '@react-email/components';
-
 interface QualityBadgeProps {
   quality: string;
 }

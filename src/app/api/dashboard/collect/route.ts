@@ -5,7 +5,6 @@ import {
   requireSession,
   withApiHandler,
 } from '@/lib/api-route';
-import { getOrCreateCpeClient } from '@/lib/cpe-client';
 import { checkAlerts, collectTrafficData } from '@/lib/scheduler';
 import { isCpeConfigured, readNotificationConfig } from '@/lib/settings-store';
 import { sendCollectionReport } from '@/lib/notifiers/email';
@@ -26,74 +25,168 @@ export const POST = withApiHandler(async () => {
     });
   }
 
-  // Verify CPE is reachable and credentials are valid
-  try {
-    const client = getOrCreateCpeClient();
-    await client.ensureLogin();
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'CPE 连接失败';
-    return jsonOk({
-      success: false,
-      collectedDevices: 0,
-      alertsTriggered: 0,
-      error: errorMessage,
-      collectedAt: new Date().toISOString(),
-    });
-  }
-
-  // Proceed with data collection
   const startedAt = new Date().toISOString();
-  const collectedDevices = await collectTrafficData();
+  const collection = await collectTrafficData('manual');
+  const collectedDevices = collection.collectedDevices;
+  const collectionSucceeded = collection.success;
+  // Run alert evaluation after both successful and failed collections so a
+  // consecutive-failure rule can notify on manual collection failures too.
   const alertsTriggered = await checkAlerts();
 
-  // Fetch current and previous traffic snapshots to compute delta
-  const allTraffic = db.prepare(
-    'SELECT id, upload_bytes, download_bytes, connected_devices, signal_strength, timestamp FROM traffic_data ORDER BY id DESC LIMIT 2',
-  ).all() as { id: number; upload_bytes: number; download_bytes: number; connected_devices: number; signal_strength: number; timestamp: string }[];
+  const latestTraffic = collection.collectionId !== null ? db.prepare(
+    `SELECT
+       upload_bytes,
+       download_bytes,
+       delta_upload_bytes,
+       delta_download_bytes,
+       upload_bps,
+       download_bps,
+       connected_devices,
+       signal_strength,
+       network_type,
+       band,
+       cell_id,
+       pci,
+       rsrp,
+       rsrq,
+       sinr,
+       rssi,
+       timestamp
+     FROM traffic_data
+     WHERE collection_id = ?
+     ORDER BY id DESC
+     LIMIT 1`,
+  ).get(collection.collectionId) as {
+    upload_bytes: number;
+    download_bytes: number;
+    delta_upload_bytes: number | null;
+    delta_download_bytes: number | null;
+    upload_bps: number | null;
+    download_bps: number | null;
+    connected_devices: number;
+    signal_strength: number;
+    network_type: string | null;
+    band: string | null;
+    cell_id: string | null;
+    pci: string | null;
+    rsrp: number | null;
+    rsrq: number | null;
+    sinr: number | null;
+    rssi: number | null;
+    timestamp: string;
+  } | undefined : undefined;
 
-  const latestTraffic = allTraffic[0];
-  const previousTraffic = allTraffic[1];
+  const collectionRun = collection.collectionId !== null ? db.prepare(
+    `SELECT id, source, status, started_at, completed_at, error_message
+     FROM collection_runs
+     WHERE id = ?`,
+  ).get(collection.collectionId) as {
+    id: number;
+    source: string;
+    status: string;
+    started_at: string | null;
+    completed_at: string | null;
+    error_message: string | null;
+  } | undefined : undefined;
 
-  // Compute traffic delta since last collection
-  // upload_bytes/download_bytes are CPE cumulative values; the delta
-  // represents traffic accumulated between the two collection runs.
-  const trafficDelta = latestTraffic && previousTraffic
+  const trafficDelta = latestTraffic
     ? {
-        uploadBytes: Math.max(0, latestTraffic.upload_bytes - previousTraffic.upload_bytes),
-        downloadBytes: Math.max(0, latestTraffic.download_bytes - previousTraffic.download_bytes),
+        uploadBytes: latestTraffic.delta_upload_bytes || 0,
+        downloadBytes: latestTraffic.delta_download_bytes || 0,
       }
-    : latestTraffic
-      ? { uploadBytes: 0, downloadBytes: 0 }
-      : null;
+    : null;
 
-  // Fetch the latest device data that was just collected
-  // Use the last insert row id range for reliable matching
-  const latestDeviceId = db.prepare(
-    'SELECT id FROM device_data ORDER BY id DESC LIMIT 1',
-  ).get() as { id: number } | undefined;
-  const latestDeviceIdStart = latestDeviceId ? Math.max(1, latestDeviceId.id - 50) : 0;
-  const latestDevices = db.prepare(
-    'SELECT device_name, device_ip, upload_bytes, download_bytes FROM device_data WHERE id >= ? ORDER BY id DESC',
-  ).all(latestDeviceIdStart) as { device_name: string; device_ip: string; upload_bytes: number; download_bytes: number }[];
+  const latestDevices = collection.collectionId !== null ? db.prepare(
+    `SELECT
+       device_name,
+       device_ip,
+       device_mac,
+       delta_upload_bytes,
+       delta_download_bytes,
+       upload_bps,
+       download_bps,
+       interface_type,
+       frequency,
+       rssi
+     FROM device_data
+     WHERE collection_id = ?
+     ORDER BY (COALESCE(delta_upload_bytes, 0) + COALESCE(delta_download_bytes, 0)) DESC`,
+  ).all(collection.collectionId) as {
+    device_name: string;
+    device_ip: string;
+    device_mac: string;
+    delta_upload_bytes: number | null;
+    delta_download_bytes: number | null;
+    upload_bps: number | null;
+    download_bps: number | null;
+    interface_type: string | null;
+    frequency: string | null;
+    rssi: number | null;
+  }[] : [];
 
   const topDevices = latestDevices.map((device) => ({
     name: device.device_name || device.device_ip || '未知设备',
-    uploadBytes: device.upload_bytes,
-    downloadBytes: device.download_bytes,
+    ip: device.device_ip || '',
+    mac: device.device_mac || '',
+    uploadBytes: device.delta_upload_bytes || 0,
+    downloadBytes: device.delta_download_bytes || 0,
+    uploadBps: device.upload_bps || 0,
+    downloadBps: device.download_bps || 0,
+    interfaceType: device.interface_type || '',
+    frequency: device.frequency || '',
+    rssi: device.rssi,
   }));
 
   // Send email report if email notification is configured
   try {
     const emailConfig = readNotificationConfig('email');
     if (emailConfig) {
-      const signalStrength = latestTraffic?.signal_strength ?? null;
+      const completedAt = collectionRun?.completed_at || new Date().toISOString();
+      const startedTime = new Date(startedAt).getTime();
+      const completedTime = collectionRun?.completed_at
+        ? new Date(`${collectionRun.completed_at.replace(' ', 'T')}Z`).getTime()
+        : Date.now();
       void sendCollectionReport(emailConfig, {
+        success: collectionSucceeded,
+        collectionId: collection.collectionId,
+        source: collectionRun?.source || 'manual',
+        error: collectionSucceeded ? null : collection.error || collectionRun?.error_message || '采集失败',
         collectedDevices,
         alertsTriggered,
         trafficDelta,
-        signalStrength,
+        cumulativeTraffic: latestTraffic
+          ? {
+              uploadBytes: latestTraffic.upload_bytes || 0,
+              downloadBytes: latestTraffic.download_bytes || 0,
+            }
+          : null,
+        rates: latestTraffic
+          ? {
+              uploadBps: latestTraffic.upload_bps || 0,
+              downloadBps: latestTraffic.download_bps || 0,
+            }
+          : null,
+        network: latestTraffic
+          ? {
+              networkType: latestTraffic.network_type,
+              band: latestTraffic.band,
+              cellId: latestTraffic.cell_id,
+              pci: latestTraffic.pci,
+            }
+          : null,
+        signal: latestTraffic
+          ? {
+              signalStrength: latestTraffic.signal_strength,
+              rsrp: latestTraffic.rsrp,
+              rsrq: latestTraffic.rsrq,
+              sinr: latestTraffic.sinr,
+              rssi: latestTraffic.rssi,
+            }
+          : null,
         topDevices,
         collectedAt: startedAt,
+        completedAt,
+        durationMs: Math.max(0, completedTime - startedTime),
       });
     }
   } catch (error) {
@@ -102,9 +195,10 @@ export const POST = withApiHandler(async () => {
   }
 
   return jsonOk({
-    success: true,
+    success: collectionSucceeded,
     collectedDevices,
     alertsTriggered,
+    error: collectionSucceeded ? undefined : collection.error || '采集失败',
     trafficSnapshot: latestTraffic
       ? {
           uploadBytes: latestTraffic.upload_bytes,

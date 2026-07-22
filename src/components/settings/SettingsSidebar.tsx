@@ -1,5 +1,6 @@
 import {
   BellRing,
+  Database,
   KeyRound,
   Mail,
   MessageSquareText,
@@ -49,6 +50,13 @@ export function SettingsSidebar({
             label="自动化"
             detail="短信同步"
             onClick={() => onOpenSection('automation')}
+          />
+          <SettingsNav
+            href="#retention"
+            icon={<Database className="h-3.5 w-3.5" />}
+            label="数据保留"
+            detail="自动清理"
+            onClick={() => onOpenSection('retention')}
           />
           <SettingsNav
             href="#email"

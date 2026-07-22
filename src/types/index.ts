@@ -21,7 +21,18 @@ export interface DeviceData {
 export interface AlertRule {
   id: number;
   name: string;
-  metricType: 'traffic_up' | 'traffic_down' | 'devices' | 'signal';
+  metricType:
+    | 'traffic_up'
+    | 'traffic_down'
+    | 'upload_rate'
+    | 'download_rate'
+    | 'devices'
+    | 'signal'
+    | 'rsrp'
+    | 'rsrq'
+    | 'sinr'
+    | 'rssi'
+    | 'collection_failures';
   threshold: number;
   operator: '>' | '<' | '>=' | '<=';
   enabled: boolean;
@@ -84,6 +95,23 @@ export interface DailyReport {
   networkQuality: string | null;
   sentAt: Date | null;
   createdAt: Date | null;
+  sampleCount?: number;
+  expectedSamples?: number;
+  successfulCollections?: number;
+  failedCollections?: number;
+  alertCount?: number;
+  peakTrafficBytes?: number;
+  peakDownloadBps?: number;
+  peakUploadBps?: number;
+  averageDevices?: number;
+  maxDevices?: number;
+  avgRsrp?: number | null;
+  avgRsrq?: number | null;
+  avgSinr?: number | null;
+  avgRssi?: number | null;
+  networkTypes?: string[];
+  bands?: string[];
+  generatedAt?: string;
 }
 
 export interface DeviceRanking {
@@ -147,6 +175,17 @@ export interface DashboardOverviewResponse {
   source: 'cpe' | 'database';
   cpeError: string;
   schedulerStatus: SchedulerStatus & { running?: boolean };
+  collectionHealth: {
+    status: 'healthy' | 'failed' | 'stale' | 'never' | 'disabled';
+    label: string;
+    detail: string;
+    lastRunAt: string | null;
+    lastSuccessAt: string | null;
+    lastError: string | null;
+    consecutiveFailures: number;
+    staleAfterMinutes: number;
+    ageMinutes: number | null;
+  };
 }
 
 export interface TrafficStatsResponse {

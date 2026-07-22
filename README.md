@@ -41,19 +41,17 @@ npm install
 ```env
 ADMIN_PASSWORD=your_secure_password
 JWT_SECRET=your_jwt_secret
-DATABASE_URL=postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/cpe_monitor?sslmode=require
 CPE_DEFAULT_URL=http://192.168.31.1
 CPE_USERNAME=admin
 CPE_PASSWORD=your_cpe_password
+CPE_SESSION_SECRET=your_long_stable_session_secret
+CPE_SESSION_MAX_IDLE_HOURS=24
+CPE_CONFIG_SECRET=your_long_stable_config_secret
 ```
 
 ### 3. 初始化数据库
 
-访问 Neon 控制台创建数据库，然后运行:
-
-```bash
-npm run db:push
-```
+项目使用 `data/cpe-monitor.db`。首次启动会自动创建 SQLite 数据库；升级时也会幂等补充新增字段和索引，无需手动执行迁移命令。
 
 ### 4. 启动开发服务器
 
@@ -63,7 +61,9 @@ npm run dev
 
 访问 http://localhost:3000，使用配置的密码登录。
 
-`CPE_PASSWORD` 只在服务端读取，不能提交到 Git。CPE 的 SessionID、登录令牌和 RSA 会话信息只保存在进程内存中；令牌失效或接口返回 401/403 时会自动重新登录。数据库中的旧密码字段仅作为兼容回退，建议迁移到环境变量后清理。
+`CPE_PASSWORD` 只在服务端读取，不能提交到 Git。成功登录后的 SessionID、请求校验 Token 和 RSA 会话参数会使用 AES-256-GCM 加密后保存到 SQLite，服务重启后优先复用；只有 CPE 明确返回会话失效时才会清除旧会话并重新登录一次。通过设置页面保存的 CPE 密码同样使用 AES-256-GCM 加密，旧版本留下的明文会在首次使用时自动迁移。`CPE_CONFIG_SECRET` 和 `CPE_SESSION_SECRET` 必须保持稳定，缺省时依次回退到其他 CPE 密钥和 `JWT_SECRET`。
+
+流量与设备历史默认保留 90 天，采集运行记录默认保留 180 天。可在「系统设置 → 数据保留」修改，并选择立即清理；正常采集后最多每 12 小时自动清理一次过期记录。
 
 ## 项目结构
 

@@ -18,8 +18,18 @@ export interface TrafficHistoryPoint {
   timestamp: string;
   uploadBytes?: number;
   downloadBytes?: number;
+  uploadBps?: number;
+  downloadBps?: number;
   connectedDevices?: number;
   signalStrength?: number;
+  networkType?: string | null;
+  band?: string | null;
+  cellId?: string | null;
+  pci?: string | null;
+  rsrp?: number | null;
+  rsrq?: number | null;
+  sinr?: number | null;
+  rssi?: number | null;
 }
 
 export interface DeviceSnapshot {

@@ -24,10 +24,42 @@ import { apiFetch } from '@/lib/client-api';
 import type { AlertRule } from '@/types';
 
 const metricTypes = [
-  { value: 'traffic_down', label: '下载流量', unit: 'MB' },
-  { value: 'traffic_up', label: '上传流量', unit: 'MB' },
-  { value: 'devices', label: '设备数量', unit: '台' },
-  { value: 'signal', label: '信号强度', unit: 'dBm' },
+  {
+    value: 'traffic_down',
+    label: '区间下载流量',
+    unit: 'MB',
+    hint: '相邻两次采集之间产生的下载流量。',
+  },
+  {
+    value: 'traffic_up',
+    label: '区间上传流量',
+    unit: 'MB',
+    hint: '相邻两次采集之间产生的上传流量。',
+  },
+  {
+    value: 'download_rate',
+    label: '平均下载速率',
+    unit: 'Mbps',
+    hint: '根据相邻采集点计算的平均下载速率。',
+  },
+  {
+    value: 'upload_rate',
+    label: '平均上传速率',
+    unit: 'Mbps',
+    hint: '根据相邻采集点计算的平均上传速率。',
+  },
+  { value: 'devices', label: '在线设备数量', unit: '台', hint: '采集时刻在线的终端数量。' },
+  { value: 'rsrp', label: 'RSRP', unit: 'dBm', hint: '参考信号接收功率，数值越接近 0 越强。' },
+  { value: 'rsrq', label: 'RSRQ', unit: 'dB', hint: '参考信号接收质量，数值越接近 0 越好。' },
+  { value: 'sinr', label: 'SINR', unit: 'dB', hint: '信号与干扰噪声比，通常越高越好。' },
+  { value: 'rssi', label: 'RSSI', unit: 'dBm', hint: '接收信号总强度，数值越接近 0 越强。' },
+  { value: 'signal', label: '兼容信号强度', unit: 'dBm', hint: '旧规则兼容字段，新规则建议使用 RSRP。' },
+  {
+    value: 'collection_failures',
+    label: '连续采集失败',
+    unit: '次',
+    hint: '最近连续失败的采集次数，建议设置为大于等于 1。',
+  },
 ] as const;
 
 const operators = [
@@ -129,13 +161,14 @@ export default function AlertsPage() {
 
   const getMetricLabel = (type: string) => metricTypes.find((item) => item.value === type)?.label || type;
   const getMetricUnit = (type: string) => metricTypes.find((item) => item.value === type)?.unit || '';
+  const getMetricHint = (type: string) => metricTypes.find((item) => item.value === type)?.hint || '';
   const getOperatorLabel = (operator: string) => operators.find((item) => item.value === operator)?.label || operator;
 
   return (
     <PageShell>
       <PageHeader
         title="告警规则"
-        description="为流量、设备数量与信号强度设定阈值，达到条件时通过邮件或企业微信通知。"
+        description="为区间流量、平均速率、射频质量、设备数量和采集失败设定阈值。"
         actions={<Button onClick={openCreateModal}>新建规则</Button>}
       />
 
@@ -269,9 +302,13 @@ export default function AlertsPage() {
                   </SelectContent>
                 </Select>
               </FieldGroup>
-              <FieldGroup label="阈值" hint="流量用 MB，设备用台，信号用 dBm">
+              <FieldGroup
+                label={`阈值（${getMetricUnit(formData.metricType)}）`}
+                hint={getMetricHint(formData.metricType)}
+              >
                 <Input
                   type="number"
+                  step="any"
                   value={String(formData.threshold)}
                   onChange={(event) => setFormData({
                     ...formData,
@@ -284,6 +321,9 @@ export default function AlertsPage() {
             <FieldGroup label="静默期 (分钟)">
               <Input
                 type="number"
+                min="1"
+                max="10080"
+                step="1"
                 value={String(formData.cooldownMinutes)}
                 onChange={(event) => setFormData({
                   ...formData,

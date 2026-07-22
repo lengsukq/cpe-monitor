@@ -54,8 +54,8 @@ export const POST = withApiHandler(async () => {
       totalDownload: formatBytes(report.totalDownload),
       totalUpload: formatBytes(report.totalUpload),
       deviceCount: report.topDevices?.length || 0,
-      networkQuality: report.networkQuality,
-      avgSignal: report.avgSignal,
+      networkQuality: report.networkQuality || '数据不足',
+      avgSignal: report.avgSignal || 0,
     });
   }
 

@@ -4,7 +4,7 @@ interface StatusPillProps {
   icon: ReactNode;
   label: string;
   value: string;
-  tone: 'success' | 'info' | 'muted';
+  tone: 'success' | 'info' | 'warning' | 'danger' | 'muted';
 }
 
 export default function StatusPill({ icon, label, value, tone }: StatusPillProps) {
@@ -12,6 +12,10 @@ export default function StatusPill({ icon, label, value, tone }: StatusPillProps
     ? 'bg-success/10 text-success'
     : tone === 'info'
       ? 'bg-info/10 text-info'
+      : tone === 'warning'
+        ? 'bg-warning/10 text-warning'
+        : tone === 'danger'
+          ? 'bg-destructive/10 text-destructive'
       : 'bg-muted/60 text-muted-foreground';
 
   return (

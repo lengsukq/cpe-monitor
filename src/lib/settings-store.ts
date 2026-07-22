@@ -1,5 +1,10 @@
 import { db, ensureDatabaseReady } from '@/lib/db';
 import type { EmailConfig, WechatConfig } from '@/types';
+import {
+  decryptSecureValue,
+  encryptSecureValue,
+  isEncryptedSecureValue,
+} from '@/lib/secure-value';
 
 export interface SystemSettingRow {
   key: string;
@@ -33,6 +38,7 @@ export interface PublicCpeConfig {
 
 export const DEFAULT_CPE_URL = process.env.CPE_DEFAULT_URL || 'http://192.168.31.1';
 export const DEFAULT_CPE_USERNAME = process.env.CPE_USERNAME || 'admin';
+const CPE_PASSWORD_PURPOSE = 'cpe-config-password';
 
 export function getSettingsMap(): Record<string, string> {
   ensureDatabaseReady();
@@ -111,7 +117,32 @@ export function getPublicCpeConfig(): PublicCpeConfig {
  */
 export function getCpeCredentials(): { url: string; username: string; password: string } {
   const config = getCpeConfigRow();
-  const password = process.env.CPE_PASSWORD || config?.cpe_password_encrypted || '';
+  const environmentPassword = process.env.CPE_PASSWORD || '';
+  let storedPassword = config?.cpe_password_encrypted || '';
+
+  if (environmentPassword && config && storedPassword && !isEncryptedSecureValue(storedPassword)) {
+    // The environment is authoritative. Remove an obsolete plaintext fallback
+    // instead of leaving it at rest indefinitely.
+    db.prepare(
+      `UPDATE cpe_config
+       SET cpe_password_encrypted = NULL, updated_at = datetime('now')
+       WHERE id = ?`,
+    ).run(config.id);
+    storedPassword = '';
+  } else if (config && storedPassword && !isEncryptedSecureValue(storedPassword)) {
+    // Older deployments wrote plaintext into the misleadingly named column.
+    const encryptedPassword = encryptSecureValue(storedPassword, CPE_PASSWORD_PURPOSE);
+    db.prepare(
+      `UPDATE cpe_config
+       SET cpe_password_encrypted = ?, updated_at = datetime('now')
+       WHERE id = ?`,
+    ).run(encryptedPassword, config.id);
+    storedPassword = encryptedPassword;
+  }
+
+  const password = environmentPassword || (
+    storedPassword ? decryptSecureValue(storedPassword, CPE_PASSWORD_PURPOSE) : ''
+  );
   if (!password) {
     throw new Error('CPE not configured');
   }
@@ -133,13 +164,31 @@ export function upsertCpeConfig(input: {
   const password = typeof input.cpePassword === 'string' && input.cpePassword.trim()
     ? input.cpePassword.trim()
     : null;
+  const encryptedPassword = password
+    ? encryptSecureValue(password, CPE_PASSWORD_PURPOSE)
+    : null;
 
   if (existing) {
-    if (password) {
+    if (encryptedPassword) {
       db.prepare(
         `UPDATE cpe_config SET cpe_url = ?, cpe_username = ?, cpe_password_encrypted = ?, updated_at = datetime('now') WHERE id = ?`,
-      ).run(input.cpeUrl, input.cpeUsername, password, existing.id);
+      ).run(input.cpeUrl, input.cpeUsername, encryptedPassword, existing.id);
     } else {
+      if (
+        existing.cpe_password_encrypted
+        && !isEncryptedSecureValue(existing.cpe_password_encrypted)
+      ) {
+        const migratedPassword = encryptSecureValue(
+          existing.cpe_password_encrypted,
+          CPE_PASSWORD_PURPOSE,
+        );
+        db.prepare(
+          `UPDATE cpe_config
+           SET cpe_url = ?, cpe_username = ?, cpe_password_encrypted = ?, updated_at = datetime('now')
+           WHERE id = ?`,
+        ).run(input.cpeUrl, input.cpeUsername, migratedPassword, existing.id);
+        return;
+      }
       db.prepare(
         `UPDATE cpe_config SET cpe_url = ?, cpe_username = ?, updated_at = datetime('now') WHERE id = ?`,
       ).run(input.cpeUrl, input.cpeUsername, existing.id);
@@ -153,7 +202,7 @@ export function upsertCpeConfig(input: {
 
   db.prepare(
     'INSERT INTO cpe_config (cpe_url, cpe_username, cpe_password_encrypted) VALUES (?, ?, ?)',
-  ).run(input.cpeUrl, input.cpeUsername, password);
+  ).run(input.cpeUrl, input.cpeUsername, encryptedPassword);
 }
 
 export function listNotificationConfigRows(): NotificationConfigRow[] {

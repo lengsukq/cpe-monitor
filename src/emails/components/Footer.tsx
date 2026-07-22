@@ -1,43 +1,52 @@
 import { Section, Text } from '@react-email/components';
 
-export default function Footer() {
+interface FooterProps {
+  generatedAt?: string;
+  note?: string;
+}
+
+export default function Footer({ generatedAt, note }: FooterProps) {
   return (
     <Section
       style={{
-        background: '#1a2a36',
-        padding: '24px 36px',
+        backgroundColor: '#0f2f3e',
+        padding: '22px 34px 25px',
         textAlign: 'center',
       }}
     >
       <Text
         style={{
-          color: '#6b8a9e',
+          color: '#a6c7d1',
           fontSize: '11px',
-          margin: '0 0 4px 0',
-          fontWeight: 500,
+          fontWeight: 700,
+          letterSpacing: '.7px',
+          margin: 0,
         }}
       >
-        CPEye Monitor &middot; 自动生成报告
+        CPEYE MONITOR · NETWORK OBSERVABILITY
       </Text>
+      {generatedAt ? (
+        <Text
+          style={{
+            color: '#6f98a6',
+            fontSize: '10px',
+            lineHeight: '1.5',
+            margin: '7px 0 0',
+          }}
+        >
+          生成时间：{generatedAt}
+        </Text>
+      ) : null}
       <Text
         style={{
-          color: '#4a6a7e',
+          color: '#5f8795',
           fontSize: '10px',
-          margin: '0',
+          lineHeight: '1.55',
+          margin: '5px 0 0',
         }}
       >
-        此邮件由系统自动发送，请勿回复
+        {note || '此邮件由 CPE Monitor 自动生成。数据以采集时设备返回内容为准，请勿直接回复。'}
       </Text>
-      {/* Decorative line */}
-      <div
-        style={{
-          width: '32px',
-          height: '2px',
-          background: '#2c5a78',
-          borderRadius: '1px',
-          margin: '12px auto 0 auto',
-        }}
-      />
     </Section>
   );
 }
