@@ -1,14 +1,5 @@
 import type { DailyReport, DeviceRanking } from '@/types';
-
-function parseSqliteDateTime(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  if (value.includes('T')) {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-  const parsed = new Date(`${value.replace(' ', 'T')}Z`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
+import { parseDateTime } from '@/lib/date-time';
 
 export interface DailyReportRow {
   id: number;
@@ -46,8 +37,8 @@ export function mapDailyReportRow(row: DailyReportRow): DailyReport {
     avgSignal: row.avg_signal,
     uptimePercent: row.uptime_percent,
     networkQuality: row.network_quality,
-    sentAt: parseSqliteDateTime(row.sent_at),
-    createdAt: parseSqliteDateTime(row.created_at),
+    sentAt: parseDateTime(row.sent_at),
+    createdAt: parseDateTime(row.created_at),
   };
 }
 

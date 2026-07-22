@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Activity, Download, Signal, Upload } from 'lucide-react';
 import { apiFetch } from '@/lib/client-api';
-import { formatBytes, formatRate } from '@/lib/format';
+import { formatBitsPerSecond, formatBytes } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import TrafficChart from '@/components/TrafficChart';
@@ -132,7 +132,7 @@ export default function DeviceHistoryPanel({ mac }: DeviceHistoryPanelProps) {
             <div className="rounded-xl border border-border/70 bg-background/70 p-3">
               <Activity className="h-4 w-4 text-success" />
               <p className="mt-2 text-lg font-semibold tabular-nums">
-                {formatRate(data.summary.peakDownloadBps / 8)}
+                {formatBitsPerSecond(data.summary.peakDownloadBps)}
               </p>
               <p className="text-xs text-muted-foreground">下载峰值</p>
             </div>

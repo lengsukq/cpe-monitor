@@ -13,14 +13,14 @@ H153 CPE 流量监控、告警通知、每日报告系统。
 - 短信收件箱 - 读取 CPE 本地短信，展示未读状态和会话内容
 - 新短信同步 - 短信持久化到本地 SQLite，默认每 15 分钟独立同步一次；支持 1–1440 分钟自定义间隔和手动同步
 - 每日报告 - 自动生成流量日报，包含设备排名、网络质量评估
-- 优美邮件模板 - React Email + TailwindCSS 响应式设计
+- 网页化邮件模板 - React Email 响应式 HTML 邮件
 
 ## 技术栈
 
-- 框架: Next.js 15 (App Router)
-- UI: HeroUI v3 + TailwindCSS v4
-- 数据库: Neon PostgreSQL (serverless)
-- ORM: Drizzle ORM
+- 框架: Next.js 16 (App Router)
+- UI: Base UI + TailwindCSS v4
+- 数据库: SQLite (`better-sqlite3`, WAL)
+- 数据迁移: 内置版本化 Migration (`PRAGMA user_version`)
 - 认证: JWT (jose) + bcryptjs
 - 图表: Chart.js + react-chartjs-2
 - 定时任务: node-cron
@@ -46,12 +46,13 @@ CPE_USERNAME=admin
 CPE_PASSWORD=your_cpe_password
 CPE_SESSION_SECRET=your_long_stable_session_secret
 CPE_SESSION_MAX_IDLE_HOURS=24
+CPE_REQUEST_TIMEOUT_MS=15000
 CPE_CONFIG_SECRET=your_long_stable_config_secret
 ```
 
 ### 3. 初始化数据库
 
-项目使用 `data/cpe-monitor.db`。首次启动会自动创建 SQLite 数据库；升级时也会幂等补充新增字段和索引，无需手动执行迁移命令。
+项目使用 `data/cpe-monitor.db`。首次启动会自动创建 SQLite 数据库；升级时按 `PRAGMA user_version` 顺序执行幂等 Migration。数据库初始化在每个 Node 进程内只运行一次，不需要执行额外的 ORM 命令。
 
 ### 4. 启动开发服务器
 
@@ -61,7 +62,18 @@ npm run dev
 
 访问 http://localhost:3000，使用配置的密码登录。
 
-`CPE_PASSWORD` 只在服务端读取，不能提交到 Git。成功登录后的 SessionID、请求校验 Token 和 RSA 会话参数会使用 AES-256-GCM 加密后保存到 SQLite，服务重启后优先复用；只有 CPE 明确返回会话失效时才会清除旧会话并重新登录一次。通过设置页面保存的 CPE 密码同样使用 AES-256-GCM 加密，旧版本留下的明文会在首次使用时自动迁移。`CPE_CONFIG_SECRET` 和 `CPE_SESSION_SECRET` 必须保持稳定，缺省时依次回退到其他 CPE 密钥和 `JWT_SECRET`。
+`CPE_PASSWORD` 只在服务端读取，不能提交到 Git。成功登录后的 SessionID、请求校验 Token 和 RSA 会话参数会使用 AES-256-GCM 加密后保存到 SQLite，服务重启后优先复用；只有 CPE 明确返回会话失效时才会清除旧会话并重新登录一次。通过设置页面保存的 CPE 密码、SMTP 密码和企业微信 Webhook 同样使用 AES-256-GCM 加密，旧版本留下的明文会在首次服务端读取时自动迁移。设置接口只向浏览器返回“已配置”状态，不会返回现有密钥。`CPE_CONFIG_SECRET` 和 `CPE_SESSION_SECRET` 必须保持稳定，缺省时依次回退到其他 CPE 密钥和 `JWT_SECRET`。所有 CPE HTTP 请求默认 15 秒超时，可通过 `CPE_REQUEST_TIMEOUT_MS` 调整。
+
+### 5. 质量检查
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run check
+```
+
+测试使用 Node 22 自带的 TypeScript 类型剥离和 `node:test`，不会额外启动数据库服务。核心测试覆盖时区、计数器复位、速率单位、告警目录、通知密钥加密和 Migration 幂等性。
 
 流量与设备历史默认保留 90 天，采集运行记录默认保留 180 天。可在「系统设置 → 数据保留」修改，并选择立即清理；正常采集后最多每 12 小时自动清理一次过期记录。
 
@@ -80,13 +92,19 @@ src/
 ├── lib/
 │   ├── auth.ts              # JWT 认证
 │   ├── cpe-client.ts        # CPE 客户端
-│   ├── db.ts                # 数据库连接
-│   ├── schema.ts            # 数据库 Schema
+│   ├── cpe-protocol.ts      # XML 协议、转义和认证错误识别
+│   ├── db.ts                # SQLite 连接与版本化 Migration
+│   ├── date-time.ts         # UTC/Asia-Shanghai 时间边界
+│   ├── traffic-units.ts     # 流量计数器和速率单位
+│   ├── alert-metrics.ts     # 告警指标单一目录
+│   ├── notification-config.ts # 通知密钥安全序列化
+│   ├── repositories/        # 数据访问边界
 │   ├── scheduler.ts         # 定时任务
 │   ├── report-generator.ts  # 报告生成
 │   └── notifiers/           # 通知模块
 ├── emails/                  # React Email 模板
-└── components/              # 组件
+├── components/              # 组件
+└── types/                   # API 与 CPE 响应类型
 ```
 
 ## API 接口
@@ -134,19 +152,14 @@ src/
 
 ## 部署
 
-### Vercel
-
-1. Fork 本仓库
-2. 在 Vercel 创建项目
-3. 配置环境变量
-4. 部署
-
 ### 自托管
 
 ```bash
 npm run build
 npm start
 ```
+
+该项目依赖持久化 SQLite 文件和后台定时任务，生产环境应使用 Docker、服务器或 NAS，并将 `/app/data` 挂载到持久化卷。无持久化文件系统或会暂停后台进程的 Serverless 平台不适合直接部署此版本。
 
 ## License
 

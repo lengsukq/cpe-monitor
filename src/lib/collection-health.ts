@@ -1,4 +1,5 @@
 import { db, ensureDatabaseReady } from '@/lib/db';
+import { parseTimestampMs } from '@/lib/date-time';
 
 export type CollectionHealthStatus = 'healthy' | 'failed' | 'stale' | 'never' | 'disabled';
 
@@ -20,12 +21,6 @@ interface CollectionRunRow {
   completed_at: string | null;
   status: string;
   error_message: string | null;
-}
-
-function parseSqliteTimestamp(value: string | null | undefined): number | null {
-  if (!value) return null;
-  const parsed = new Date(`${value.replace(' ', 'T')}Z`).getTime();
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function getRunTime(row: CollectionRunRow | undefined): string | null {
@@ -70,7 +65,7 @@ export function getCollectionHealth(input: {
 
   const lastRunAt = getRunTime(latestRun);
   const lastSuccessAt = getRunTime(latestSuccess);
-  const lastSuccessTime = parseSqliteTimestamp(lastSuccessAt);
+  const lastSuccessTime = parseTimestampMs(lastSuccessAt);
   const ageMinutes = lastSuccessTime === null
     ? null
     : Math.max(0, Math.floor((now.getTime() - lastSuccessTime) / 60_000));

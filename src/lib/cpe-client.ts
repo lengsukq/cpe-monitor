@@ -8,10 +8,26 @@ import {
   saveCpeSession,
   type PersistedCpeSession,
 } from './cpe-session-store';
+import {
+  buildXmlRequest,
+  decodeHtmlEntities,
+  extractXmlTag,
+  isCpeAuthenticationFailure,
+  parseCpeRecord,
+} from './cpe-protocol';
+import type {
+  CpeDeviceInformation,
+  CpeDeviceState,
+  CpeHostRaw,
+  CpeNetworkSnapshot,
+  CpeOnlineState,
+  CpeRecord,
+  CpeTrafficStatistics,
+} from '@/types/cpe';
 
 type CpeSession = PersistedCpeSession;
 
-interface CpeDevice {
+export interface CpeDevice {
   name: string;
   ip: string;
   mac: string;
@@ -25,7 +41,7 @@ interface CpeDevice {
   raw: Record<string, unknown>;
 }
 
-interface CpeTrafficData {
+export interface CpeTrafficData {
   uploadBytes: number;
   downloadBytes: number;
   connectedDevices: number;
@@ -55,6 +71,26 @@ export interface CpeSmsMessage {
 
 const SESSION_PERSIST_INTERVAL = 5 * 60 * 1000;
 const RECENT_LOGIN_GUARD_MS = 5 * 1000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+
+function getRequestTimeoutMs(): number {
+  const configured = Number(process.env.CPE_REQUEST_TIMEOUT_MS || DEFAULT_REQUEST_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured >= 1_000
+    ? Math.floor(configured)
+    : DEFAULT_REQUEST_TIMEOUT_MS;
+}
+
+function isRecord(value: unknown): value is CpeRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toText(value: unknown, fallback = ''): string {
+  return value === null || value === undefined ? fallback : String(value);
+}
+
+function isActiveFlag(value: unknown): boolean {
+  return value === true || value === 1 || value === '1';
+}
 
 export class CpeClient {
   private baseUrl: string;
@@ -72,6 +108,12 @@ export class CpeClient {
     this.password = password;
     this.session = loadCpeSession(baseUrl, username);
     this.lastSessionPersistAt = this.session?.lastUsedAt || 0;
+  }
+
+  matchesCredentials(baseUrl: string, username: string, password: string): boolean {
+    return this.baseUrl === baseUrl
+      && this.username === username
+      && this.password === password;
   }
 
   private isSessionValid(): boolean {
@@ -95,6 +137,25 @@ export class CpeClient {
 
   private generateNonce(): string {
     return crypto.randomBytes(32).toString('hex');
+  }
+
+  private async fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutMs = getRequestTimeoutMs();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, {
+        ...init,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`CPE 请求超时（${Math.ceil(timeoutMs / 1000)} 秒）：${url}`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private async withRequestLock<T>(task: () => Promise<T>): Promise<T> {
@@ -130,21 +191,10 @@ export class CpeClient {
     });
   }
 
-  private decodeHtmlEntities(str: string): string {
-    return str
-      .replace(/&#x2F;/g, '/')
-      .replace(/&#x3D;/g, '=')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'");
-  }
-
   async login(): Promise<boolean> {
     try {
       this.lastLoginError = '';
-      const initResp = await fetch(`${this.baseUrl}/`, {
+      const initResp = await this.fetchWithTimeout(`${this.baseUrl}/`, {
         method: 'GET',
         headers: {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -169,7 +219,7 @@ export class CpeClient {
         return match ? match[1] : '';
       }) : [];
 
-      const tokenResp = await fetch(`${this.baseUrl}/api/webserver/token`, {
+      const tokenResp = await this.fetchWithTimeout(`${this.baseUrl}/api/webserver/token`, {
         method: 'GET',
         headers: {
           'Cookie': `SessionID=${sessionId}`,
@@ -188,14 +238,18 @@ export class CpeClient {
       } catch {
         const tokenMatch = tokenText.match(/<token>([^<]+)<\/token>/);
         if (tokenMatch) {
-          token = this.decodeHtmlEntities(tokenMatch[1]).substring(32);
+          token = decodeHtmlEntities(tokenMatch[1]).substring(32);
         }
       }
 
       const firstNonce = this.generateNonce();
-      const challengeXml = `<?xml version="1.0" encoding="UTF-8"?><request><username>${this.username}</username><firstnonce>${firstNonce}</firstnonce><mode>1</mode></request>`;
+      const challengeXml = buildXmlRequest({
+        username: this.username,
+        firstnonce: firstNonce,
+        mode: 1,
+      });
 
-      const challengeResp = await fetch(`${this.baseUrl}/api/user/challenge_login`, {
+      const challengeResp = await this.fetchWithTimeout(`${this.baseUrl}/api/user/challenge_login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -210,9 +264,9 @@ export class CpeClient {
       });
 
       const challengeText = await challengeResp.text();
-      const salt = this.decodeHtmlEntities(this.extractValue(challengeText, 'salt') || '');
-      const iterations = parseInt(this.extractValue(challengeText, 'iterations') || '1000');
-      const serverNonce = this.decodeHtmlEntities(this.extractValue(challengeText, 'servernonce') || '');
+      const salt = extractXmlTag(challengeText, 'salt');
+      const iterations = parseInt(extractXmlTag(challengeText, 'iterations') || '1000');
+      const serverNonce = extractXmlTag(challengeText, 'servernonce');
 
       if (!salt || !serverNonce) {
         this.lastLoginError = 'CPE 登录质询返回异常，请检查用户名或设备固件接口。';
@@ -223,7 +277,7 @@ export class CpeClient {
       const clientProof = this.computeClientProof(this.password, salt, iterations, firstNonce, serverNonce);
 
       // Refresh token before authentication_login
-      const tokenResp2 = await fetch(`${this.baseUrl}/api/webserver/token`, {
+      const tokenResp2 = await this.fetchWithTimeout(`${this.baseUrl}/api/webserver/token`, {
         method: 'GET',
         headers: {
           'Cookie': `SessionID=${sessionId}`,
@@ -240,13 +294,16 @@ export class CpeClient {
       } catch {
         const tokenMatch2 = tokenText2.match(/<token>([^<]+)<\/token>/);
         if (tokenMatch2) {
-          token = this.decodeHtmlEntities(tokenMatch2[1]).substring(32);
+          token = decodeHtmlEntities(tokenMatch2[1]).substring(32);
         }
       }
 
-      const authXml = `<?xml version="1.0" encoding="UTF-8"?><request><clientproof>${clientProof}</clientproof><finalnonce>${serverNonce}</finalnonce></request>`;
+      const authXml = buildXmlRequest({
+        clientproof: clientProof,
+        finalnonce: serverNonce,
+      });
 
-      const authResp = await fetch(`${this.baseUrl}/api/user/authentication_login`, {
+      const authResp = await this.fetchWithTimeout(`${this.baseUrl}/api/user/authentication_login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -261,8 +318,8 @@ export class CpeClient {
       });
 
       const authText = await authResp.text();
-      const rsae = this.extractValue(authText, 'rsae');
-      const rsan = this.extractValue(authText, 'rsan');
+      const rsae = extractXmlTag(authText, 'rsae');
+      const rsan = extractXmlTag(authText, 'rsan');
 
       if (rsae && rsan) {
         const newCookies = authResp.headers.get('set-cookie') || '';
@@ -343,29 +400,11 @@ export class CpeClient {
     return clientProof.toString('hex');
   }
 
-  private extractValue(xml: string, tag: string): string | null {
-    const match = xml.match(new RegExp(`<${tag}>([^<]+)</${tag}>`));
-    return match ? match[1] : null;
-  }
-
-  private extractXmlTag(xml: string, tag: string): string {
-    const safeTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const match = xml.match(new RegExp(`<${safeTag}>([\\s\\S]*?)</${safeTag}>`, 'i'));
-    return match ? this.decodeHtmlEntities(match[1]).trim() : '';
-  }
-
-  private isAuthenticationFailure(status: number, text: string): boolean {
-    if (status === 401 || status === 403) return true;
-    if (/<title>[^<]*(登录|login)/i.test(text)) return true;
-    const errorCode = this.extractXmlTag(text, 'code');
-    return ['125001', '125002', '125003'].includes(errorCode);
-  }
-
   private async refreshTokenUnlocked(): Promise<void> {
     if (!this.session) return;
     const sessionId = this.session.sessionId;
     const requestToken = this.session.token;
-    const response = await fetch(`${this.baseUrl}/api/webserver/token`, {
+    const response = await this.fetchWithTimeout(`${this.baseUrl}/api/webserver/token`, {
       headers: {
         Cookie: `SessionID=${sessionId}`,
         '__RequestVerificationToken': requestToken,
@@ -380,17 +419,17 @@ export class CpeClient {
     try {
       token = JSON.parse(text)?.token || '';
     } catch {
-      token = this.extractXmlTag(text, 'token');
+      token = extractXmlTag(text, 'token');
     }
     if (token && this.session?.sessionId === sessionId) {
-      this.session.token = this.decodeHtmlEntities(token).substring(32);
+      this.session.token = decodeHtmlEntities(token).substring(32);
       this.persistSession(true);
     }
   }
 
   private rsaEncrypt(value: string): string {
     if (!this.session) throw new Error('CPE session is not available');
-    const pem = forge.pki.publicKeyToPem({ n: this.session.rsan, e: this.session.rsae } as any);
+    const pem = forge.pki.publicKeyToPem({ n: this.session.rsan, e: this.session.rsae });
     const publicKey = forge.pki.publicKeyFromPem(pem);
     const base64 = forge.util.encode64(forge.util.encodeUtf8(value));
     return forge.util.bytesToHex(publicKey.encrypt(forge.util.encodeUtf8(base64), 'RSA-OAEP'));
@@ -403,7 +442,7 @@ export class CpeClient {
   ): Promise<{ status: number; text: string; sessionId: string }> {
     const session = this.session;
     if (!session) throw new Error('CPE session is not available');
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await this.fetchWithTimeout(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': contentType,
@@ -443,9 +482,7 @@ export class CpeClient {
       if (encryptPhone && typeof requestData.phone === 'string') {
         requestData.phone = this.rsaEncrypt(requestData.phone);
       }
-      const requestXml = `<?xml version="1.0" encoding="UTF-8"?><request>${Object.entries(requestData)
-        .map(([key, value]) => `<${key}>${String(value)}</${key}>`)
-        .join('')}</request>`;
+      const requestXml = buildXmlRequest(requestData);
       const result = await this.postWithSession(
         path,
         requestXml,
@@ -455,7 +492,7 @@ export class CpeClient {
     });
 
     const { result, firstNonce, secondNonce } = encryptedAttempt;
-    if (retry && this.isAuthenticationFailure(result.status, result.text)) {
+    if (retry && isCpeAuthenticationFailure(result.status, result.text)) {
       const ok = await this.relogin(result.sessionId);
       if (!ok) throw new Error(this.getLastLoginError());
       return this.apiPostEncrypted(path, data, encryptPhone, false);
@@ -468,9 +505,9 @@ export class CpeClient {
     if (/<error[\s>]/i.test(xml)) return '';
     this.persistSession();
 
-    const encrypted = this.extractXmlTag(xml, 'pwd');
-    const hash = this.extractXmlTag(xml, 'hash');
-    const iterations = Number(this.extractXmlTag(xml, 'iter'));
+    const encrypted = extractXmlTag(xml, 'pwd');
+    const hash = extractXmlTag(xml, 'hash');
+    const iterations = Number(extractXmlTag(xml, 'iter'));
     if (!encrypted || !hash || !iterations) return xml;
 
     const firstKey = crypto.pbkdf2Sync(
@@ -494,7 +531,7 @@ export class CpeClient {
     return Buffer.concat([decipher.update(Buffer.from(encrypted, 'hex')), decipher.final()]).toString('utf8');
   }
 
-  private async apiGet(path: string, retry = true): Promise<any> {
+  private async apiGet(path: string, retry = true): Promise<unknown> {
     const result = await this.withRequestLock(async () => {
       if (!this.isSessionValid()) {
         const ok = await this.ensureLogin();
@@ -502,7 +539,7 @@ export class CpeClient {
       }
       const session = this.session;
       if (!session) throw new Error('CPE session is not available');
-      const resp = await fetch(`${this.baseUrl}${path}`, {
+      const resp = await this.fetchWithTimeout(`${this.baseUrl}${path}`, {
         headers: {
           'Cookie': `SessionID=${session.sessionId}`,
           '__RequestVerificationToken': session.token,
@@ -519,7 +556,7 @@ export class CpeClient {
       };
     });
 
-    if (retry && this.isAuthenticationFailure(result.status, result.text)) {
+    if (retry && isCpeAuthenticationFailure(result.status, result.text)) {
       const ok = await this.relogin(result.sessionId);
       if (!ok) throw new Error(this.getLastLoginError());
 
@@ -532,7 +569,7 @@ export class CpeClient {
     try { return JSON.parse(result.text); } catch { return result.text; }
   }
 
-  private async apiPost(path: string, body: string, contentType = 'application/json; charset=UTF-8', retry = true): Promise<any> {
+  private async apiPost(path: string, body: string, contentType = 'application/json; charset=UTF-8', retry = true): Promise<unknown> {
     const result = await this.withRequestLock(async () => {
       if (!this.isSessionValid()) {
         const ok = await this.ensureLogin();
@@ -541,7 +578,7 @@ export class CpeClient {
       return this.postWithSession(path, body, contentType);
     });
 
-    if (retry && this.isAuthenticationFailure(result.status, result.text)) {
+    if (retry && isCpeAuthenticationFailure(result.status, result.text)) {
       const ok = await this.relogin(result.sessionId);
       if (!ok) throw new Error(this.getLastLoginError());
 
@@ -554,96 +591,115 @@ export class CpeClient {
     try { return JSON.parse(result.text); } catch { return result.text; }
   }
 
-  async getDeviceInfo(retry = true): Promise<any> {
-    const data = await this.apiGet('/api/system/deviceinfoex');
-    if (retry && (!data || typeof data !== 'object' || Object.keys(data).length === 0)) {
+  private normalizeRecord(raw: unknown): CpeRecord {
+    return isRecord(raw) ? raw : parseCpeRecord(raw);
+  }
+
+  async getDeviceInfo(retry = true): Promise<CpeDeviceState> {
+    const data = this.normalizeRecord(await this.apiGet('/api/system/deviceinfoex')) as CpeDeviceState;
+    if (retry && Object.keys(data).length === 0) {
       const ok = await this.relogin();
       if (!ok) throw new Error(this.getLastLoginError());
       return this.getDeviceInfo(false);
     }
     return data;
   }
-  async getCellInformation(): Promise<any> { return this.getNetworkSnapshot(); }
-  async getDeviceInformation(retry = true): Promise<any> {
-    const raw = await this.apiGet('/api/device/information');
-    const data = typeof raw === 'object' ? raw : this.parseXmlResponse(raw);
-    if (retry && (!data || typeof data !== 'object' || !data.DeviceName || !data.Imei || !data.MacAddress1)) {
+
+  async getCellInformation(): Promise<CpeNetworkSnapshot> {
+    return this.getNetworkSnapshot();
+  }
+
+  async getDeviceInformation(retry = true): Promise<CpeDeviceInformation> {
+    const data = this.normalizeRecord(
+      await this.apiGet('/api/device/information'),
+    ) as CpeDeviceInformation;
+    if (retry && (!data.DeviceName || !data.Imei || !data.MacAddress1)) {
       const ok = await this.relogin();
       if (!ok) throw new Error(this.getLastLoginError());
       return this.getDeviceInformation(false);
     }
     return data;
   }
-  async getOnlineState(retry = true): Promise<any> {
-    const data = await this.apiGet('/api/system/onlinestate');
-    if (retry && (!data || typeof data !== 'object' || !data.DeviceName || !data.CurrentVersion || !data.IpAddress)) {
+
+  async getOnlineState(retry = true): Promise<CpeOnlineState> {
+    const data = this.normalizeRecord(
+      await this.apiGet('/api/system/onlinestate'),
+    ) as CpeOnlineState;
+    if (retry && (!data.DeviceName || !data.CurrentVersion || !data.IpAddress)) {
       const ok = await this.relogin();
       if (!ok) throw new Error(this.getLastLoginError());
       return this.getOnlineState(false);
     }
     return data;
   }
-  async getTopology(): Promise<any> {
+
+  async getTopology(): Promise<unknown> {
     const raw = await this.apiGet('/api/system/topology');
-    if (typeof raw === 'object') return raw;
-    return this.parseXmlResponse(raw);
+    return isRecord(raw) || Array.isArray(raw) ? raw : parseCpeRecord(raw);
   }
-  async getDevCapacity(): Promise<any> {
-    const raw = await this.apiGet('/api/system/devcapacity');
-    if (typeof raw === 'object') return raw;
-    return this.parseXmlResponse(raw);
+
+  async getDevCapacity(): Promise<CpeRecord> {
+    return this.normalizeRecord(await this.apiGet('/api/system/devcapacity'));
   }
-  async getWlanDbho(): Promise<any> {
-    const raw = await this.apiGet('/api/wlan/wlandbho');
-    if (typeof raw === 'object') return raw;
-    return this.parseXmlResponse(raw);
+
+  async getWlanDbho(): Promise<CpeRecord> {
+    return this.normalizeRecord(await this.apiGet('/api/wlan/wlandbho'));
   }
-  async getPortalSettings(): Promise<any> {
-    const raw = await this.apiGet('/api/lan/portal-settings');
-    if (typeof raw === 'object') return raw;
-    return this.parseXmlResponse(raw);
+
+  async getPortalSettings(): Promise<CpeRecord> {
+    return this.normalizeRecord(await this.apiGet('/api/lan/portal-settings'));
   }
-  async getIocDeviceCapacity(): Promise<any> { return this.apiGet('/system/ioc_device_capacity.json'); }
-  async getVendorName(language = 'zh_cn'): Promise<any> {
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><request><language>${language}</language></request>`;
-    const raw = await this.apiPost('/api/device/vendorname', xml, 'application/x-www-form-urlencoded; charset=UTF-8');
-    if (typeof raw === 'object') return raw;
-    return this.parseXmlResponse(raw);
+
+  async getIocDeviceCapacity(): Promise<unknown> {
+    return this.apiGet('/system/ioc_device_capacity.json');
   }
-  async checkOnlineUpgrade(): Promise<any> {
-    return this.apiPost('/api/system/onlineupg', JSON.stringify({ action: 'check', data: { UpdateAction: 1 } }));
+
+  async getVendorName(language = 'zh_cn'): Promise<CpeRecord> {
+    const xml = buildXmlRequest({ language });
+    return this.normalizeRecord(
+      await this.apiPost(
+        '/api/device/vendorname',
+        xml,
+        'application/x-www-form-urlencoded; charset=UTF-8',
+      ),
+    );
   }
-  async getTrafficStatistics(): Promise<any> {
-    const raw = await this.apiGet('/api/monitoring/traffic-statistics');
-    if (typeof raw === 'object') return raw;
-    return this.parseXmlResponse(raw);
+
+  async checkOnlineUpgrade(): Promise<unknown> {
+    return this.apiPost(
+      '/api/system/onlineupg',
+      JSON.stringify({ action: 'check', data: { UpdateAction: 1 } }),
+    );
+  }
+
+  async getTrafficStatistics(): Promise<CpeTrafficStatistics> {
+    return this.normalizeRecord(
+      await this.apiGet('/api/monitoring/traffic-statistics'),
+    ) as CpeTrafficStatistics;
   }
 
   async getMonthStatistics(): Promise<Record<string, string>> {
-    const raw = await this.apiGet('/api/monitoring/month_statistics');
-    return this.parseXmlResponse(raw);
+    return parseCpeRecord(await this.apiGet('/api/monitoring/month_statistics'));
   }
 
-  async getStartDate(): Promise<any> {
-    const raw = await this.apiGet('/api/monitoring/start_date');
-    if (typeof raw === 'object') return raw;
-    return this.parseXmlResponse(raw);
+  async getStartDate(): Promise<CpeRecord> {
+    return this.normalizeRecord(await this.apiGet('/api/monitoring/start_date'));
   }
 
   async getMonitoringStatus(): Promise<Record<string, string>> {
-    return this.parseXmlResponse(await this.apiGet('/api/monitoring/status'));
+    return parseCpeRecord(await this.apiGet('/api/monitoring/status'));
   }
 
   async getCurrentPlmn(): Promise<Record<string, string>> {
-    return this.parseXmlResponse(await this.apiGet('/api/net/current-plmn'));
+    return parseCpeRecord(await this.apiGet('/api/net/current-plmn'));
   }
 
   async getCellInfo(): Promise<Record<string, string>> {
-    return this.parseXmlResponse(await this.apiGet('/api/net/cell-info'));
+    return parseCpeRecord(await this.apiGet('/api/net/cell-info'));
   }
 
   async getSignalInfo(): Promise<Record<string, string>> {
-    return this.parseXmlResponse(await this.apiGet('/api/device/signal'));
+    return parseCpeRecord(await this.apiGet('/api/device/signal'));
   }
 
   private parseSmsMessages(xml: string): CpeSmsMessage[] {
@@ -652,13 +708,13 @@ export class CpeClient {
     const blocks = xml.matchAll(/<message>([\s\S]*?)<\/message>/gi);
     for (const block of blocks) {
       const item = block[1];
-      const phone = this.extractXmlTag(item, 'phone');
-      const content = this.extractXmlTag(item, 'content');
-      const date = this.extractXmlTag(item, 'date');
-      const status = this.extractXmlTag(item, 'smstat');
-      const type = this.extractXmlTag(item, 'smstype');
-      const box = this.extractXmlTag(item, 'curbox');
-      const index = this.extractXmlTag(item, 'index');
+      const phone = extractXmlTag(item, 'phone');
+      const content = extractXmlTag(item, 'content');
+      const date = extractXmlTag(item, 'date');
+      const status = extractXmlTag(item, 'smstat');
+      const type = extractXmlTag(item, 'smstype');
+      const box = extractXmlTag(item, 'curbox');
+      const index = extractXmlTag(item, 'index');
       if (!phone && !content && !date) continue;
       messages.push({
         id: index || `${phone}|${date}|${content}`,
@@ -676,9 +732,7 @@ export class CpeClient {
   }
 
   async getSmsCount(): Promise<Record<string, string>> {
-    const raw = await this.apiGet('/api/sms/sms-count');
-    if (typeof raw === 'object') return raw;
-    return this.parseXmlResponse(raw);
+    return parseCpeRecord(await this.apiGet('/api/sms/sms-count'));
   }
 
   async getSmsMessages(): Promise<{ messages: CpeSmsMessage[]; count: Record<string, string> }> {
@@ -732,7 +786,7 @@ export class CpeClient {
     return result;
   }
 
-  async getNetworkSnapshot(retry = true): Promise<any> {
+  async getNetworkSnapshot(retry = true): Promise<CpeNetworkSnapshot> {
     const [status, plmn, cellInfo, signal] = await Promise.all([
       this.getMonitoringStatus(),
       this.getCurrentPlmn(),
@@ -771,30 +825,6 @@ export class CpeClient {
     return snapshot;
   }
 
-  private parseXmlResponse(xml: unknown): Record<string, string> {
-    const result: Record<string, string> = {};
-    if (xml && typeof xml === 'object' && !Array.isArray(xml)) {
-      const object = xml as Record<string, unknown>;
-      const source = object.response && typeof object.response === 'object'
-        ? object.response as Record<string, unknown>
-        : object.data && typeof object.data === 'object'
-          ? object.data as Record<string, unknown>
-          : object;
-      for (const [key, value] of Object.entries(source)) {
-        if (value !== null && ['string', 'number', 'boolean'].includes(typeof value)) {
-          result[key] = this.decodeHtmlEntities(String(value));
-        }
-      }
-      return result;
-    }
-    if (typeof xml !== 'string' || /<error[\s>]/i.test(xml)) return result;
-    const matches = xml.matchAll(/<([\w-]+)>([^<]*)<\/\1>/g);
-    for (const m of matches) {
-      result[m[1]] = this.decodeHtmlEntities(m[2]);
-    }
-    return result;
-  }
-
   private parseSignalValue(value: unknown): number {
     const match = String(value ?? '').match(/-?\d+(?:\.\d+)?/);
     return match ? Number(match[0]) : 0;
@@ -805,32 +835,42 @@ export class CpeClient {
     return match ? Number(match[0]) : null;
   }
 
-  private async getHostInfoRaw(retry = true): Promise<any[]> {
+  private async getHostInfoRaw(retry = true): Promise<CpeHostRaw[]> {
     const data = await this.apiGet('/api/system/HostInfo');
-    if (retry && (!Array.isArray(data) || data.length === 0)) {
+    const hosts = Array.isArray(data)
+      ? data.filter(isRecord) as CpeHostRaw[]
+      : [];
+    if (retry && hosts.length === 0) {
       const ok = await this.relogin();
       if (!ok) throw new Error(this.getLastLoginError());
       return this.getHostInfoRaw(false);
     }
-    return Array.isArray(data) ? data : [];
+    return hosts;
   }
 
   async getHostInfo(): Promise<{ devices: CpeDevice[] }> {
     const data = await this.getHostInfoRaw();
     const devices: CpeDevice[] = [];
     for (const host of data) {
-      const txKBytes = parseInt(host.TxKBytes || '0', 10);
-      const rxKBytes = parseInt(host.RxKBytes || '0', 10);
+      const txKBytes = parseInt(toText(host.TxKBytes, '0'), 10);
+      const rxKBytes = parseInt(toText(host.RxKBytes, '0'), 10);
       devices.push({
-        name: host.ActualName || host.HostName || 'Unknown',
-        ip: host.IPAddress || '',
-        mac: host.MACAddress || '',
-        online: Boolean(host.Active),
-        uploadBytes: (txKBytes || parseInt(host.UploadBytes || '0', 10)) * 1024,
-        downloadBytes: (rxKBytes || parseInt(host.DownloadBytes || '0', 10)) * 1024,
-        onlineDuration: parseInt(host.AssociatedTime || host.OnlineDuration || '0', 10),
-        interfaceType: host.InterfaceType || '',
-        frequency: host.Frequency || '',
+        name: toText(host.ActualName || host.HostName, 'Unknown'),
+        ip: toText(host.IPAddress),
+        mac: toText(host.MACAddress),
+        online: isActiveFlag(host.Active),
+        uploadBytes: (
+          txKBytes || parseInt(toText(host.UploadBytes, '0'), 10)
+        ) * 1024,
+        downloadBytes: (
+          rxKBytes || parseInt(toText(host.DownloadBytes, '0'), 10)
+        ) * 1024,
+        onlineDuration: parseInt(
+          toText(host.AssociatedTime || host.OnlineDuration, '0'),
+          10,
+        ),
+        interfaceType: toText(host.InterfaceType),
+        frequency: toText(host.Frequency),
         rssi: this.parseOptionalSignalValue(host.rssi || host.SignalStrength),
         raw: host,
       });
@@ -838,7 +878,7 @@ export class CpeClient {
     return { devices };
   }
 
-  async getRawHostInfo(): Promise<any[]> {
+  async getRawHostInfo(): Promise<CpeHostRaw[]> {
     return this.getHostInfoRaw();
   }
 
@@ -856,8 +896,8 @@ export class CpeClient {
     // Keep the history/alert counters aligned with the router's own traffic
     // statistics. Per-device counters remain available for report rankings.
     return {
-      uploadBytes: parseInt(trafficStats?.CurrentUpload || String(totalUpload), 10) || 0,
-      downloadBytes: parseInt(trafficStats?.CurrentDownload || String(totalDownload), 10) || 0,
+      uploadBytes: parseInt(toText(trafficStats.CurrentUpload, String(totalUpload)), 10) || 0,
+      downloadBytes: parseInt(toText(trafficStats.CurrentDownload, String(totalDownload)), 10) || 0,
       connectedDevices: onlineDevices.length,
       signalStrength,
       networkType: String(networkSnapshot.networkType || ''),
@@ -880,13 +920,13 @@ export function getCpeClient(): CpeClient | null {
   return cachedClient;
 }
 
-export function resetCpeClient() {
+export function resetCpeClient(): void {
   cachedClient = null;
   clearCpeSession();
 }
 
 export function initCpeClient(url: string, username: string, password: string): CpeClient {
-  if (!cachedClient || cachedClient['baseUrl'] !== url || cachedClient['username'] !== username || cachedClient['password'] !== password) {
+  if (!cachedClient || !cachedClient.matchesCredentials(url, username, password)) {
     if (cachedClient) clearCpeSession();
     cachedClient = new CpeClient(url, username, password);
   }

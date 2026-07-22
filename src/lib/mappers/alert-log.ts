@@ -1,14 +1,5 @@
 import type { AlertLog } from '@/types';
-
-function parseSqliteDateTime(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  if (value.includes('T')) {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-  const parsed = new Date(`${value.replace(' ', 'T')}Z`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
+import { parseDateTime } from '@/lib/date-time';
 
 export interface AlertLogRow {
   id: number;
@@ -32,7 +23,7 @@ export function mapAlertLogRow(row: AlertLogRow): AlertLogWithRuleName {
   return {
     id: row.id,
     ruleId: row.rule_id,
-    triggeredAt: parseSqliteDateTime(row.triggered_at),
+    triggeredAt: parseDateTime(row.triggered_at),
     message: row.message,
     notified: toBoolean(row.notified),
     ruleName: row.rule_name ?? null,

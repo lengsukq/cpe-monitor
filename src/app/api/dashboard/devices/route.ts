@@ -6,6 +6,8 @@ export const GET = withApiHandler(async () => {
   const client = getOrCreateCpeClient();
   await client.ensureLogin();
   const allDevices = await client.getRawHostInfo();
-  const devices = allDevices.filter((device: { Active?: boolean }) => device.Active);
+  const devices = allDevices.filter((device) => (
+    device.Active === true || device.Active === 1 || device.Active === '1'
+  ));
   return jsonOk({ devices, total: allDevices.length });
 }, '获取设备列表失败');

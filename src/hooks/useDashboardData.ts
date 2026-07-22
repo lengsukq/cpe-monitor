@@ -13,6 +13,7 @@ import type {
   SmsSyncStatusView,
   TrafficStatsResponse,
 } from '@/types';
+import { bytesPerSecondToBitsPerSecond } from '@/lib/traffic-units';
 
 export interface TrafficHistoryPoint {
   timestamp: string;
@@ -142,12 +143,8 @@ export function useDashboardData() {
 
     const point: TrafficHistoryPoint = {
       timestamp: new Date().toISOString(),
-      uploadBps: Number.isFinite(uploadBytesPerSecond)
-        ? uploadBytesPerSecond * 8
-        : 0,
-      downloadBps: Number.isFinite(downloadBytesPerSecond)
-        ? downloadBytesPerSecond * 8
-        : 0,
+      uploadBps: bytesPerSecondToBitsPerSecond(uploadBytesPerSecond),
+      downloadBps: bytesPerSecondToBitsPerSecond(downloadBytesPerSecond),
       connectedDevices: overviewResult?.connectedDevices,
       signalStrength: overviewResult?.signalStrength,
       rsrp: overviewResult?.signalStrength,

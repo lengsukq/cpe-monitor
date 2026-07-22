@@ -8,6 +8,7 @@ import {
   withApiHandler,
 } from '@/lib/api-route';
 import { mapAlertRuleRow, mapAlertRuleRows, type AlertRuleRow } from '@/lib/mappers/alert-rule';
+import { isAlertMetricType, isAlertOperator } from '@/lib/alert-metrics';
 import type { AlertRule } from '@/types';
 
 interface AlertRuleWriteBody {
@@ -22,30 +23,14 @@ interface AlertRuleWriteBody {
   cooldownMinutes?: number;
 }
 
-const METRIC_TYPES = new Set<AlertRule['metricType']>([
-  'traffic_up',
-  'traffic_down',
-  'upload_rate',
-  'download_rate',
-  'devices',
-  'signal',
-  'rsrp',
-  'rsrq',
-  'sinr',
-  'rssi',
-  'collection_failures',
-]);
-
-const OPERATORS = new Set<AlertRule['operator']>(['>', '<', '>=', '<=']);
-
 function validateRuleBody(body: AlertRuleWriteBody) {
   if (!body.name?.trim() || body.name.trim().length > 100) {
     throw new ApiError('规则名称不能为空且不能超过 100 个字符', 400);
   }
-  if (!METRIC_TYPES.has(body.metricType)) {
+  if (!isAlertMetricType(body.metricType)) {
     throw new ApiError('不支持的监控指标', 400);
   }
-  if (!OPERATORS.has(body.operator)) {
+  if (!isAlertOperator(body.operator)) {
     throw new ApiError('不支持的运算符', 400);
   }
   if (!Number.isFinite(body.threshold)) {

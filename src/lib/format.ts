@@ -23,14 +23,21 @@ export function formatWithUnit(bytes: number, unit: 'MB' | 'GB'): string {
   return (bytes / divisor).toFixed(2) + ' ' + unit;
 }
 
-/** CPE traffic-rate fields are bytes per second; the router UI displays bits/s. */
-export function formatRate(bytesPerSecond: number): string {
-  const bitsPerSecond = Math.max(0, bytesPerSecond) * 8;
-  if (bitsPerSecond >= 1_000_000_000) return (bitsPerSecond / 1_000_000_000).toFixed(1) + ' Gbps';
-  if (bitsPerSecond >= 1_000_000) return (bitsPerSecond / 1_000_000).toFixed(1) + ' Mbps';
-  if (bitsPerSecond >= 1_000) return (bitsPerSecond / 1_000).toFixed(1) + ' Kbps';
-  return Math.round(bytesPerSecond) + ' B/s';
+export function formatBitsPerSecond(bitsPerSecond: number): string {
+  const normalized = Math.max(0, Number.isFinite(bitsPerSecond) ? bitsPerSecond : 0);
+  if (normalized >= 1_000_000_000) return (normalized / 1_000_000_000).toFixed(1) + ' Gbps';
+  if (normalized >= 1_000_000) return (normalized / 1_000_000).toFixed(1) + ' Mbps';
+  if (normalized >= 1_000) return (normalized / 1_000).toFixed(1) + ' Kbps';
+  return Math.round(normalized) + ' bps';
 }
+
+/** CPE real-time rate fields are bytes per second. */
+export function formatBytesPerSecond(bytesPerSecond: number): string {
+  return formatBitsPerSecond(Math.max(0, bytesPerSecond) * 8);
+}
+
+/** @deprecated Prefer formatBytesPerSecond or formatBitsPerSecond to make units explicit. */
+export const formatRate = formatBytesPerSecond;
 
 export function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}秒`;
@@ -67,9 +74,12 @@ export function getCarrier(mcc: string): string {
   return carriers[mcc] || mcc || '-';
 }
 
-export function getNetworkType(onlineState: any): string {
-  if (!onlineState?.CellData) return '未知';
-  const mode = onlineState.CellData.WirelessNetworkMode;
+export function getNetworkType(onlineState: unknown): string {
+  if (!onlineState || typeof onlineState !== 'object') return '未知';
+  const cellData = (onlineState as { CellData?: unknown }).CellData;
+  if (!cellData || typeof cellData !== 'object') return '未知';
+  const modeValue = (cellData as { WirelessNetworkMode?: unknown }).WirelessNetworkMode;
+  const mode = typeof modeValue === 'string' ? modeValue : '';
   const map: Record<string, string> = { 'LTE': '4G LTE', 'NR': '5G NR', 'NSA': '5G NSA' };
   return map[mode] || mode || '未知';
 }

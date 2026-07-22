@@ -38,53 +38,29 @@ import {
 } from '@/components/ui/dialog';
 import { TableCell, TableHead, TableRow } from '@/components/ui/table';
 import { apiFetch } from '@/lib/client-api';
+import {
+  ALERT_METRIC_DEFINITIONS,
+  ALERT_METRIC_TYPES,
+  ALERT_OPERATORS,
+} from '@/lib/alert-metrics';
 import type { AlertRule } from '@/types';
 
-const metricTypes = [
-  {
-    value: 'traffic_down',
-    label: '区间下载流量',
-    unit: 'MB',
-    hint: '相邻两次采集之间产生的下载流量。',
-  },
-  {
-    value: 'traffic_up',
-    label: '区间上传流量',
-    unit: 'MB',
-    hint: '相邻两次采集之间产生的上传流量。',
-  },
-  {
-    value: 'download_rate',
-    label: '平均下载速率',
-    unit: 'Mbps',
-    hint: '根据相邻采集点计算的平均下载速率。',
-  },
-  {
-    value: 'upload_rate',
-    label: '平均上传速率',
-    unit: 'Mbps',
-    hint: '根据相邻采集点计算的平均上传速率。',
-  },
-  { value: 'devices', label: '在线设备数量', unit: '台', hint: '采集时刻在线的终端数量。' },
-  { value: 'rsrp', label: 'RSRP', unit: 'dBm', hint: '参考信号接收功率，数值越接近 0 越强。' },
-  { value: 'rsrq', label: 'RSRQ', unit: 'dB', hint: '参考信号接收质量，数值越接近 0 越好。' },
-  { value: 'sinr', label: 'SINR', unit: 'dB', hint: '信号与干扰噪声比，通常越高越好。' },
-  { value: 'rssi', label: 'RSSI', unit: 'dBm', hint: '接收信号总强度，数值越接近 0 越强。' },
-  { value: 'signal', label: '兼容信号强度', unit: 'dBm', hint: '旧规则兼容字段，新规则建议使用 RSRP。' },
-  {
-    value: 'collection_failures',
-    label: '连续采集失败',
-    unit: '次',
-    hint: '最近连续失败的采集次数，建议设置为大于等于 1。',
-  },
-] as const;
+const metricTypes = ALERT_METRIC_TYPES.map((value) => ({
+  value,
+  ...ALERT_METRIC_DEFINITIONS[value],
+}));
 
-const operators = [
-  { value: '>', label: '大于' },
-  { value: '<', label: '小于' },
-  { value: '>=', label: '大于等于' },
-  { value: '<=', label: '小于等于' },
-] as const;
+const operatorLabels: Record<AlertRule['operator'], string> = {
+  '>': '大于',
+  '<': '小于',
+  '>=': '大于等于',
+  '<=': '小于等于',
+};
+
+const operators = ALERT_OPERATORS.map((value) => ({
+  value,
+  label: operatorLabels[value],
+}));
 
 type MetricType = AlertRule['metricType'];
 type Operator = AlertRule['operator'];

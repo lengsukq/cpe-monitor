@@ -1,3 +1,5 @@
+import type { AlertMetricType, AlertOperator } from '@/lib/alert-metrics';
+
 export interface TrafficData {
   id: number;
   timestamp: Date;
@@ -21,20 +23,9 @@ export interface DeviceData {
 export interface AlertRule {
   id: number;
   name: string;
-  metricType:
-    | 'traffic_up'
-    | 'traffic_down'
-    | 'upload_rate'
-    | 'download_rate'
-    | 'devices'
-    | 'signal'
-    | 'rsrp'
-    | 'rsrq'
-    | 'sinr'
-    | 'rssi'
-    | 'collection_failures';
+  metricType: AlertMetricType;
   threshold: number;
-  operator: '>' | '<' | '>=' | '<=';
+  operator: AlertOperator;
   enabled: boolean;
   notifyEmail: boolean;
   notifyWechat: boolean;

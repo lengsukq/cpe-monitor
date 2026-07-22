@@ -8,6 +8,7 @@ import {
 import { checkAlerts, collectTrafficData } from '@/lib/scheduler';
 import { isCpeConfigured, readNotificationConfig } from '@/lib/settings-store';
 import { sendCollectionReport } from '@/lib/notifiers/email';
+import { parseTimestampMs } from '@/lib/date-time';
 
 export const POST = withApiHandler(async () => {
   await requireSession();
@@ -143,9 +144,7 @@ export const POST = withApiHandler(async () => {
     if (emailConfig) {
       const completedAt = collectionRun?.completed_at || new Date().toISOString();
       const startedTime = new Date(startedAt).getTime();
-      const completedTime = collectionRun?.completed_at
-        ? new Date(`${collectionRun.completed_at.replace(' ', 'T')}Z`).getTime()
-        : Date.now();
+      const completedTime = parseTimestampMs(collectionRun?.completed_at) ?? Date.now();
       void sendCollectionReport(emailConfig, {
         success: collectionSucceeded,
         collectionId: collection.collectionId,

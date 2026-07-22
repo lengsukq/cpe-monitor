@@ -1,5 +1,11 @@
-import { db, toSqliteTimestamp } from './db';
+import { db } from './db';
 import type { DailyReport, DeviceRanking } from '@/types';
+import {
+  getAppDayRange,
+  getAppHour,
+  toSqliteTimestamp,
+} from './date-time';
+import { computeCounterDelta } from './traffic-units';
 
 interface TrafficReportRow {
   timestamp: string;
@@ -38,32 +44,13 @@ function average(values: Array<number | null | undefined>): number | null {
   return available.reduce((total, value) => total + value, 0) / available.length;
 }
 
-function getCounterDelta(current: number | null, previous: number | null | undefined): number {
-  if (current === null || previous === null || previous === undefined || current < previous) return 0;
-  return current - previous;
-}
-
 function getLocalHour(timestamp: string): number {
-  const date = new Date(`${timestamp.replace(' ', 'T')}Z`);
-  return Number(new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Shanghai',
-    hour: '2-digit',
-    hour12: false,
-  }).format(date));
+  return getAppHour(timestamp) ?? 0;
 }
 
 export async function generateDailyReport(): Promise<DailyReport> {
   const now = new Date();
-  const dateFormatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const todayStr = dateFormatter.format(now);
-  const today = new Date(`${todayStr}T00:00:00+08:00`);
-  const tomorrow = new Date(today);
-  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const { dateKey: todayStr, start: today, end: tomorrow } = getAppDayRange(now);
   const todayIso = toSqliteTimestamp(today);
   const tomorrowIso = toSqliteTimestamp(tomorrow);
 
@@ -98,9 +85,9 @@ export async function generateDailyReport(): Promise<DailyReport> {
 
   for (const row of todayTraffic) {
     const uploadDelta = row.delta_upload_bytes
-      ?? getCounterDelta(row.upload_bytes, previousTraffic?.upload_bytes);
+      ?? computeCounterDelta(row.upload_bytes, previousTraffic?.upload_bytes);
     const downloadDelta = row.delta_download_bytes
-      ?? getCounterDelta(row.download_bytes, previousTraffic?.download_bytes);
+      ?? computeCounterDelta(row.download_bytes, previousTraffic?.download_bytes);
     totalUpload += uploadDelta;
     totalDownload += downloadDelta;
     const hour = getLocalHour(row.timestamp);
@@ -151,9 +138,9 @@ export async function generateDailyReport(): Promise<DailyReport> {
       previousDownload: null,
     };
     const uploadDelta = row.delta_upload_bytes
-      ?? getCounterDelta(row.upload_bytes, current.previousUpload);
+      ?? computeCounterDelta(row.upload_bytes, current.previousUpload);
     const downloadDelta = row.delta_download_bytes
-      ?? getCounterDelta(row.download_bytes, current.previousDownload);
+      ?? computeCounterDelta(row.download_bytes, current.previousDownload);
     current.name = row.device_name || current.name;
     current.ip = row.device_ip || current.ip;
     current.mac = row.device_mac || current.mac;
@@ -181,7 +168,11 @@ export async function generateDailyReport(): Promise<DailyReport> {
     "SELECT value FROM system_settings WHERE key = 'scheduler_interval'",
   ).get() as { value?: string } | undefined;
   const intervalMinutes = Math.max(1, Number(intervalSetting?.value || 60));
-  const expectedSamples = Math.ceil((24 * 60) / intervalMinutes);
+  const elapsedMinutes = Math.min(
+    24 * 60,
+    Math.max(0, Math.ceil((now.getTime() - today.getTime()) / 60_000)),
+  );
+  const expectedSamples = Math.max(1, Math.ceil(elapsedMinutes / intervalMinutes));
   const samplingRatio = expectedSamples > 0
     ? Math.min(1, todayTraffic.length / expectedSamples)
     : 0;

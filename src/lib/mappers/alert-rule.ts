@@ -1,14 +1,5 @@
 import type { AlertRule } from '@/types';
-
-function parseSqliteDateTime(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  if (value.includes('T')) {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-  const parsed = new Date(`${value.replace(' ', 'T')}Z`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
+import { parseDateTime } from '@/lib/date-time';
 
 export interface AlertRuleRow {
   id: number;
@@ -38,7 +29,7 @@ export function mapAlertRuleRow(row: AlertRuleRow): AlertRule {
     notifyEmail: toBoolean(row.notify_email),
     notifyWechat: toBoolean(row.notify_wechat),
     cooldownMinutes: row.cooldown_minutes ?? 30,
-    createdAt: parseSqliteDateTime(row.created_at),
+    createdAt: parseDateTime(row.created_at),
   };
 }
 

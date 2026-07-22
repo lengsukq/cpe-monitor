@@ -1,4 +1,4 @@
-import { db, toSqliteTimestamp } from '@/lib/db';
+import { db } from '@/lib/db';
 import {
   ensureDatabase,
   jsonError,
@@ -6,6 +6,11 @@ import {
   requireSession,
   withApiHandler,
 } from '@/lib/api-route';
+import { parseTimestampMs, toSqliteTimestamp } from '@/lib/date-time';
+import {
+  bitsPerSecondBetweenTimestamps,
+  computeCounterDelta,
+} from '@/lib/traffic-units';
 
 interface DeviceHistoryRow {
   timestamp: string;
@@ -34,25 +39,6 @@ function getStartTime(range: string, now: Date): Date {
     default:
       return new Date(now.getTime() - 24 * 60 * 60 * 1000);
   }
-}
-
-function parseTimestamp(value: string | undefined): number | null {
-  if (!value) return null;
-  const parsed = new Date(`${value.replace(' ', 'T')}Z`).getTime();
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function getDelta(current: number | null, previous: number | null | undefined): number {
-  if (current === null || previous === null || previous === undefined || current < previous) {
-    return 0;
-  }
-  return current - previous;
-}
-
-function getRate(deltaBytes: number, currentTime: number | null, previousTime: number | null) {
-  if (deltaBytes <= 0 || currentTime === null || previousTime === null) return 0;
-  const elapsedSeconds = (currentTime - previousTime) / 1000;
-  return elapsedSeconds > 0 ? (deltaBytes * 8) / elapsedSeconds : 0;
 }
 
 const SELECT_COLUMNS = `
@@ -101,14 +87,16 @@ export const GET = withApiHandler(async (request) => {
 
   let previousRow = previous;
   const points = rows.map((row) => {
-    const currentTime = parseTimestamp(row.timestamp);
-    const previousTime = parseTimestamp(previousRow?.timestamp);
+    const currentTime = parseTimestampMs(row.timestamp);
+    const previousTime = parseTimestampMs(previousRow?.timestamp);
     const uploadBytes = row.delta_upload_bytes
-      ?? getDelta(row.upload_bytes, previousRow?.upload_bytes);
+      ?? computeCounterDelta(row.upload_bytes, previousRow?.upload_bytes);
     const downloadBytes = row.delta_download_bytes
-      ?? getDelta(row.download_bytes, previousRow?.download_bytes);
-    const uploadBps = row.upload_bps ?? getRate(uploadBytes, currentTime, previousTime);
-    const downloadBps = row.download_bps ?? getRate(downloadBytes, currentTime, previousTime);
+      ?? computeCounterDelta(row.download_bytes, previousRow?.download_bytes);
+    const uploadBps = row.upload_bps
+      ?? bitsPerSecondBetweenTimestamps(uploadBytes, currentTime, previousTime);
+    const downloadBps = row.download_bps
+      ?? bitsPerSecondBetweenTimestamps(downloadBytes, currentTime, previousTime);
 
     previousRow = row;
     return {

@@ -57,6 +57,26 @@ export interface TestResultState {
   latency?: string;
 }
 
+interface NotificationApiRow {
+  type: string;
+  config: string;
+}
+
+interface PublicEmailApiConfig {
+  smtpHost?: string;
+  smtpPort?: string | number;
+  smtpUser?: string;
+  smtpPass?: string;
+  smtpPasswordSet?: boolean;
+  from?: string;
+  to?: string | string[];
+}
+
+interface PublicWechatApiConfig {
+  webhookUrl?: string;
+  webhookConfigured?: boolean;
+}
+
 const DEFAULT_CPE: CpeConfigForm = {
   cpeUrl: 'http://192.168.31.1',
   cpeUsername: 'admin',
@@ -76,6 +96,8 @@ export function useSettingsPage() {
   const [cpeConfig, setCpeConfig] = useState<CpeConfigForm>(DEFAULT_CPE);
   const [emailConfig, setEmailConfig] = useState<EmailConfigForm>(DEFAULT_EMAIL);
   const [wechatConfig, setWechatConfig] = useState<WechatConfigForm>({ webhookUrl: '' });
+  const [emailPasswordSet, setEmailPasswordSet] = useState(false);
+  const [wechatWebhookSet, setWechatWebhookSet] = useState(false);
   const [passwordForm, setPasswordForm] = useState<PasswordFormState>({
     currentPassword: '',
     newPassword: '',
@@ -126,7 +148,7 @@ export function useSettingsPage() {
     try {
       const [cpeData, notifData, smsSyncData, retentionData] = await Promise.all([
         apiFetch<Record<string, unknown>>('/api/settings/cpe', undefined, '获取CPE配置失败'),
-        apiFetch<Array<{ type: string; config: string }>>(
+        apiFetch<NotificationApiRow[]>(
           '/api/settings/notification',
           undefined,
           '获取通知配置失败',
@@ -155,9 +177,20 @@ export function useSettingsPage() {
 
       for (const config of notifData) {
         if (config.type === 'email') {
-          setEmailConfig(JSON.parse(config.config) as EmailConfigForm);
+          const parsed = JSON.parse(config.config) as PublicEmailApiConfig;
+          setEmailConfig({
+            smtpHost: parsed.smtpHost || '',
+            smtpPort: String(parsed.smtpPort || 587),
+            smtpUser: parsed.smtpUser || '',
+            smtpPass: '',
+            from: parsed.from || '',
+            to: Array.isArray(parsed.to) ? parsed.to.join('\n') : parsed.to || '',
+          });
+          setEmailPasswordSet(Boolean(parsed.smtpPasswordSet));
         } else if (config.type === 'wechat') {
-          setWechatConfig(JSON.parse(config.config) as WechatConfigForm);
+          const parsed = JSON.parse(config.config) as PublicWechatApiConfig;
+          setWechatConfig({ webhookUrl: parsed.webhookUrl || '' });
+          setWechatWebhookSet(Boolean(parsed.webhookConfigured));
         }
       }
 
@@ -181,8 +214,13 @@ export function useSettingsPage() {
   }, []);
 
   useEffect(() => {
-    void fetchConfigs();
-    void fetchUpdateStatus();
+    const timer = window.setTimeout(() => {
+      void Promise.allSettled([
+        fetchConfigs(),
+        fetchUpdateStatus(),
+      ]);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchConfigs, fetchUpdateStatus]);
 
   async function saveCpeConfig() {
@@ -260,6 +298,8 @@ export function useSettingsPage() {
         },
         '保存失败',
       );
+      if (emailConfig.smtpPass.trim()) setEmailPasswordSet(true);
+      setEmailConfig((current) => ({ ...current, smtpPass: '' }));
       setMessage({ type: 'success', text: '邮件配置已保存' });
       collapseSection();
     } catch (error) {
@@ -281,6 +321,8 @@ export function useSettingsPage() {
         },
         '保存失败',
       );
+      if (wechatConfig.webhookUrl.trim()) setWechatWebhookSet(true);
+      setWechatConfig({ webhookUrl: '' });
       setMessage({ type: 'success', text: '企业微信配置已保存' });
       collapseSection();
     } catch (error) {
@@ -429,7 +471,7 @@ export function useSettingsPage() {
       ? '运行中'
       : '等待启动';
   const emailConfigured = Boolean(emailConfig.smtpHost && emailConfig.to);
-  const wechatConfigured = Boolean(wechatConfig.webhookUrl);
+  const wechatConfigured = wechatWebhookSet || Boolean(wechatConfig.webhookUrl);
   const recipientCount = emailConfig.to
     ? emailConfig.to.split(/[\n,;]+/).map((item) => item.trim()).filter(Boolean).length
     : 0;
@@ -446,7 +488,11 @@ export function useSettingsPage() {
       emailHost: emailConfig.smtpHost,
       recipientCount,
       wechatConfigured,
-      wechatMasked: wechatConfigured ? maskSecret(wechatConfig.webhookUrl) : '',
+      wechatMasked: wechatConfig.webhookUrl
+        ? maskSecret(wechatConfig.webhookUrl)
+        : wechatWebhookSet
+          ? '已安全保存'
+          : '',
       smsSyncLabel: formatSyncTime(smsSyncConfig.lastSyncedAt),
     }),
     [
@@ -460,6 +506,7 @@ export function useSettingsPage() {
       recipientCount,
       wechatConfigured,
       wechatConfig.webhookUrl,
+      wechatWebhookSet,
     ],
   );
 
@@ -489,7 +536,9 @@ export function useSettingsPage() {
     setOpenSection,
     smsState,
     emailConfigured,
+    emailPasswordSet,
     wechatConfigured,
+    wechatWebhookSet,
     recipientCount,
     overviewMeta,
     saveCpeConfig,

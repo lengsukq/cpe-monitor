@@ -6,6 +6,10 @@ import { mapDailyReportRows, type DailyReportRow } from '@/lib/mappers/daily-rep
 import { readNotificationConfig } from '@/lib/settings-store';
 import { sendDailyReport } from '@/lib/notifiers/email';
 import { sendDailyReportWechat } from '@/lib/notifiers/wechat';
+import {
+  markDailyReportSent,
+  upsertDailyReport,
+} from '@/lib/repositories/report-repository';
 
 export const GET = withApiHandler(async () => {
   await requireSession();
@@ -18,26 +22,11 @@ export const GET = withApiHandler(async () => {
 
 export const POST = withApiHandler(async () => {
   await requireSession();
+  ensureDatabase();
 
-  // 1. Generate the report
   const report = await generateDailyReport();
+  upsertDailyReport(report);
 
-  // 2. Save to database
-  db.prepare(
-    'INSERT INTO daily_reports (report_date, total_upload, total_download, peak_hour, top_devices, avg_signal, uptime_percent, network_quality) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(
-    report.reportDate,
-    report.totalUpload,
-    report.totalDownload,
-    report.peakHour,
-    JSON.stringify(report.topDevices || []),
-    report.avgSignal,
-    report.uptimePercent,
-    report.networkQuality,
-  );
-
-  // 3. Send notifications if configured
-  const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
   const emailConfig = readNotificationConfig('email');
   const wechatConfig = readNotificationConfig('wechat');
   const emailConfigured = Boolean(emailConfig);
@@ -60,7 +49,7 @@ export const POST = withApiHandler(async () => {
   }
 
   if (emailSent || wechatSent) {
-    db.prepare('UPDATE daily_reports SET sent_at = ? WHERE report_date = ?').run(timestamp, report.reportDate);
+    markDailyReportSent(report.reportDate);
   }
 
   return jsonOk({

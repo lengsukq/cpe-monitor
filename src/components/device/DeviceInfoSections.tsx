@@ -10,12 +10,18 @@ import {
 } from '@/lib/device-display';
 import { formatDurationFromString, getCarrier } from '@/lib/format';
 import { Activity, Database, Radio, ShieldCheck } from 'lucide-react';
+import type {
+  CpeDeviceInformation,
+  CpeDeviceState,
+  CpeNetworkSnapshot,
+  CpeOnlineState,
+} from '@/types/cpe';
 
 interface DeviceInfoSectionsProps {
-  info: Record<string, any>;
-  deviceState?: Record<string, any>;
-  onlineState?: Record<string, any>;
-  cell?: Record<string, any> | null;
+  info: CpeDeviceInformation;
+  deviceState?: CpeDeviceState;
+  onlineState?: CpeOnlineState;
+  cell?: CpeNetworkSnapshot | null;
   vendor?: string;
   wlanDbho?: unknown;
   topology?: unknown;
@@ -89,7 +95,7 @@ export default function DeviceInfoSections({
               <div className="fluid-card-grid gap-4 [--fluid-card-min:12rem]">
                 <InfoField label="工作模式" value={info.workmode} />
                 <InfoField label="支持模式" value={info.supportmode} />
-                <InfoField label="运营商" value={getCarrier(info.Mccmnc)} />
+                <InfoField label="运营商" value={getCarrier(info.Mccmnc || '')} />
                 <InfoField label="MCC-MNC" value={info.Mccmnc} mono />
                 <InfoField label="信号强度" value={cell?.rsrp || '-'} />
               </div>

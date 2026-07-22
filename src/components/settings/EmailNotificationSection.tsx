@@ -15,6 +15,7 @@ interface EmailNotificationSectionProps {
   emailConfig: EmailConfigForm;
   setEmailConfig: (value: EmailConfigForm) => void;
   emailConfigured: boolean;
+  passwordConfigured: boolean;
   recipientCount: number;
   loading: boolean;
   onSave: () => void;
@@ -26,6 +27,7 @@ export function EmailNotificationSection({
   emailConfig,
   setEmailConfig,
   emailConfigured,
+  passwordConfigured,
   recipientCount,
   loading,
   onSave,
@@ -48,7 +50,14 @@ export function EmailNotificationSection({
         { label: 'SMTP 服务器', value: emailConfig.smtpHost || '—' },
         { label: '端口', value: emailConfig.smtpPort || '—' },
         { label: '用户名', value: emailConfig.smtpUser || '—' },
-        { label: 'SMTP 密码', value: emailConfig.smtpPass ? '已填写' : '未填写 / 已保存' },
+        {
+          label: 'SMTP 密码',
+          value: emailConfig.smtpPass
+            ? '将更新'
+            : passwordConfigured
+              ? '已安全保存'
+              : '未配置',
+        },
         { label: '发件人', value: emailConfig.from || '—' },
         { label: '收件人', value: recipientCount > 0 ? `${recipientCount} 个邮箱` : '—' },
       ]}
@@ -79,12 +88,16 @@ export function EmailNotificationSection({
             onChange={(event) => setEmailConfig({ ...emailConfig, smtpUser: event.target.value })}
           />
         </FieldGroup>
-        <FieldGroup label="SMTP 密码">
+        <FieldGroup
+          label="SMTP 密码"
+          hint={passwordConfigured ? '密码已加密保存；留空可保留现有密码。' : '密码只会加密保存，不会返回到浏览器。'}
+        >
           <Input
             className="h-9 rounded-lg bg-background/60"
             type="password"
             value={emailConfig.smtpPass}
             onChange={(event) => setEmailConfig({ ...emailConfig, smtpPass: event.target.value })}
+            placeholder={passwordConfigured ? '留空保持现有密码' : '输入 SMTP 密码'}
           />
         </FieldGroup>
       </div>

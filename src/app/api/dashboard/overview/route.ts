@@ -56,12 +56,12 @@ export const GET = withApiHandler(async () => {
     ]);
     networkSnapshot = snapshot as Record<string, unknown>;
 
-    currentUpload = parseInt(trafficStats?.CurrentUploadRate || '0', 10);
-    currentDownload = parseInt(trafficStats?.CurrentDownloadRate || '0', 10);
+    currentUpload = parseInt(String(trafficStats.CurrentUploadRate || '0'), 10);
+    currentDownload = parseInt(String(trafficStats.CurrentDownloadRate || '0'), 10);
     connectedDevices = hostInfo?.devices?.filter((device: { online?: boolean }) => device.online).length || 0;
     connectionStatus = snapshot?.connectionStatus || 'unknown';
     const deviceState = await client.getOnlineState();
-    updateState = deviceState?.UpdateState || deviceState?.upgState || 'unknown';
+    updateState = String(deviceState.UpdateState || deviceState.upgState || 'unknown');
     networkType = snapshot?.networkType || 'unknown';
     source = 'cpe';
     signalStrength = snapshot?.signalStrength || 0;

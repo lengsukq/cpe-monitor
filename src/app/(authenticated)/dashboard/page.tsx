@@ -24,7 +24,7 @@ import TrafficTrendCard from '@/components/dashboard/TrafficTrendCard';
 import NetworkHistoryGrid from '@/components/dashboard/NetworkHistoryGrid';
 import QuickLinks from '@/components/dashboard/QuickLinks';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import { formatLocalTime, formatRate } from '@/lib/format';
+import { formatBytesPerSecond, formatLocalTime } from '@/lib/format';
 
 export default function DashboardPage() {
   const data = useDashboardData();
@@ -132,7 +132,7 @@ export default function DashboardPage() {
       <div className="fluid-card-grid gap-4 [--fluid-card-min:15rem]">
         <MetricStatCard
           label="下载速率"
-          value={formatRate(parseInt(String(data.rate.CurrentDownloadRate || '0'), 10))}
+          value={formatBytesPerSecond(parseInt(String(data.rate.CurrentDownloadRate || '0'), 10))}
           color="text-brand"
           icon={<DownloadCloud className="h-5 w-5" />}
           hint="实时下行"
@@ -140,7 +140,7 @@ export default function DashboardPage() {
         />
         <MetricStatCard
           label="上传速率"
-          value={formatRate(parseInt(String(data.rate.CurrentUploadRate || '0'), 10))}
+          value={formatBytesPerSecond(parseInt(String(data.rate.CurrentUploadRate || '0'), 10))}
           color="text-info"
           icon={<UploadCloud className="h-5 w-5" />}
           hint="实时上行"

@@ -1,20 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import type { OnlineDeviceRow } from '@/components/device/OnlineDevicesTable';
+import type { CpeDevicePageResponse } from '@/types/cpe';
 
-export interface DevicePageData {
-  deviceInformation?: Record<string, any>;
-  deviceInfo?: Record<string, any>;
-  onlineState?: Record<string, any>;
-  cellInformation?: Record<string, any>;
-  vendorName?: unknown;
-  wlanDbho?: unknown;
-  topology?: unknown;
-  devCapacity?: unknown;
-  portalSettings?: unknown;
-  iocDeviceCapacity?: unknown;
+export type DevicePageData = CpeDevicePageResponse;
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
 export function useDevicePage() {
@@ -27,34 +21,34 @@ export function useDevicePage() {
   const [deviceError, setDeviceError] = useState('');
   const [devicesError, setDevicesError] = useState('');
 
-  async function fetchDeviceInfo(attempt = 0) {
-    let retryScheduled = false;
+  const fetchDeviceInfo = useCallback(async () => {
     try {
-      const data = await apiFetch<DevicePageData>(
-        '/api/dashboard/device',
-        undefined,
-        '获取设备信息失败',
-      );
-      if (!data.deviceInformation?.DeviceName) {
-        if (attempt < 2) {
-          retryScheduled = true;
-          setDeviceError('CPE 身份信息暂未返回，正在自动重试…');
-          window.setTimeout(() => { void fetchDeviceInfo(attempt + 1); }, 1000);
+      for (let attempt = 0; attempt <= 2; attempt += 1) {
+        const data = await apiFetch<DevicePageData>(
+          '/api/dashboard/device',
+          undefined,
+          '获取设备信息失败',
+        );
+        if (data.deviceInformation?.DeviceName) {
+          setDeviceInfo(data);
+          setDeviceError('');
           return;
         }
-        throw new Error('CPE 未返回设备身份信息，请点击刷新重试');
+        if (attempt < 2) {
+          setDeviceError('CPE 身份信息暂未返回，正在自动重试…');
+          await wait(1000);
+        }
       }
-      setDeviceInfo(data);
-      setDeviceError('');
+      throw new Error('CPE 未返回设备身份信息，请点击刷新重试');
     } catch (error) {
       console.error(error);
       setDeviceError(error instanceof Error ? error.message : '无法获取设备信息');
     } finally {
-      if (!retryScheduled) setLoading(false);
+      setLoading(false);
     }
-  }
+  }, []);
 
-  async function fetchConnectedDevices() {
+  const fetchConnectedDevices = useCallback(async () => {
     try {
       const data = await apiFetch<{ devices?: OnlineDeviceRow[] }>(
         '/api/dashboard/devices',
@@ -71,18 +65,21 @@ export function useDevicePage() {
     } finally {
       setDevicesLoading(false);
     }
-  }
+  }, []);
 
-  async function refreshDevicePage() {
+  const refreshDevicePage = useCallback(async () => {
     // The CPE exposes one shared web session. Fetch identity first so the
     // HostInfo request cannot make an in-flight identity response incomplete.
     await fetchDeviceInfo();
     await fetchConnectedDevices();
-  }
+  }, [fetchConnectedDevices, fetchDeviceInfo]);
 
   useEffect(() => {
-    void refreshDevicePage();
-  }, []);
+    const timer = window.setTimeout(() => {
+      void refreshDevicePage();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refreshDevicePage]);
 
   useEffect(() => {
     if (loading || window.location.hash !== '#online-devices') return;

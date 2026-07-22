@@ -168,6 +168,7 @@ export default function SettingsPage() {
             emailConfig={settings.emailConfig}
             setEmailConfig={settings.setEmailConfig}
             emailConfigured={settings.emailConfigured}
+            passwordConfigured={settings.emailPasswordSet}
             recipientCount={settings.recipientCount}
             loading={settings.loading}
             onSave={() => { void settings.saveEmailConfig(); }}
