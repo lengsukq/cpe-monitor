@@ -31,7 +31,7 @@ export default function NetworkHistoryGrid({ data }: NetworkHistoryGridProps) {
   ));
 
   return (
-    <div className="grid gap-5 xl:grid-cols-2">
+    <div className="fluid-card-grid gap-5 [--fluid-card-min:26rem]">
       <Card className="card-hover">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">

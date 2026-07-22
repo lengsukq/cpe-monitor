@@ -197,11 +197,11 @@
 }
 
 .app-panel {
-  @apply rounded-3xl border border-white/80 bg-card shadow-card dark:border-border;
+  @apply w-full min-w-0 rounded-3xl border border-white/80 bg-card shadow-card dark:border-border;
 }
 
 .metric-panel {
-  @apply relative overflow-hidden rounded-3xl border border-white/80 bg-card p-5 shadow-card dark:border-border;
+  @apply relative w-full min-w-0 overflow-hidden rounded-3xl border border-white/80 bg-card p-5 shadow-card dark:border-border;
 }
 
 .metric-icon {
@@ -209,7 +209,38 @@
 }
 
 .page-header-panel {
-  @apply rounded-3xl border border-white/80 bg-card p-5 shadow-card dark:border-border sm:p-6;
+  @apply w-full min-w-0 rounded-3xl border border-white/80 bg-card p-5 shadow-card dark:border-border sm:p-6;
+}
+
+/*
+ * Fluid card grids use content-aware columns instead of fixed breakpoint counts.
+ * Override --fluid-card-min per usage when a denser or wider card is needed.
+ */
+.fluid-card-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, var(--fluid-card-min, 14rem)), 1fr)
+  );
+}
+
+.fluid-card-grid > * {
+  min-width: 0;
+}
+
+.fluid-sidebar-grid {
+  display: grid;
+  align-items: start;
+}
+
+.fluid-sidebar-grid > * {
+  min-width: 0;
+}
+
+@media (min-width: 64rem) {
+  .fluid-sidebar-grid {
+    grid-template-columns: clamp(13rem, 18vw, 16rem) minmax(0, 1fr);
+  }
 }
 
 .soft-grid {

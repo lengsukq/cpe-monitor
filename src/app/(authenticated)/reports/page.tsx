@@ -1,15 +1,37 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Activity, CalendarDays, CheckCircle2, Download, Eye, Mail, Signal, TrendingUp, Wifi } from 'lucide-react';
+import {
+  Activity,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Download,
+  Eye,
+  Mail,
+  Search,
+  Signal,
+  SlidersHorizontal,
+  TrendingUp,
+  Upload,
+  UsersRound,
+  Wifi,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { PageShell } from '@/components/PageShell';
 import { PageOverview } from '@/components/PageOverview';
+import ResponsiveDataView from '@/components/ResponsiveDataView';
+import {
+  OverviewBars,
+  OverviewDonut,
+  OverviewSparkline,
+} from '@/components/overview/OverviewMiniCharts';
 import { Callout } from '@/components/Callout';
 import DataTableCard from '@/components/DataTableCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -46,6 +68,8 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [qualityFilter, setQualityFilter] = useState('all');
 
   async function fetchReports() {
     setLoading(true);
@@ -76,7 +100,6 @@ export default function ReportsPage() {
       setPreviewReport(data);
       setIsOpen(true);
 
-      // Show notification status
       const notifications = data.notifications;
       if (notifications?.emailSent) {
         toast.success('日报已保存并通过邮件发送', { duration: 4000 });
@@ -86,17 +109,40 @@ export default function ReportsPage() {
         toast.success('日报已保存至数据库', { duration: 3000 });
       }
 
-      // Refresh the report list
       await fetchReports();
     } catch (previewError) {
       setError(previewError instanceof Error ? previewError.message : '生成报告失败');
     }
   }
 
+  function openReport(report: DailyReport) {
+    setPreviewReport(report);
+    setIsOpen(true);
+  }
+
   const topDevices = Array.isArray(previewReport?.topDevices)
     ? (previewReport?.topDevices as DeviceRanking[])
     : [];
   const latestReport = reports[0];
+  const recentReports = [...reports].slice(0, 10).reverse();
+  const trafficTrend = recentReports.map((report) => (
+    (report.totalDownload || 0) + (report.totalUpload || 0)
+  ));
+  const downloadTrend = recentReports.map((report) => report.totalDownload || 0);
+  const signalTrend = recentReports.map((report) => report.avgSignal);
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const qualityOptions = Array.from(new Set(
+    reports.map((report) => report.networkQuality).filter((value): value is string => Boolean(value)),
+  ));
+  const visibleReports = reports.filter((report) => {
+    const matchesQuery = !normalizedQuery || [
+      report.reportDate,
+      report.networkQuality,
+      report.avgSignal,
+    ].join(' ').toLocaleLowerCase().includes(normalizedQuery);
+    const matchesQuality = qualityFilter === 'all' || report.networkQuality === qualityFilter;
+    return matchesQuery && matchesQuality;
+  });
 
   return (
     <PageShell>
@@ -118,73 +164,219 @@ export default function ReportsPage() {
             value: loading ? '…' : String(reports.length),
             detail: '已生成的历史日报',
             icon: <CalendarDays className="h-3.5 w-3.5" />,
+            chart: (
+              <OverviewBars
+                values={trafficTrend}
+                label="最近日报总流量"
+                className="text-brand"
+              />
+            ),
           },
           {
             label: '最近日期',
             value: loading ? '…' : (latestReport?.reportDate || '—'),
             detail: latestReport ? `数据完整率 ${latestReport.uptimePercent?.toFixed(1) || 0}%` : '暂无数据',
             icon: <Wifi className="h-3.5 w-3.5" />,
+            chart: (
+              <OverviewDonut
+                value={latestReport?.uptimePercent || 0}
+                total={100}
+                label="最近日报数据完整率"
+                className="text-success"
+              />
+            ),
           },
           {
             label: '最近下载',
             value: loading ? '…' : formatBytes(latestReport?.totalDownload ?? null),
             detail: latestReport ? `上传 ${formatBytes(latestReport.totalUpload)}` : '—',
             icon: <Download className="h-3.5 w-3.5" />,
+            chart: (
+              <OverviewSparkline
+                values={downloadTrend}
+                label="最近日报下载流量趋势"
+                className="text-info"
+              />
+            ),
           },
           {
             label: '最近质量',
             value: loading ? '…' : (latestReport?.networkQuality || '—'),
             detail: latestReport ? `平均信号 ${latestReport.avgSignal || 0} dBm` : '—',
             icon: <Signal className="h-3.5 w-3.5" />,
+            chart: (
+              <OverviewSparkline
+                values={signalTrend}
+                label="最近日报平均信号趋势"
+                className="text-warning"
+              />
+            ),
           },
         ]}
       />
 
       {error ? <Callout tone="danger">{error}</Callout> : null}
 
-      <DataTableCard
-        colSpan={7}
+      <section className="app-panel grid gap-3 p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] sm:items-center sm:p-4">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索报告日期、网络质量或信号值"
+            className="h-10 rounded-xl pl-9"
+          />
+        </div>
+        <label className="relative min-w-0">
+          <span className="sr-only">网络质量</span>
+          <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <select
+            value={qualityFilter}
+            onChange={(event) => setQualityFilter(event.target.value)}
+            className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm outline-none transition focus:border-ring focus:ring-3 focus:ring-ring/30"
+          >
+            <option value="all">全部网络质量</option>
+            {qualityOptions.map((quality) => (
+              <option key={quality} value={quality}>{quality}</option>
+            ))}
+          </select>
+        </label>
+        <span className="shrink-0 text-center text-xs text-muted-foreground sm:text-left">
+          显示 {visibleReports.length} / {reports.length} 天
+        </span>
+      </section>
+
+      <ResponsiveDataView
         loading={loading}
-        isEmpty={reports.length === 0}
-        emptyMessage="暂无报告记录"
-        columns={
-          <>
-            <TableHead>日期</TableHead>
-            <TableHead>总下载</TableHead>
-            <TableHead>总上传</TableHead>
-            <TableHead>峰值时段</TableHead>
-            <TableHead>平均信号</TableHead>
-            <TableHead>网络质量</TableHead>
-            <TableHead>数据完整率</TableHead>
-          </>
-        }
-      >
-        {reports.map((report) => (
-          <TableRow key={report.id}>
-            <TableCell>{report.reportDate}</TableCell>
-            <TableCell>{formatBytes(report.totalDownload)}</TableCell>
-            <TableCell>{formatBytes(report.totalUpload)}</TableCell>
-            <TableCell>{report.peakHour !== null ? `${report.peakHour}:00` : '-'}</TableCell>
-            <TableCell>{report.avgSignal || 0} dBm</TableCell>
-            <TableCell>
-              <Badge variant={getQualityVariant(report.networkQuality)}>
-                {report.networkQuality || '-'}
-              </Badge>
-            </TableCell>
-            <TableCell>{report.uptimePercent?.toFixed(1) || 0}%</TableCell>
-          </TableRow>
-        ))}
-      </DataTableCard>
+        isEmpty={visibleReports.length === 0}
+        emptyMessage={reports.length === 0 ? '暂无报告记录' : '没有符合条件的报告'}
+        mobile={visibleReports.map((report) => {
+          const totalTraffic = (report.totalDownload || 0) + (report.totalUpload || 0);
+          return (
+            <article
+              key={report.id}
+              className="rounded-[26px] border border-border/65 bg-card p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-base font-bold text-foreground">{report.reportDate}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    总流量 {formatBytes(totalTraffic)}
+                  </p>
+                </div>
+                <Badge variant={getQualityVariant(report.networkQuality)}>
+                  {report.networkQuality || '未评级'}
+                </Badge>
+              </div>
+
+              <div className="fluid-card-grid mt-4 gap-2 [--fluid-card-min:8.5rem]">
+                <div className="rounded-2xl bg-brand/10 p-3">
+                  <p className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                    <Download className="h-3 w-3 text-brand" />
+                    总下载
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-brand">
+                    {formatBytes(report.totalDownload)}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-info/10 p-3">
+                  <p className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                    <Upload className="h-3 w-3 text-info" />
+                    总上传
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-info">
+                    {formatBytes(report.totalUpload)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="fluid-card-grid mt-3 gap-2 text-center [--fluid-card-min:6.75rem]">
+                <div className="rounded-2xl bg-muted/35 p-2.5">
+                  <Clock3 className="mx-auto h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="mt-1 text-xs font-bold">
+                    {report.peakHour !== null ? `${report.peakHour}:00` : '—'}
+                  </p>
+                  <p className="mt-0.5 text-[9px] text-muted-foreground">峰值时段</p>
+                </div>
+                <div className="rounded-2xl bg-muted/35 p-2.5">
+                  <Signal className="mx-auto h-3.5 w-3.5 text-warning" />
+                  <p className="mt-1 text-xs font-bold">{report.avgSignal ?? '—'} dBm</p>
+                  <p className="mt-0.5 text-[9px] text-muted-foreground">平均信号</p>
+                </div>
+                <div className="rounded-2xl bg-muted/35 p-2.5">
+                  <Wifi className="mx-auto h-3.5 w-3.5 text-success" />
+                  <p className="mt-1 text-xs font-bold">
+                    {report.uptimePercent?.toFixed(1) || 0}%
+                  </p>
+                  <p className="mt-0.5 text-[9px] text-muted-foreground">完整率</p>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-4 w-full rounded-xl"
+                onClick={() => openReport(report)}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                查看日报详情
+              </Button>
+            </article>
+          );
+        })}
+        desktop={(
+          <DataTableCard
+            colSpan={8}
+            loading={loading}
+            isEmpty={visibleReports.length === 0}
+            emptyMessage={reports.length === 0 ? '暂无报告记录' : '没有符合条件的报告'}
+            columns={
+              <>
+                <TableHead>日期</TableHead>
+                <TableHead>总下载</TableHead>
+                <TableHead>总上传</TableHead>
+                <TableHead>峰值时段</TableHead>
+                <TableHead>平均信号</TableHead>
+                <TableHead>网络质量</TableHead>
+                <TableHead>数据完整率</TableHead>
+                <TableHead>操作</TableHead>
+              </>
+            }
+          >
+            {visibleReports.map((report) => (
+              <TableRow key={report.id}>
+                <TableCell>{report.reportDate}</TableCell>
+                <TableCell>{formatBytes(report.totalDownload)}</TableCell>
+                <TableCell>{formatBytes(report.totalUpload)}</TableCell>
+                <TableCell>{report.peakHour !== null ? `${report.peakHour}:00` : '-'}</TableCell>
+                <TableCell>{report.avgSignal ?? '—'} dBm</TableCell>
+                <TableCell>
+                  <Badge variant={getQualityVariant(report.networkQuality)}>
+                    {report.networkQuality || '-'}
+                  </Badge>
+                </TableCell>
+                <TableCell>{report.uptimePercent?.toFixed(1) || 0}%</TableCell>
+                <TableCell>
+                  <Button size="sm" variant="ghost" onClick={() => openReport(report)}>
+                    <Eye className="mr-1 h-3.5 w-3.5" />
+                    详情
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </DataTableCard>
+        )}
+      />
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl overflow-y-auto rounded-[28px] p-4 sm:p-6">
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                 <Eye className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <DialogTitle className="text-lg">今日报告预览</DialogTitle>
+                <DialogTitle className="text-lg">日报详情</DialogTitle>
                 <DialogDescription>
                   {previewReport?.reportDate || ''}
                 </DialogDescription>
@@ -204,7 +396,7 @@ export default function ReportsPage() {
           {previewReport ? (
             <div className="space-y-5">
               {/* Metric cards row */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="fluid-card-grid gap-3 [--fluid-card-min:8rem]">
                 <div className="rounded-lg border bg-card p-3 text-center">
                   <Download className="mx-auto mb-1.5 h-4 w-4 text-brand" />
                   <div className="text-2xl font-bold tabular-nums text-brand">
@@ -228,6 +420,37 @@ export default function ReportsPage() {
                 </div>
               </div>
 
+              <div className="fluid-card-grid gap-2 [--fluid-card-min:8rem]">
+                <div className="rounded-2xl bg-muted/35 p-3">
+                  <Activity className="h-4 w-4 text-brand" />
+                  <p className="mt-2 text-lg font-bold tabular-nums">
+                    {previewReport.sampleCount ?? '—'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">采样点</p>
+                </div>
+                <div className="rounded-2xl bg-muted/35 p-3">
+                  <CheckCircle2 className="h-4 w-4 text-success" />
+                  <p className="mt-2 text-lg font-bold tabular-nums">
+                    {previewReport.successfulCollections ?? '—'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">成功采集</p>
+                </div>
+                <div className="rounded-2xl bg-muted/35 p-3">
+                  <UsersRound className="h-4 w-4 text-info" />
+                  <p className="mt-2 text-lg font-bold tabular-nums">
+                    {previewReport.averageDevices?.toFixed(1) ?? '—'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">平均设备数</p>
+                </div>
+                <div className="rounded-2xl bg-muted/35 p-3">
+                  <Signal className="h-4 w-4 text-warning" />
+                  <p className="mt-2 text-lg font-bold tabular-nums">
+                    {previewReport.alertCount ?? '—'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">告警次数</p>
+                </div>
+              </div>
+
               {/* Device ranking */}
               <div className="rounded-lg border bg-card p-4">
                 <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
@@ -240,26 +463,30 @@ export default function ReportsPage() {
                       const maxTotal = Math.max(...topDevices.map((d) => d.totalBytes));
                       const pct = maxTotal > 0 ? Math.round((device.totalBytes / maxTotal) * 100) : 0;
                       return (
-                        <div key={device.mac || index} className="flex items-center gap-3">
-                          <span className="w-5 text-center text-xs font-medium text-muted-foreground">
+                        <div key={device.mac || index} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3">
+                          <span className="pt-0.5 text-center text-xs font-medium text-muted-foreground">
                             {index + 1}
                           </span>
-                          <span className="w-20 truncate text-sm text-muted-foreground" title={device.name}>
-                            {device.name}
-                          </span>
-                          <span className="hidden w-20 truncate text-xs text-muted-foreground/60 sm:block" title={device.ip}>
-                            {device.ip}
-                          </span>
-                          <div className="flex flex-1 items-center gap-2">
-                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                          <div className="min-w-0 space-y-1.5">
+                            <div className="flex min-w-0 items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm text-muted-foreground" title={device.name}>
+                                  {device.name}
+                                </p>
+                                <p className="truncate text-[10px] text-muted-foreground/60" title={device.ip}>
+                                  {device.ip}
+                                </p>
+                              </div>
+                              <span className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                                {formatBytes(device.totalBytes)}
+                              </span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                               <div
                                 className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary transition-all duration-500"
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
-                            <span className="w-20 text-right text-xs tabular-nums text-muted-foreground">
-                              {formatBytes(device.totalBytes)}
-                            </span>
                           </div>
                         </div>
                       );
@@ -335,8 +562,8 @@ export default function ReportsPage() {
             </div>
           ) : null}
 
-          <div className="-mx-4 -mb-4 flex justify-end rounded-b-xl border-t bg-muted/50 p-4">
-            <Button onClick={() => setIsOpen(false)} variant="outline">
+          <div className="sticky bottom-0 -mx-4 -mb-4 flex border-t border-border/70 bg-background/95 p-4 backdrop-blur sm:-mx-6 sm:-mb-6 sm:justify-end sm:p-6">
+            <Button className="w-full sm:w-auto" onClick={() => setIsOpen(false)} variant="outline">
               关闭
             </Button>
           </div>

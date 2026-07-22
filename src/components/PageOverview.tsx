@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import HeroSection from '@/components/HeroSection';
 import HeroStatTile from '@/components/HeroStatTile';
-import { cn } from '@/lib/utils';
 
 export interface PageOverviewItem {
   label: string;
@@ -10,6 +9,8 @@ export interface PageOverviewItem {
   icon?: ReactNode;
   href?: string;
   mono?: boolean;
+  chart?: ReactNode;
+  toneClassName?: string;
 }
 
 interface PageOverviewProps {
@@ -20,14 +21,6 @@ interface PageOverviewProps {
   items: PageOverviewItem[];
   footer?: ReactNode;
   className?: string;
-}
-
-function statsGridClass(itemCount: number) {
-  if (itemCount <= 1) return 'grid-cols-1';
-  if (itemCount === 2) return 'grid-cols-1 sm:grid-cols-2';
-  if (itemCount === 3) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
-  if (itemCount === 5) return 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-5';
-  return 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4';
 }
 
 export function PageOverview({
@@ -50,7 +43,7 @@ export function PageOverview({
       actions={actions}
       stats={
         items.length > 0 ? (
-          <div className={cn('grid gap-2 sm:gap-3', statsGridClass(items.length))}>
+          <div className="fluid-card-grid gap-2 [--fluid-card-min:12.5rem] sm:gap-3">
             {items.map((item) => (
               <HeroStatTile
                 key={item.label}
@@ -60,6 +53,8 @@ export function PageOverview({
                 detail={item.detail}
                 href={item.href}
                 mono={item.mono}
+                chart={item.chart}
+                className={item.toneClassName}
               />
             ))}
           </div>

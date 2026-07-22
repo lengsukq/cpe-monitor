@@ -49,7 +49,7 @@ export default function SchedulerCard({
             value={String(interval || 60)}
             onValueChange={(value) => onIntervalChange(Number(value))}
           >
-            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-auto sm:min-w-28"><SelectValue /></SelectTrigger>
             <SelectContent>
               {[5, 15, 30, 60].map((minutes) => (
                 <SelectItem key={minutes} value={String(minutes)}>每 {minutes} 分钟</SelectItem>

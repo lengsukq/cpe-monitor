@@ -75,7 +75,7 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
           <Separator />
 
           {/* 网络信息 */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem]">
             <div>
               <p className="text-sm text-muted-foreground">IP 地址</p>
               <p className="break-all font-mono text-sm">{device.IPAddress || '-'}</p>
@@ -97,7 +97,7 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
           <Separator />
 
           {/* 流量信息 */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem]">
             <div>
               <p className="text-sm text-muted-foreground">上行流量</p>
               <p className="text-sm font-medium text-info">{formatBytesFromString(device.TxKBytes, true)}</p>
@@ -119,7 +119,7 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
           <Separator />
 
           {/* 时间信息 */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem]">
             <div>
               <p className="text-sm text-muted-foreground">在线时长</p>
               <p className="text-sm">{formatDurationFromString(device.AssociatedTime)}</p>
@@ -134,7 +134,7 @@ export default function DeviceDetailDialog({ device, open, onOpenChange }: Devic
           {(device.VendorClassID || device.DeviceBrands) && (
             <>
               <Separator />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem]">
                 {device.DeviceBrands && (
                   <div>
                     <p className="text-sm text-muted-foreground">品牌</p>

@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
-  TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
@@ -41,18 +40,28 @@ export default function DataTableCard({
           {header || (title ? <CardTitle>{title}</CardTitle> : null)}
         </CardHeader>
       ) : null}
-      <CardContent className="overflow-x-auto pt-6">
+      <CardContent className="px-0 pt-0 sm:px-6 sm:pt-6">
         {loading ? (
-          <TableSkeleton />
+          <div className="px-4 py-5 sm:px-0 sm:py-0">
+            <TableSkeleton />
+          </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>{columns}</TableRow>
-            </TableHeader>
-            <TableBody>
-              {isEmpty ? <EmptyTableRow colSpan={colSpan} message={emptyMessage} /> : children}
-            </TableBody>
-          </Table>
+          <>
+            <div className="flex items-center justify-between border-b border-border/60 px-4 py-2 text-[10px] font-medium text-muted-foreground sm:hidden">
+              <span>表格支持横向滑动</span>
+              <span aria-hidden>左右滑动 →</span>
+            </div>
+            <div className="overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
+              <Table className="min-w-[640px]">
+                <TableHeader>
+                  <TableRow>{columns}</TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isEmpty ? <EmptyTableRow colSpan={colSpan} message={emptyMessage} /> : children}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

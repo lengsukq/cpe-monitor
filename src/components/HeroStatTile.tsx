@@ -10,6 +10,7 @@ interface HeroStatTileProps {
   mono?: boolean;
   href?: string;
   className?: string;
+  chart?: ReactNode;
 }
 
 export default function HeroStatTile({
@@ -20,10 +21,11 @@ export default function HeroStatTile({
   mono = false,
   href,
   className,
+  chart,
 }: HeroStatTileProps) {
   const content = (
     <div className={cn(
-      'min-w-0 rounded-2xl border border-border/65 bg-muted/35 p-3 transition hover:border-brand/20 hover:bg-muted/55 sm:p-4',
+      'flex h-full w-full min-w-0 flex-col rounded-2xl border border-border/65 bg-muted/35 p-3 transition hover:border-brand/20 hover:bg-muted/55 sm:p-4',
       className,
     )}>
       <p className="flex items-center gap-1.5 truncate text-[10px] font-semibold text-muted-foreground sm:text-xs">
@@ -43,8 +45,9 @@ export default function HeroStatTile({
           {detail}
         </p>
       ) : null}
+      {chart ? <div className="mt-3 min-h-11">{chart}</div> : null}
     </div>
   );
 
-  return href ? <Link href={href} className="block min-w-0">{content}</Link> : content;
+  return href ? <Link href={href} className="block h-full min-w-0">{content}</Link> : content;
 }

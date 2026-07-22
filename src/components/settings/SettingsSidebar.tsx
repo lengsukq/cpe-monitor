@@ -33,8 +33,8 @@ export function SettingsSidebar({
   return (
     <aside className="space-y-4 lg:sticky lg:top-28">
       <Card className="overflow-hidden">
-        <CardContent className="p-2">
-          <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        <CardContent className="fluid-card-grid gap-1 p-2 [--fluid-card-min:9rem] lg:block">
+          <p className="col-span-full px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             配置导航
           </p>
           <SettingsNav
@@ -100,7 +100,7 @@ export function SettingsSidebar({
           <p className="rounded-lg border border-border/60 bg-muted/30 px-2.5 py-2 text-xs leading-5 text-muted-foreground">
             {updateStatus?.error || updateStatus?.message || '手动检查在线升级，不会自动写入 CPE。'}
           </p>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="fluid-card-grid gap-1.5 [--fluid-card-min:7rem]">
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={onRefreshUpdate}>
               <RefreshCw className="mr-1 h-3 w-3" />刷新
             </Button>

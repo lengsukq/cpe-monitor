@@ -42,7 +42,7 @@ export function DataRetentionSection({
         { label: '上次清理', value: formatSyncTime(value.lastCleanupAt) },
       ]}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="fluid-card-grid gap-4 [--fluid-card-min:15rem]">
         <FieldGroup
           label="流量与设备历史（天）"
           hint="保留图表与单设备历史，范围 7–3650 天。"

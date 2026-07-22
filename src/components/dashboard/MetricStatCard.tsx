@@ -27,7 +27,7 @@ export default function MetricStatCard({
   points = [],
 }: MetricStatCardProps) {
   const card = (
-    <Card className={cn('card-hover h-full min-h-[190px]', href && 'cursor-pointer')}>
+    <Card className={cn('card-hover h-full min-h-[190px] min-w-0', href && 'cursor-pointer')}>
       <CardContent className="flex h-full flex-col pt-0">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -55,7 +55,7 @@ export default function MetricStatCard({
   );
 
   return href ? (
-    <Link href={href} aria-label={`查看${label}详情`} className="block h-full">
+    <Link href={href} aria-label={`查看${label}详情`} className="block h-full min-w-0">
       {card}
     </Link>
   ) : card;

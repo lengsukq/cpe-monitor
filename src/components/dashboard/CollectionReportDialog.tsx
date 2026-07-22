@@ -82,20 +82,20 @@ function SignalQualityText({ value }: { value: number }) {
 function MiniTrafficBar({ value, max, label }: { value: number; max: number; label: string }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
-    <div className="flex items-center gap-3">
-      <span className="w-24 truncate text-sm text-muted-foreground" title={label}>
-        {label}
-      </span>
-      <div className="flex flex-1 items-center gap-2">
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary transition-all duration-500"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        <span className="w-20 text-right text-xs tabular-nums text-muted-foreground">
+    <div className="min-w-0 space-y-1.5">
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground" title={label}>
+          {label}
+        </span>
+        <span className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
           {formatBytes(value)}
         </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
@@ -159,7 +159,7 @@ export function CollectionReportDialog({
         {data.success ? (
           <div className="space-y-5">
             {/* Metric cards row */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="fluid-card-grid gap-3 [--fluid-card-min:8rem]">
               <div className="rounded-lg border bg-card p-3 text-center">
                 <Wifi className="mx-auto mb-1.5 h-4 w-4 text-primary" />
                 <div className="text-2xl font-bold tabular-nums">

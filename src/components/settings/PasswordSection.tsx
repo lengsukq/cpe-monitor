@@ -38,7 +38,7 @@ export function PasswordSection({
         { label: '密码策略', value: '本地 bcrypt 哈希存储' },
       ]}
     >
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem]">
         <FieldGroup label="当前密码">
           <Input
             className="h-9 rounded-lg bg-background/60"

@@ -97,7 +97,7 @@ export default function DeviceHistoryPanel({ mac }: DeviceHistoryPanelProps) {
 
       {loading ? (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="fluid-card-grid gap-3 [--fluid-card-min:9rem]">
             {Array.from({ length: 4 }).map((_, index) => (
               <Skeleton key={index} className="h-20 rounded-xl" />
             ))}
@@ -114,7 +114,7 @@ export default function DeviceHistoryPanel({ mac }: DeviceHistoryPanelProps) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="fluid-card-grid gap-3 [--fluid-card-min:9rem]">
             <div className="rounded-xl border border-border/70 bg-background/70 p-3">
               <Download className="h-4 w-4 text-brand" />
               <p className="mt-2 text-lg font-semibold tabular-nums">

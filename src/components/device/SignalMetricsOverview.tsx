@@ -86,6 +86,26 @@ function getQuality(value: number | null, thresholds: [number, number, number]) 
   };
 }
 
+function getMetricScore(value: number | null, thresholds: [number, number, number]) {
+  if (value === null) return 0;
+  const [excellent, good, fair] = thresholds;
+  if (value >= excellent) return 100;
+  if (value >= good) {
+    return 75 + ((value - good) / Math.max(1, excellent - good)) * 25;
+  }
+  if (value >= fair) {
+    return 45 + ((value - fair) / Math.max(1, good - fair)) * 30;
+  }
+  const lowerRange = Math.max(10, Math.abs(good - fair) * 2);
+  return Math.max(5, 45 - ((fair - value) / lowerRange) * 40);
+}
+
+function getScoreTone(score: number) {
+  if (score >= 75) return 'bg-success';
+  if (score >= 45) return 'bg-warning';
+  return 'bg-danger';
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -122,14 +142,15 @@ export default function SignalMetricsOverview({ cell }: SignalMetricsOverviewPro
         </p>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem]">
           {metrics.map((metric) => {
             const value = resolveMetricValue(cell, metric.key);
             const quality = getQuality(value, metric.thresholds);
+            const score = getMetricScore(value, metric.thresholds);
             return (
               <div
                 key={metric.key}
-                className="rounded-2xl border border-border/70 bg-muted/20 p-4"
+                className="min-w-0 rounded-2xl border border-border/70 bg-muted/20 p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -152,6 +173,20 @@ export default function SignalMetricsOverview({ cell }: SignalMetricsOverviewPro
                 <p className="mt-2 text-xs text-muted-foreground">
                   当前等级参考：{quality.detail} {metric.unit}
                 </p>
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>质量评分</span>
+                    <span className="font-semibold tabular-nums text-foreground">
+                      {value === null ? '—' : `${Math.round(score)} / 100`}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full transition-[width] duration-500 ${getScoreTone(score)}`}
+                      style={{ width: `${score}%` }}
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}

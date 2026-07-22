@@ -122,7 +122,7 @@ export default function OnlineDevicesTable({
         </div>
 
         {!loading && devices.length > 0 ? (
-          <div className="grid gap-2 rounded-2xl border border-border/70 bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_160px_160px]">
+          <div className="fluid-card-grid gap-2 rounded-2xl border border-border/70 bg-muted/20 p-3 [--fluid-card-min:10rem]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -194,7 +194,7 @@ export default function OnlineDevicesTable({
                         {device.Active ? '在线' : '离线'}
                       </Badge>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                    <div className="fluid-card-grid mt-3 gap-2 text-xs text-muted-foreground [--fluid-card-min:8rem]">
                       <span>接入：{getConnectionLabel(device)}</span>
                       <span>信号：{signal === null ? '-' : `${signal} dBm`}</span>
                       <span>下行：{formatBytesFromString(device.RxKBytes, true)}</span>

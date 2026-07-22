@@ -9,7 +9,7 @@ export default function PageSkeleton({ cards = 4, showChart = true }: PageSkelet
   return (
     <div className="space-y-6">
       <Skeleton className="h-8 w-32" />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="fluid-card-grid gap-4 [--fluid-card-min:15rem]">
         {Array.from({ length: cards }).map((_, index) => (
           <Skeleton key={index} className="h-28 rounded-2xl" />
         ))}

@@ -6,6 +6,11 @@ import { Callout } from '@/components/Callout';
 import { PageHeader } from '@/components/PageHeader';
 import { PageShell } from '@/components/PageShell';
 import { PageOverview } from '@/components/PageOverview';
+import {
+  OverviewBars,
+  OverviewDonut,
+  OverviewSegments,
+} from '@/components/overview/OverviewMiniCharts';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingBlock } from '@/components/LoadingBlock';
 import { Button } from '@/components/ui/button';
@@ -33,6 +38,22 @@ interface SmsSyncStatus {
 
 type Filter = 'all' | 'unread' | 'read';
 type DirectionFilter = 'all' | 'inbound' | 'outbound';
+
+function getRecentDailyCounts(messages: SmsMessage[], dayCount = 7) {
+  const now = Date.now();
+  const counts = Array.from({ length: dayCount }, () => 0);
+
+  for (const message of messages) {
+    const parsed = new Date(message.date.replace(' ', 'T')).getTime();
+    if (!Number.isFinite(parsed)) continue;
+    const diffDays = Math.floor((now - parsed) / (24 * 60 * 60 * 1000));
+    if (diffDays >= 0 && diffDays < dayCount) {
+      counts[dayCount - 1 - diffDays] += 1;
+    }
+  }
+
+  return counts;
+}
 
 export default function SmsPage() {
   const [messages, setMessages] = useState<SmsMessage[]>([]);
@@ -119,6 +140,9 @@ export default function SmsPage() {
     },
     [direction, filter, keyword, messages],
   );
+  const inboundCount = messages.filter((message) => message.direction === 'inbound').length;
+  const outboundCount = messages.filter((message) => message.direction === 'outbound').length;
+  const recentDailyCounts = getRecentDailyCounts(messages);
 
   return (
     <PageShell>
@@ -145,24 +169,51 @@ export default function SmsPage() {
             value: `${total} 条`,
             detail: '已同步到本地数据库',
             icon: <MessageSquareText className="h-3.5 w-3.5" />,
+            chart: <OverviewBars values={recentDailyCounts} label="最近七天短信数量" />,
           },
           {
             label: '未读',
             value: `${unread} 条`,
             detail: unread > 0 ? '有待查看短信' : '全部已读',
             icon: <Mail className="h-3.5 w-3.5" />,
+            chart: (
+              <OverviewDonut
+                value={unread}
+                total={Math.max(total, 1)}
+                label="未读短信占比"
+                className="text-warning"
+              />
+            ),
           },
           {
             label: '同步策略',
             value: sync?.enabled ? `每 ${sync.interval} 分钟` : '已暂停',
             detail: sync?.running ? '后台运行中' : '等待下一次同步',
             icon: <ShieldCheck className="h-3.5 w-3.5" />,
+            chart: (
+              <OverviewSegments
+                segments={[
+                  { label: '收到', value: inboundCount },
+                  { label: '发出', value: outboundCount },
+                ]}
+                label="短信收发方向占比"
+              />
+            ),
           },
           {
             label: '最近同步',
             value: formatSyncTime(sync?.lastSyncedAt),
             detail: sync?.lastError ? '最近一次同步失败' : '状态正常',
             icon: <RefreshCw className="h-3.5 w-3.5" />,
+            chart: (
+              <OverviewDonut
+                value={sync?.running ? 1 : 0}
+                total={1}
+                centerLabel={sync?.running ? '运行' : '暂停'}
+                label="短信同步运行状态"
+                className={sync?.running ? 'text-success' : 'text-muted-foreground'}
+              />
+            ),
           },
         ]}
       />
@@ -255,7 +306,7 @@ export default function SmsPage() {
         ) : (
           <div className="mt-5 grid gap-3">
             {visibleMessages.map((message, index) => (
-              <article key={`${message.id}-${index}`} className="group grid gap-4 rounded-2xl border border-border/65 bg-muted/25 p-4 transition hover:border-brand/20 hover:bg-muted/40 md:grid-cols-[minmax(150px,0.3fr)_minmax(0,1fr)_150px] md:items-start">
+              <article key={`${message.id}-${index}`} className="group grid min-w-0 gap-4 rounded-2xl border border-border/65 bg-muted/25 p-4 transition hover:border-brand/20 hover:bg-muted/40 md:grid-cols-[minmax(0,.4fr)_minmax(0,1fr)] md:items-start xl:grid-cols-[minmax(0,.3fr)_minmax(0,1fr)_minmax(0,.25fr)]">
                 <div className="flex items-center gap-3">
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${message.unread ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
                     {message.direction === 'inbound' ? <Smartphone className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
@@ -266,7 +317,7 @@ export default function SmsPage() {
                   </div>
                 </div>
                 <p className={`whitespace-pre-wrap text-sm leading-6 ${message.unread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>{message.content || '（无内容）'}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground md:justify-end">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground md:col-span-2 xl:col-span-1 xl:justify-end">
                   {message.unread ? <Badge variant="info">未读</Badge> : <Badge variant="secondary">已读</Badge>}
                   <span>{message.date || '未知时间'}</span>
                 </div>

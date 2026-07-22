@@ -53,7 +53,7 @@ export function EmailNotificationSection({
         { label: '收件人', value: recipientCount > 0 ? `${recipientCount} 个邮箱` : '—' },
       ]}
     >
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_88px]">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,.55fr)]">
         <FieldGroup label="SMTP 服务器">
           <Input
             className="h-9 rounded-lg bg-background/60"
@@ -71,7 +71,7 @@ export function EmailNotificationSection({
           />
         </FieldGroup>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem]">
         <FieldGroup label="SMTP 用户名">
           <Input
             className="h-9 rounded-lg bg-background/60"

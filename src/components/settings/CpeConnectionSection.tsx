@@ -52,7 +52,7 @@ export function CpeConnectionSection({
         },
       ]}
     >
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="fluid-card-grid gap-3 [--fluid-card-min:16rem]">
         <FieldGroup label="CPE 地址" hint="本地管理地址或可访问的内网地址。">
           <Input
             className="h-9 rounded-lg bg-background/60"

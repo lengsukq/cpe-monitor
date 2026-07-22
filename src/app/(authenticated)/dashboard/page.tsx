@@ -129,7 +129,7 @@ export default function DashboardPage() {
         collectionHealthStatus={data.overview?.collectionHealth?.status || 'never'}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="fluid-card-grid gap-4 [--fluid-card-min:15rem]">
         <MetricStatCard
           label="下载速率"
           value={formatRate(parseInt(String(data.rate.CurrentDownloadRate || '0'), 10))}
@@ -169,7 +169,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,.75fr)]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,.75fr)]">
         <TrafficTrendCard
           timeRange={data.timeRange}
           onTimeRangeChange={data.setTimeRange}
@@ -213,7 +213,7 @@ export default function DashboardPage() {
         deviceName={data.deviceName}
       />
 
-      <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]">
         <CellSnapshotCard
           networkType={data.overview?.networkType}
           connectionStatus={data.overview?.connectionStatus}

@@ -39,7 +39,7 @@ export default function TrafficStatsPanel({
       </CardHeader>
       <CardContent>
         {trafficStats ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem]">
             <InfoField label="本次下载" value={formatWithUnit(parseInt(String(rate.CurrentDownload || '0'), 10), unit)} />
             <InfoField label="本次上传" value={formatWithUnit(parseInt(String(rate.CurrentUpload || '0'), 10), unit)} />
             <InfoField label="累计下载" value={formatWithUnit(parseInt(String(rate.TotalDownload || '0'), 10), unit)} />

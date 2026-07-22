@@ -50,7 +50,7 @@ export function PageHeader({
         ) : null}
       </div>
       {actions ? (
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto md:justify-end">{actions}</div>
+        <div className="flex w-full flex-wrap items-center gap-2 max-sm:[&_[data-slot=button]]:w-full sm:w-auto md:justify-end">{actions}</div>
       ) : null}
     </div>
   );

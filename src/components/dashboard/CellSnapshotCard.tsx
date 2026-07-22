@@ -42,7 +42,7 @@ export default function CellSnapshotCard({
         </Badge>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-3 lg:grid-cols-4">
+        <div className="fluid-card-grid gap-x-4 gap-y-4 [--fluid-card-min:11rem]">
           <InfoField size="sm" label="设备型号" value={deviceName} />
           <InfoField size="sm" label="运营商" value={cell.carrier || getCarrier(String(carrierCode || ''))} />
           <InfoField size="sm" label="频段" value={cell.band} />

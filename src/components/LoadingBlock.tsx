@@ -10,7 +10,7 @@ interface LoadingBlockProps {
 export function LoadingBlock({ className, variant = 'page' }: LoadingBlockProps) {
   if (variant === 'cards') {
     return (
-      <div className={cn('grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4', className)}>
+      <div className={cn('fluid-card-grid gap-4 [--fluid-card-min:15rem]', className)}>
         {Array.from({ length: 4 }).map((_, index) => (
           <Skeleton key={index} className="h-28 rounded-2xl" />
         ))}
@@ -36,7 +36,7 @@ export function LoadingBlock({ className, variant = 'page' }: LoadingBlockProps)
         <Skeleton className="h-9 w-48 rounded-xl" />
         <Skeleton className="h-4 w-72 max-w-full rounded-lg" />
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="fluid-card-grid gap-4 [--fluid-card-min:15rem]">
         {Array.from({ length: 4 }).map((_, index) => (
           <Skeleton key={index} className="h-28 rounded-2xl" />
         ))}

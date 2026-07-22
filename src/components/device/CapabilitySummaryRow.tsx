@@ -17,7 +17,7 @@ export default function CapabilitySummaryRow({
   topology,
 }: CapabilitySummaryRowProps) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:gap-4 xl:grid-cols-4">
+    <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem] lg:gap-4">
       <CapabilityCard
         icon={<Cpu className="h-5 w-5" />}
         label="厂商/型号"

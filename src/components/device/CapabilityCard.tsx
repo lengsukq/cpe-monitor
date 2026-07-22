@@ -22,7 +22,7 @@ export default function CapabilityCard({ icon, label, value }: CapabilityCardPro
         <p className="hidden min-w-0 flex-1 text-sm leading-5 text-muted-foreground sm:block">
           {label}
         </p>
-        <p className="break-words text-sm font-semibold leading-5 text-foreground sm:max-w-[50%] sm:truncate sm:text-right">
+        <p className="min-w-0 break-words text-sm font-semibold leading-5 text-foreground sm:flex-1 sm:truncate sm:text-right">
           {value || '-'}
         </p>
       </CardContent>

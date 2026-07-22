@@ -29,10 +29,10 @@ export default function DataPlanCard({ startDate, trafficStats }: DataPlanCardPr
       : 'var(--brand)';
 
   return (
-    <div className="grid min-h-[300px] items-center gap-6 md:grid-cols-[170px_minmax(0,1fr)]">
+    <div className="fluid-card-grid min-h-[300px] items-center gap-6 [--fluid-card-min:15rem]">
       <div className="flex justify-center">
         <div
-          className="relative size-44 rounded-full p-[18px] shadow-inner"
+          className="relative size-[clamp(9rem,24vw,11rem)] rounded-full p-[clamp(14px,2vw,18px)] shadow-inner"
           style={{
             background: `conic-gradient(${progressColor} ${Math.min(percent, 100)}%, color-mix(in oklch, var(--muted) 88%, white) 0)`,
           }}
@@ -58,7 +58,7 @@ export default function DataPlanCard({ startDate, trafficStats }: DataPlanCardPr
           <p className="mt-2 text-sm text-muted-foreground">剩余 {formatWithUnit(remaining, 'GB')}</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="fluid-card-grid gap-2 [--fluid-card-min:7.5rem]">
           <div className="rounded-2xl bg-muted/45 p-3">
             <p className="text-xs text-muted-foreground">日阈值</p>
             <p className="mt-1 font-bold">{startDate.DayThreshold || 90}%</p>
