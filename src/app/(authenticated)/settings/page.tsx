@@ -1,17 +1,10 @@
 'use client';
 
-import {
-  BellRing,
-  Mail,
-  MessageSquareText,
-  RadioTower,
-  Settings2,
-} from 'lucide-react';
+import { Settings2 } from 'lucide-react';
 import { Callout } from '@/components/Callout';
 import { PageHeader } from '@/components/PageHeader';
 import { PageShell } from '@/components/PageShell';
 import { LoadingBlock } from '@/components/LoadingBlock';
-import { PageOverview } from '@/components/PageOverview';
 import { SettingsSidebar } from '@/components/settings/SettingsSidebar';
 import { CpeConnectionSection } from '@/components/settings/CpeConnectionSection';
 import { SmsSyncSection } from '@/components/settings/SmsSyncSection';
@@ -31,36 +24,6 @@ export default function SettingsPage() {
     );
   }
 
-  const meta = settings.overviewMeta;
-  const overviewItems = [
-    {
-      label: 'CPE 连接',
-      value: meta.cpeConfigured ? '已配置' : '待配置',
-      detail: meta.cpeUrl || '尚未填写地址',
-      icon: <RadioTower className="h-3.5 w-3.5" />,
-    },
-    {
-      label: '短信同步',
-      value: meta.smsEnabled ? `每 ${meta.smsInterval} 分钟` : '已暂停',
-      detail: meta.smsSyncLabel,
-      icon: <MessageSquareText className="h-3.5 w-3.5" />,
-    },
-    {
-      label: '邮件通知',
-      value: meta.emailConfigured ? '已启用' : '未配置',
-      detail: meta.emailConfigured
-        ? `${meta.emailHost} · ${meta.recipientCount} 收件人`
-        : '告警与日报将无法发送',
-      icon: <Mail className="h-3.5 w-3.5" />,
-    },
-    {
-      label: '企业微信',
-      value: meta.wechatConfigured ? '已启用' : '未配置',
-      detail: meta.wechatConfigured ? meta.wechatMasked : 'Webhook 尚未填写',
-      icon: <BellRing className="h-3.5 w-3.5" />,
-    },
-  ];
-
   return (
     <PageShell maxWidth="6xl" className="space-y-4">
       <PageHeader
@@ -68,13 +31,6 @@ export default function SettingsPage() {
         title="系统设置"
         description="默认展示当前配置摘要；点击「修改」展开对应区块进行编辑，各区块独立保存。"
         icon={<Settings2 className="h-6 w-6" />}
-      />
-
-      <PageOverview
-        eyebrow="Configuration snapshot"
-        title="当前配置摘要"
-        description="快速查看连接、同步与通知渠道状态。"
-        items={overviewItems}
       />
 
       {settings.message.text ? (

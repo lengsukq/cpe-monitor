@@ -49,7 +49,7 @@ export function SettingsAccordionSection({
         className,
       )}
     >
-      <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-2.5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             <span className="flex h-5 w-5 items-center justify-center rounded-md bg-muted text-foreground">
@@ -57,7 +57,7 @@ export function SettingsAccordionSection({
             </span>
             {eyebrow}
           </p>
-          <h3 className="mt-1.5 text-base font-medium tracking-tight">{title}</h3>
+          <h3 className="mt-1 text-base font-medium tracking-tight">{title}</h3>
           {description ? (
             <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
           ) : null}
@@ -95,25 +95,15 @@ export function SettingsAccordionSection({
       </div>
 
       {!open ? (
-        <CardContent className="px-4 py-4">
-          <dl className="grid gap-3 sm:grid-cols-2">
+        <CardContent className="px-4 py-3">
+          <div className="flex flex-wrap gap-x-5 gap-y-1">
             {summary.map((row) => (
-              <div
-                key={row.label}
-                className="rounded-xl border border-border/60 bg-muted/25 px-3 py-2.5"
-              >
-                <dt className="text-[11px] text-muted-foreground">{row.label}</dt>
-                <dd
-                  className={cn(
-                    'mt-1 truncate text-sm font-medium text-foreground',
-                    row.mono && 'font-mono text-xs',
-                  )}
-                >
-                  {row.value || '—'}
-                </dd>
+              <div key={row.label} className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{row.label}:</span>{' '}
+                <span className={cn(row.mono && 'font-mono')}>{row.value || '—'}</span>
               </div>
             ))}
-          </dl>
+          </div>
         </CardContent>
       ) : (
         <CardContent id={`${id}-panel`} className="space-y-3.5 px-4 py-4">

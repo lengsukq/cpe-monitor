@@ -75,7 +75,7 @@ export function SettingsSidebar({
       </Card>
 
       <Card className="overflow-hidden border-warning/20 shadow-sm">
-        <CardHeader className="space-y-0 p-3 pb-2">
+        <CardHeader className="space-y-0 p-2.5 pb-1">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-warning/10 text-warning">
@@ -102,10 +102,6 @@ export function SettingsSidebar({
           </div>
         </CardContent>
       </Card>
-
-      <p className="px-1 text-xs leading-5 text-muted-foreground">
-        折叠时只读展示当前值；展开后可编辑并独立保存。
-      </p>
     </aside>
   );
 }
