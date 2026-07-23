@@ -292,6 +292,88 @@ const migrations: Array<{ version: number; migrate: Migration }> = [
       `);
     },
   },
+  {
+    version: 5,
+    migrate(database) {
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS cpe_device_snapshots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          collected_at TEXT NOT NULL DEFAULT (datetime('now')),
+          source TEXT NOT NULL DEFAULT 'scheduler',
+          device_name TEXT,
+          friendly_name TEXT,
+          product_name_zh TEXT,
+          product_name_en TEXT,
+          software_version TEXT,
+          hardware_version TEXT,
+          webui_version TEXT,
+          workmode TEXT,
+          supportmode TEXT,
+          imei TEXT,
+          imsi TEXT,
+          iccid TEXT,
+          msisdn TEXT,
+          serial_number TEXT,
+          mccmnc TEXT,
+          mac_address1 TEXT,
+          wan_ip TEXT,
+          wan_ipv6 TEXT,
+          uptime_seconds INTEGER,
+          carrier TEXT,
+          plmn_code TEXT,
+          network_type TEXT,
+          connection_status TEXT,
+          sim_status TEXT,
+          payload_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS cpe_device_profile (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          source TEXT NOT NULL DEFAULT 'scheduler',
+          device_name TEXT,
+          friendly_name TEXT,
+          product_name_zh TEXT,
+          product_name_en TEXT,
+          software_version TEXT,
+          hardware_version TEXT,
+          webui_version TEXT,
+          workmode TEXT,
+          supportmode TEXT,
+          imei TEXT,
+          imsi TEXT,
+          iccid TEXT,
+          msisdn TEXT,
+          serial_number TEXT,
+          mccmnc TEXT,
+          mac_address1 TEXT,
+          wan_ip TEXT,
+          wan_ipv6 TEXT,
+          uptime_seconds INTEGER,
+          carrier TEXT,
+          plmn_code TEXT,
+          network_type TEXT,
+          connection_status TEXT,
+          sim_status TEXT,
+          payload_json TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_cpe_device_snapshots_collected
+        ON cpe_device_snapshots (collected_at DESC);
+      `);
+
+      const insertDefault = database.prepare(
+        'INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)',
+      );
+      const defaults: Array<[string, string]> = [
+        ['device_info_sync_enabled', 'true'],
+        ['device_info_sync_interval', '360'],
+        ['device_info_last_sync_at', ''],
+        ['device_info_last_sync_error', ''],
+      ];
+      for (const [key, value] of defaults) insertDefault.run(key, value);
+    },
+  },
 ];
 
 function readSchemaVersion(database: SqliteDatabase): number {

@@ -1,4 +1,11 @@
-export type SettingsSectionId = 'connection' | 'automation' | 'retention' | 'email' | 'wechat' | 'security';
+export type SettingsSectionId =
+  | 'connection'
+  | 'automation'
+  | 'deviceInfo'
+  | 'retention'
+  | 'email'
+  | 'wechat'
+  | 'security';
 
 export interface CpeConfigForm {
   cpeUrl: string;
@@ -26,6 +33,14 @@ export interface PasswordFormState {
 }
 
 export interface SmsSyncConfigForm {
+  enabled: boolean;
+  interval: string;
+  running: boolean;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+}
+
+export interface DeviceInfoSyncConfigForm {
   enabled: boolean;
   interval: string;
   running: boolean;

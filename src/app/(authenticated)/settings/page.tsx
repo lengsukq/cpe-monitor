@@ -14,6 +14,7 @@ import { LoadingBlock } from '@/components/LoadingBlock';
 import { SettingsSidebar } from '@/components/settings/SettingsSidebar';
 import { CpeConnectionSection } from '@/components/settings/CpeConnectionSection';
 import { SmsSyncSection } from '@/components/settings/SmsSyncSection';
+import { DeviceInfoSyncSection } from '@/components/settings/DeviceInfoSyncSection';
 import { DataRetentionSection } from '@/components/settings/DataRetentionSection';
 import { EmailNotificationSection } from '@/components/settings/EmailNotificationSection';
 import { WechatNotificationSection } from '@/components/settings/WechatNotificationSection';
@@ -155,6 +156,17 @@ export default function SettingsPage() {
             smsState={settings.smsState}
             savingSmsSync={settings.savingSmsSync}
             onSave={() => { void settings.saveSmsSyncConfig(); }}
+          />
+          <DeviceInfoSyncSection
+            open={settings.openSection === 'deviceInfo'}
+            onOpenChange={(open) => settings.setOpenSection(open ? 'deviceInfo' : null)}
+            deviceInfoSyncConfig={settings.deviceInfoSyncConfig}
+            setDeviceInfoSyncConfig={settings.setDeviceInfoSyncConfig}
+            deviceInfoState={settings.deviceInfoState}
+            savingDeviceInfoSync={settings.savingDeviceInfoSync}
+            syncingDeviceInfo={settings.syncingDeviceInfo}
+            onSave={() => { void settings.saveDeviceInfoSyncConfig(); }}
+            onSyncNow={() => { void settings.runDeviceInfoSyncNow(); }}
           />
           <DataRetentionSection
             open={settings.openSection === 'retention'}

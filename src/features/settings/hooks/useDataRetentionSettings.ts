@@ -42,7 +42,13 @@ export function useDataRetentionSettings(context: SettingsActionContext) {
     try {
       const response = await apiFetch<{
         config: { historyDays: number; runDays: number; lastCleanupAt: string | null };
-        cleanup?: { trafficDeleted: number; devicesDeleted: number; runsDeleted: number; cleanedAt: string } | null;
+        cleanup?: {
+          trafficDeleted: number;
+          devicesDeleted: number;
+          deviceSnapshotsDeleted?: number;
+          runsDeleted: number;
+          cleanedAt: string;
+        } | null;
       }>('/api/settings/data-retention', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ historyDays, runDays, cleanupNow }),
@@ -53,7 +59,7 @@ export function useDataRetentionSettings(context: SettingsActionContext) {
         lastCleanupAt: response.cleanup?.cleanedAt || response.config.lastCleanupAt,
       });
       const summary = response.cleanup
-        ? `，已删除 ${response.cleanup.trafficDeleted} 条流量、${response.cleanup.devicesDeleted} 条设备和 ${response.cleanup.runsDeleted} 条采集记录`
+        ? `，已删除 ${response.cleanup.trafficDeleted} 条流量、${response.cleanup.devicesDeleted} 条终端、${response.cleanup.deviceSnapshotsDeleted || 0} 条设备快照和 ${response.cleanup.runsDeleted} 条采集记录`
         : '';
       context.onMessage({ type: 'success', text: `数据保留策略已保存${summary}` });
       context.onSaved();

@@ -31,7 +31,15 @@ export function useDevicePage() {
         );
         if (data.deviceInformation?.DeviceName) {
           setDeviceInfo(data);
-          setDeviceError('');
+          if (data.source === 'database') {
+            setDeviceError(
+              data.cpeError
+                ? `CPE 暂不可用，已显示本地缓存：${data.cpeError}`
+                : 'CPE 暂不可用，已显示本地缓存设备信息',
+            );
+          } else {
+            setDeviceError('');
+          }
           return;
         }
         if (attempt < 2) {

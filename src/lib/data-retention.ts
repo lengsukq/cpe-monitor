@@ -1,4 +1,5 @@
 import { db, ensureDatabaseReady, toSqliteTimestamp } from '@/lib/db';
+import { deleteDeviceInfoSnapshotsBefore } from '@/lib/repositories/device-info-repository';
 import { getSetting, setSetting } from '@/lib/settings-store';
 
 export const RETENTION_MIN_DAYS = 7;
@@ -17,6 +18,7 @@ export interface DataCleanupResult {
   skipped: boolean;
   trafficDeleted: number;
   devicesDeleted: number;
+  deviceSnapshotsDeleted: number;
   runsDeleted: number;
   cleanedAt: string;
 }
@@ -82,6 +84,7 @@ export function cleanupHistoricalData(force = false): DataCleanupResult {
       skipped: true,
       trafficDeleted: 0,
       devicesDeleted: 0,
+      deviceSnapshotsDeleted: 0,
       runsDeleted: 0,
       cleanedAt: config.lastCleanupAt || now.toISOString(),
     };
@@ -101,6 +104,7 @@ export function cleanupHistoricalData(force = false): DataCleanupResult {
     const traffic = db.prepare(
       'DELETE FROM traffic_data WHERE timestamp < ?',
     ).run(historyCutoff);
+    const deviceSnapshotsDeleted = deleteDeviceInfoSnapshotsBefore(historyCutoff);
     const runs = db.prepare(
       `DELETE FROM collection_runs
        WHERE COALESCE(completed_at, started_at) < ?
@@ -115,6 +119,7 @@ export function cleanupHistoricalData(force = false): DataCleanupResult {
     return {
       devicesDeleted: Number(devices.changes || 0),
       trafficDeleted: Number(traffic.changes || 0),
+      deviceSnapshotsDeleted,
       runsDeleted: Number(runs.changes || 0),
     };
   });

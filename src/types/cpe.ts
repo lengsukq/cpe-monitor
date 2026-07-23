@@ -65,7 +65,12 @@ export interface CpeOnlineState extends CpeRecord {
   IsSupportOnlineUpg?: CpePrimitive;
   IsMainDevice?: CpePrimitive;
   UpdateState?: CpePrimitive;
+  /** Legacy alias; live devices usually expose UpdateState. */
   upgState?: CpePrimitive;
+  DeviceType?: CpePrimitive;
+  Version?: CpePrimitive;
+  CurrentUpgradeTime?: CpePrimitive;
+  CurrentChangeLog?: CpePrimitive;
 }
 
 export interface CpeNetworkStatus extends CpeRecord {
@@ -155,8 +160,17 @@ export interface CpeTrafficStatistics extends CpeRecord {
   TotalDownload?: string | number;
   CurrentConnectTime?: string | number;
   TotalConnectTime?: string | number;
+  showtraffic?: string | number;
+}
+
+/** Month counters live on `/api/monitoring/month_statistics`, not traffic-statistics. */
+export interface CpeMonthStatistics extends CpeRecord {
   CurrentMonthDownload?: string | number;
   CurrentMonthUpload?: string | number;
+  MonthDuration?: string | number;
+  MonthLastClearTime?: string | number;
+  CurrentDayUsed?: string | number;
+  CurrentDayDuration?: string | number;
 }
 
 export interface CpeHostRaw extends CpeRecord {
@@ -164,7 +178,8 @@ export interface CpeHostRaw extends CpeRecord {
   HostName?: CpePrimitive;
   IPAddress?: CpePrimitive;
   MACAddress?: CpePrimitive;
-  Active?: CpePrimitive;
+  /** Huawei CPE may return boolean true/false or "1"/"0". */
+  Active?: CpePrimitive | boolean;
   TxKBytes?: CpePrimitive;
   RxKBytes?: CpePrimitive;
   UploadBytes?: CpePrimitive;
@@ -175,6 +190,11 @@ export interface CpeHostRaw extends CpeRecord {
   Frequency?: CpePrimitive;
   rssi?: CpePrimitive;
   SignalStrength?: CpePrimitive;
+  DownRate?: CpePrimitive;
+  UpRate?: CpePrimitive;
+  IconType?: CpePrimitive;
+  IsGuest?: CpePrimitive | boolean;
+  IsLocalDevice?: CpePrimitive | boolean;
 }
 
 export interface CpeDevicePageResponse {
@@ -188,6 +208,9 @@ export interface CpeDevicePageResponse {
   devCapacity?: unknown;
   portalSettings?: unknown;
   iocDeviceCapacity?: unknown;
+  source?: 'cpe' | 'database';
+  cpeError?: string;
+  cachedAt?: string | null;
 }
 
 

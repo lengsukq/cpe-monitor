@@ -1,6 +1,7 @@
 import {
   BellRing,
   Database,
+  HardDrive,
   KeyRound,
   Mail,
   MessageSquareText,
@@ -57,6 +58,13 @@ export function SettingsSidebar({
             label="自动化"
             detail="短信同步"
             onClick={() => onOpenSection('automation')}
+          />
+          <SettingsNav
+            href="#device-info-sync"
+            icon={<HardDrive className="h-3.5 w-3.5" />}
+            label="设备信息"
+            detail="长期入库"
+            onClick={() => onOpenSection('deviceInfo')}
           />
           <SettingsNav
             href="#retention"

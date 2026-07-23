@@ -7,12 +7,14 @@ import { useDataRetentionSettings } from '@/features/settings/hooks/useDataReten
 import { useNotificationSettings } from '@/features/settings/hooks/useNotificationSettings';
 import { usePasswordSettings } from '@/features/settings/hooks/usePasswordSettings';
 import { useSmsSyncSettings } from '@/features/settings/hooks/useSmsSyncSettings';
+import { useDeviceInfoSyncSettings } from '@/features/settings/hooks/useDeviceInfoSyncSettings';
 import { useSystemUpdate } from '@/features/settings/hooks/useSystemUpdate';
 import type { SettingsActionContext, SettingsMessage, SettingsSectionId } from '@/features/settings/types';
 
 export type {
   CpeConfigForm,
   DataRetentionForm,
+  DeviceInfoSyncConfigForm,
   EmailConfigForm,
   PasswordFormState,
   SettingsSectionId,
@@ -32,11 +34,16 @@ export function useSettingsPage() {
   const cpe = useCpeSettings(actionContext);
   const notifications = useNotificationSettings(actionContext);
   const sms = useSmsSyncSettings(actionContext);
+  const deviceInfoSync = useDeviceInfoSyncSettings(actionContext);
   const retention = useDataRetentionSettings(actionContext);
   const password = usePasswordSettings(actionContext);
   const update = useSystemUpdate();
 
-  const pageLoading = cpe.initialLoading || notifications.initialLoading || sms.initialLoading || retention.initialLoading;
+  const pageLoading = cpe.initialLoading
+    || notifications.initialLoading
+    || sms.initialLoading
+    || deviceInfoSync.initialLoading
+    || retention.initialLoading;
   const loading = cpe.saving || notifications.savingEmail || notifications.savingWechat || password.savingPassword;
 
   const overviewMeta = useMemo(() => ({
@@ -60,6 +67,7 @@ export function useSettingsPage() {
     ...cpe,
     ...notifications,
     ...sms,
+    ...deviceInfoSync,
     ...retention,
     ...password,
     ...update,

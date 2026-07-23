@@ -15,6 +15,11 @@ import { checkAlerts } from './alert-service';
 export { checkAlerts } from './alert-service';
 import { collectTrafficData } from './traffic-collection-service';
 export { collectTrafficData } from './traffic-collection-service';
+import {
+  collectDeviceInfo,
+  type DeviceInfoCollectionResult,
+} from './device-info-collection-service';
+export { collectDeviceInfo } from './device-info-collection-service';
 import { APP_TIME_ZONE } from './date-time';
 import {
   markDailyReportSent,
@@ -23,6 +28,9 @@ import {
 
 export const SMS_SYNC_MIN_INTERVAL = 1;
 export const SMS_SYNC_MAX_INTERVAL = 1440;
+export const DEVICE_INFO_SYNC_MIN_INTERVAL = 30;
+export const DEVICE_INFO_SYNC_MAX_INTERVAL = 10080;
+export const DEVICE_INFO_SYNC_DEFAULT_INTERVAL = 360;
 
 export interface SmsSyncStatus {
   enabled: boolean;
@@ -41,10 +49,20 @@ export interface SmsSyncResult {
   syncedAt: string;
 }
 
+export interface DeviceInfoSyncStatus {
+  enabled: boolean;
+  interval: number;
+  running: boolean;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+}
+
 let hourlyTask: ScheduledTask | null = null;
 let dailyTask: ScheduledTask | null = null;
 let smsSyncTask: ReturnType<typeof setInterval> | null = null;
 let smsSyncPromise: Promise<SmsSyncResult> | null = null;
+let deviceInfoSyncTask: ReturnType<typeof setInterval> | null = null;
+let deviceInfoSyncPromise: Promise<DeviceInfoCollectionResult> | null = null;
 
 function getSmsSyncInterval(value: string | undefined): number {
   const interval = Number(value || 15);
@@ -52,9 +70,23 @@ function getSmsSyncInterval(value: string | undefined): number {
   return Math.min(SMS_SYNC_MAX_INTERVAL, Math.max(SMS_SYNC_MIN_INTERVAL, interval));
 }
 
+function getDeviceInfoSyncInterval(value: string | undefined): number {
+  const interval = Number(value || DEVICE_INFO_SYNC_DEFAULT_INTERVAL);
+  if (!Number.isInteger(interval)) return DEVICE_INFO_SYNC_DEFAULT_INTERVAL;
+  return Math.min(
+    DEVICE_INFO_SYNC_MAX_INTERVAL,
+    Math.max(DEVICE_INFO_SYNC_MIN_INTERVAL, interval),
+  );
+}
+
 function updateSmsSyncMetadata(lastSyncedAt: string | null, lastError: string | null) {
   if (lastSyncedAt !== null) setSetting('sms_last_sync_at', lastSyncedAt);
   if (lastError !== null) setSetting('sms_last_sync_error', lastError);
+}
+
+function updateDeviceInfoSyncMetadata(lastSyncedAt: string | null, lastError: string | null) {
+  if (lastSyncedAt !== null) setSetting('device_info_last_sync_at', lastSyncedAt);
+  if (lastError !== null) setSetting('device_info_last_sync_error', lastError);
 }
 
 export function getSmsSyncStatus(): SmsSyncStatus {
@@ -72,11 +104,30 @@ export function getSmsSyncStatus(): SmsSyncStatus {
   };
 }
 
+export function getDeviceInfoSyncStatus(): DeviceInfoSyncStatus {
+  initializeDatabase();
+  const settings = getSettingsMap();
+  return {
+    enabled: settings.device_info_sync_enabled !== 'false',
+    interval: getDeviceInfoSyncInterval(settings.device_info_sync_interval),
+    running: deviceInfoSyncTask !== null,
+    lastSyncedAt: settings.device_info_last_sync_at || null,
+    lastError: settings.device_info_last_sync_error || null,
+  };
+}
+
 export function isValidSmsSyncInterval(value: unknown): value is number {
   return typeof value === 'number'
     && Number.isInteger(value)
     && value >= SMS_SYNC_MIN_INTERVAL
     && value <= SMS_SYNC_MAX_INTERVAL;
+}
+
+export function isValidDeviceInfoSyncInterval(value: unknown): value is number {
+  return typeof value === 'number'
+    && Number.isInteger(value)
+    && value >= DEVICE_INFO_SYNC_MIN_INTERVAL
+    && value <= DEVICE_INFO_SYNC_MAX_INTERVAL;
 }
 
 export async function startScheduler() {
@@ -115,6 +166,7 @@ export async function startScheduler() {
   }
 
   await ensureSmsSchedulerStarted();
+  await ensureDeviceInfoSchedulerStarted();
 }
 
 // This remains the existing flow/alert scheduler stop operation. SMS has its own independent lifecycle.
@@ -141,6 +193,7 @@ export async function ensureSchedulerStarted() {
   }
 
   await ensureSmsSchedulerStarted();
+  await ensureDeviceInfoSchedulerStarted();
 }
 
 export async function restartSmsScheduler(): Promise<SmsSyncStatus> {
@@ -178,11 +231,93 @@ async function ensureSmsSchedulerStarted() {
   }
 }
 
+export async function restartDeviceInfoScheduler(): Promise<DeviceInfoSyncStatus> {
+  initializeDatabase();
+  stopDeviceInfoScheduler();
+
+  const status = getDeviceInfoSyncStatus();
+  if (!status.enabled) {
+    console.log('Device info sync scheduler is disabled');
+    return status;
+  }
+
+  deviceInfoSyncTask = setInterval(() => {
+    void runScheduledDeviceInfoSync();
+  }, status.interval * 60 * 1000);
+
+  console.log(`Device info sync scheduler started with interval: ${status.interval} minutes`);
+  void runScheduledDeviceInfoSync();
+  return getDeviceInfoSyncStatus();
+}
+
+function stopDeviceInfoScheduler() {
+  if (deviceInfoSyncTask) {
+    clearInterval(deviceInfoSyncTask);
+    deviceInfoSyncTask = null;
+  }
+}
+
+async function ensureDeviceInfoSchedulerStarted() {
+  const status = getDeviceInfoSyncStatus();
+  if (status.enabled && !status.running) {
+    await restartDeviceInfoScheduler();
+  } else if (!status.enabled && status.running) {
+    stopDeviceInfoScheduler();
+  }
+}
+
 async function runScheduledSmsSync() {
   try {
     await syncSmsMessages();
   } catch (error) {
     console.error('Failed to sync SMS messages:', error);
+  }
+}
+
+async function runScheduledDeviceInfoSync() {
+  try {
+    await syncDeviceInfo('scheduler');
+  } catch (error) {
+    console.error('Failed to sync device info:', error);
+  }
+}
+
+function getDeviceInfoSyncErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : '设备信息同步失败';
+}
+
+export async function syncDeviceInfo(
+  source: 'scheduler' | 'manual' = 'scheduler',
+): Promise<DeviceInfoCollectionResult> {
+  if (deviceInfoSyncPromise) return deviceInfoSyncPromise;
+
+  const task = performDeviceInfoSync(source);
+  deviceInfoSyncPromise = task;
+  try {
+    return await task;
+  } finally {
+    if (deviceInfoSyncPromise === task) deviceInfoSyncPromise = null;
+  }
+}
+
+async function performDeviceInfoSync(
+  source: 'scheduler' | 'manual',
+): Promise<DeviceInfoCollectionResult> {
+  try {
+    initializeDatabase();
+    const result = await collectDeviceInfo(source);
+    if (result.success) {
+      updateDeviceInfoSyncMetadata(result.collectedAt || new Date().toISOString(), '');
+      console.log(
+        `Device info sync completed${result.deviceName ? `: ${result.deviceName}` : ''}`,
+      );
+    } else {
+      updateDeviceInfoSyncMetadata(null, result.error || '设备信息同步失败');
+    }
+    return result;
+  } catch (error) {
+    updateDeviceInfoSyncMetadata(null, getDeviceInfoSyncErrorMessage(error));
+    throw error;
   }
 }
 

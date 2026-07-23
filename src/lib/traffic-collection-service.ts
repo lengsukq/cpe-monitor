@@ -177,7 +177,7 @@ export async function collectTrafficData(
       const cleanup = cleanupHistoricalData();
       if (!cleanup.skipped) {
         console.log(
-          `Historical cleanup: traffic=${cleanup.trafficDeleted}, devices=${cleanup.devicesDeleted}, runs=${cleanup.runsDeleted}`,
+          `Historical cleanup: traffic=${cleanup.trafficDeleted}, devices=${cleanup.devicesDeleted}, deviceSnapshots=${cleanup.deviceSnapshotsDeleted}, runs=${cleanup.runsDeleted}`,
         );
       }
     } catch (cleanupError) {
