@@ -2,23 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
-  Bell,
   FileText,
   LayoutDashboard,
   LogOut,
-  Menu,
   MessageSquareText,
+  Bell,
   Palette,
   RadioTower,
   Settings,
   Smartphone,
-  X,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useDismissable } from '@/hooks/useDismissable';
 import { THEME_PRESETS } from '@/lib/theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -35,73 +34,25 @@ export function TopNav() {
   const pathname = usePathname();
   const reduce = useReducedMotion();
   const { hue, setHue } = useThemeColor();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const menuRef = useRef<HTMLElement | null>(null);
-  const toggleRef = useRef<HTMLButtonElement | null>(null);
   const paletteRef = useRef<HTMLDivElement | null>(null);
   const paletteBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setMenuOpen(false);
-    }
-
-    function handlePointerDown(event: MouseEvent | TouchEvent) {
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target) || toggleRef.current?.contains(target)) return;
-      setMenuOpen(false);
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('touchstart', handlePointerDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('touchstart', handlePointerDown);
-    };
-  }, [menuOpen]);
-
-  useEffect(() => {
-    if (!paletteOpen) return;
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setPaletteOpen(false);
-    }
-    function handlePointerDown(event: MouseEvent | TouchEvent) {
-      const target = event.target as Node;
-      if (paletteRef.current?.contains(target) || paletteBtnRef.current?.contains(target)) return;
-      setPaletteOpen(false);
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('touchstart', handlePointerDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('touchstart', handlePointerDown);
-    };
-  }, [paletteOpen]);
+  useDismissable(paletteOpen, setPaletteOpen, [paletteRef, paletteBtnRef]);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 px-3 pt-[max(.75rem,env(safe-area-inset-top))] sm:px-5 lg:px-7">
-      <div className="glass relative mx-auto flex h-[76px] max-w-screen-2xl items-center justify-between rounded-3xl px-3 shadow-card sm:px-5">
+    <header className="fixed inset-x-0 top-0 z-50 px-3 pt-[max(.5rem,env(safe-area-inset-top))] sm:px-5 lg:px-7 lg:pt-[max(.75rem,env(safe-area-inset-top))]">
+      <div className="glass relative mx-auto flex h-14 max-w-screen-2xl items-center justify-between rounded-2xl px-3 shadow-card sm:px-5 lg:h-[76px] lg:rounded-3xl">
         <Link
           href="/dashboard"
-          className="group flex min-w-0 items-center gap-3 rounded-2xl pr-2 transition-opacity hover:opacity-80"
-          onClick={() => setMenuOpen(false)}
+          className="group flex min-w-0 items-center gap-2.5 rounded-2xl pr-2 transition-opacity hover:opacity-80 lg:gap-3"
         >
-          <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-2xl bg-brand text-primary-foreground shadow-lg shadow-brand/20 transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-105">
-            <RadioTower className="h-5 w-5" aria-hidden />
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand text-primary-foreground shadow-lg shadow-brand/20 transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-105 lg:size-11 lg:rounded-2xl">
+            <RadioTower className="h-4 w-4 lg:h-5 lg:w-5" aria-hidden />
           </span>
-          <span className="hidden min-w-0 sm:block">
-            <span className="block text-lg font-extrabold tracking-tight">CPEye</span>
-            <span className="block text-[10px] font-semibold uppercase tracking-[.18em] text-muted-foreground">Network Console</span>
+          <span className="min-w-0">
+            <span className="block text-base font-extrabold tracking-tight lg:text-lg">CPEye</span>
+            <span className="hidden text-[10px] font-semibold uppercase tracking-[.18em] text-muted-foreground lg:block">Network Console</span>
           </span>
         </Link>
 
@@ -205,71 +156,7 @@ export function TopNav() {
           >
             <LogOut className="h-4 w-4" aria-hidden />
           </Link>
-          <button
-            ref={toggleRef}
-            type="button"
-            className="inline-flex size-10 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
-            aria-label={menuOpen ? '关闭导航菜单' : '打开导航菜单'}
-            aria-expanded={menuOpen}
-            aria-controls="mobile-navigation"
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
         </div>
-
-        <AnimatePresence>
-          {menuOpen ? (
-            <motion.nav
-              ref={menuRef}
-              id="mobile-navigation"
-              initial={reduce ? undefined : { opacity: 0, y: -12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={reduce ? undefined : { opacity: 0, y: -10, scale: 0.98 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-              className="absolute inset-x-0 top-[calc(100%+.65rem)] origin-top rounded-3xl border border-white/80 bg-card p-3 shadow-2xl dark:border-border lg:hidden"
-              aria-label="移动导航"
-            >
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {navItems.map((item, index) => {
-                  const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-                  const Icon = item.icon;
-                  return (
-                    <motion.div
-                      key={item.href}
-                      initial={reduce ? undefined : { opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.03 + index * 0.035, duration: 0.22 }}
-                    >
-                      <Link
-                        href={item.href}
-                        onClick={() => setMenuOpen(false)}
-                        className={cn(
-                          'flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition-colors',
-                          isActive ? 'bg-foreground text-background' : 'bg-muted/45 text-foreground hover:bg-muted',
-                        )}
-                      >
-                        <span className={cn('inline-flex size-9 items-center justify-center rounded-xl', isActive ? 'bg-background/15' : item.tone)}>
-                          <Icon className="h-4 w-4" aria-hidden />
-                        </span>
-                        <span>{item.label}</span>
-                      </Link>
-                    </motion.div>
-                  );
-                })}
-                <Link
-                  href="/api/auth/logout"
-                  className="flex items-center gap-3 rounded-2xl bg-danger/10 px-3 py-3 text-sm font-semibold text-danger sm:hidden"
-                >
-                  <span className="inline-flex size-9 items-center justify-center rounded-xl bg-danger/10">
-                    <LogOut className="h-4 w-4" />
-                  </span>
-                  退出登录
-                </Link>
-              </div>
-            </motion.nav>
-          ) : null}
-        </AnimatePresence>
       </div>
     </header>
   );

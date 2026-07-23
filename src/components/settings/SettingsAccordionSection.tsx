@@ -52,17 +52,17 @@ export function SettingsAccordionSection({
         className,
       )}
     >
-      <div className="flex flex-col gap-4 border-b border-border/60 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+      <div className="flex flex-col gap-2.5 border-b border-border/60 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand/10 text-brand sm:h-8 sm:w-8 sm:rounded-xl">
               {icon}
             </span>
             {eyebrow}
           </p>
-          <h3 className="mt-2 text-lg font-semibold tracking-tight">{title}</h3>
+          <h3 className="mt-1 text-sm font-semibold tracking-tight sm:mt-2 sm:text-lg">{title}</h3>
           {description ? (
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+            <p className="mt-0.5 hidden text-xs leading-5 text-muted-foreground sm:mt-1 sm:block">{description}</p>
           ) : null}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -107,8 +107,8 @@ export function SettingsAccordionSection({
             transition={reduce ? { duration: 0 } : spring}
             className="overflow-hidden"
           >
-            <CardContent className="px-5 py-4 sm:px-6">
-              <div className="flex flex-wrap gap-x-5 gap-y-1">
+            <CardContent className="px-4 py-3 sm:px-6 sm:py-4">
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 sm:gap-x-5 sm:gap-y-1">
                 {summary.map((row) => (
                   <div key={row.label} className="text-xs text-muted-foreground">
                     <span className="font-medium text-foreground">{row.label}:</span>{' '}
@@ -127,7 +127,7 @@ export function SettingsAccordionSection({
             transition={reduce ? { duration: 0 } : spring}
             className="overflow-hidden"
           >
-            <CardContent id={`${id}-panel`} className="space-y-4 px-5 py-5 sm:px-6">
+            <CardContent id={`${id}-panel`} className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
               {children}
             </CardContent>
           </motion.div>

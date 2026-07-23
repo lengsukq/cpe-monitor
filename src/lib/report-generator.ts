@@ -48,53 +48,35 @@ function getLocalHour(timestamp: string): number {
   return getAppHour(timestamp) ?? 0;
 }
 
-export async function generateDailyReport(): Promise<DailyReport> {
-  const now = new Date();
-  const { dateKey: todayStr, start: today, end: tomorrow } = getAppDayRange(now);
-  const todayIso = toSqliteTimestamp(today);
-  const tomorrowIso = toSqliteTimestamp(tomorrow);
+interface TrafficSummary {
+  totalUpload: number;
+  totalDownload: number;
+  peakHour: number | null;
+  peakTrafficBytes: number;
+  networkTypes: string[];
+  bands: string[];
+}
 
-  const todayTraffic = db.prepare(
-    `SELECT
-       timestamp,
-       upload_bytes,
-       download_bytes,
-       delta_upload_bytes,
-       delta_download_bytes,
-       upload_bps,
-       download_bps,
-       connected_devices,
-       signal_strength,
-       network_type,
-       band,
-       rsrp,
-       rsrq,
-       sinr,
-       rssi
-     FROM traffic_data
-     WHERE timestamp >= ? AND timestamp < ?
-     ORDER BY timestamp ASC`,
-  ).all(todayIso, tomorrowIso) as TrafficReportRow[];
-
+function computeTrafficSummary(rows: TrafficReportRow[]): TrafficSummary {
   let totalUpload = 0;
   let totalDownload = 0;
-  let previousTraffic: TrafficReportRow | undefined;
+  let previousRow: TrafficReportRow | undefined;
   const hourlyTraffic: Record<number, number> = {};
   const networkTypes = new Set<string>();
   const bands = new Set<string>();
 
-  for (const row of todayTraffic) {
+  for (const row of rows) {
     const uploadDelta = row.delta_upload_bytes
-      ?? computeCounterDelta(row.upload_bytes, previousTraffic?.upload_bytes);
+      ?? computeCounterDelta(row.upload_bytes, previousRow?.upload_bytes);
     const downloadDelta = row.delta_download_bytes
-      ?? computeCounterDelta(row.download_bytes, previousTraffic?.download_bytes);
+      ?? computeCounterDelta(row.download_bytes, previousRow?.download_bytes);
     totalUpload += uploadDelta;
     totalDownload += downloadDelta;
     const hour = getLocalHour(row.timestamp);
     hourlyTraffic[hour] = (hourlyTraffic[hour] || 0) + uploadDelta + downloadDelta;
     if (row.network_type?.trim()) networkTypes.add(row.network_type.trim());
     if (row.band?.trim()) bands.add(row.band.trim());
-    previousTraffic = row;
+    previousRow = row;
   }
 
   let peakHour: number | null = null;
@@ -106,26 +88,23 @@ export async function generateDailyReport(): Promise<DailyReport> {
     }
   }
 
-  const todayDevices = db.prepare(
-    `SELECT
-       timestamp,
-       device_name,
-       device_ip,
-       device_mac,
-       upload_bytes,
-       download_bytes,
-       delta_upload_bytes,
-       delta_download_bytes
-     FROM device_data
-     WHERE timestamp >= ? AND timestamp < ?
-     ORDER BY device_mac, device_ip, timestamp ASC`,
-  ).all(todayIso, tomorrowIso) as DeviceReportRow[];
+  return {
+    totalUpload,
+    totalDownload,
+    peakHour,
+    peakTrafficBytes,
+    networkTypes: Array.from(networkTypes),
+    bands: Array.from(bands),
+  };
+}
 
+function computeDeviceRankings(rows: DeviceReportRow[]): DeviceRanking[] {
   const deviceMap = new Map<string, DeviceRanking & {
     previousUpload: number | null;
     previousDownload: number | null;
   }>();
-  for (const row of todayDevices) {
+
+  for (const row of rows) {
     const key = row.device_mac || row.device_ip || `unknown-${row.device_name || 'device'}`;
     const current = deviceMap.get(key) || {
       name: row.device_name || '未知设备',
@@ -152,17 +131,57 @@ export async function generateDailyReport(): Promise<DailyReport> {
     deviceMap.set(key, current);
   }
 
-  const topDevices = Array.from(deviceMap.values())
-    .map((device) => ({
-      name: device.name,
-      ip: device.ip,
-      mac: device.mac,
-      uploadBytes: device.uploadBytes,
-      downloadBytes: device.downloadBytes,
-      totalBytes: device.totalBytes,
+  return Array.from(deviceMap.values())
+    .map(({ name, ip, mac, uploadBytes, downloadBytes, totalBytes }) => ({
+      name, ip, mac, uploadBytes, downloadBytes, totalBytes,
     }))
     .sort((left, right) => right.totalBytes - left.totalBytes)
     .slice(0, 10);
+}
+
+function computeNetworkQuality(
+  sampleCount: number,
+  qualitySignal: number | null,
+  samplingRatio: number,
+): string {
+  if (sampleCount < 3 || qualitySignal === null) return '数据不足';
+  if (qualitySignal >= -80 && samplingRatio >= 0.7) return '优秀';
+  if (qualitySignal >= -95 && samplingRatio >= 0.5) return '良好';
+  if (qualitySignal >= -105 && samplingRatio >= 0.3) return '一般';
+  return '差';
+}
+
+export async function generateDailyReport(): Promise<DailyReport> {
+  const now = new Date();
+  const { dateKey: todayStr, start: today, end: tomorrow } = getAppDayRange(now);
+  const todayIso = toSqliteTimestamp(today);
+  const tomorrowIso = toSqliteTimestamp(tomorrow);
+
+  const todayTraffic = db.prepare(
+    `SELECT
+       timestamp, upload_bytes, download_bytes,
+       delta_upload_bytes, delta_download_bytes,
+       upload_bps, download_bps,
+       connected_devices, signal_strength,
+       network_type, band, rsrp, rsrq, sinr, rssi
+     FROM traffic_data
+     WHERE timestamp >= ? AND timestamp < ?
+     ORDER BY timestamp ASC`,
+  ).all(todayIso, tomorrowIso) as TrafficReportRow[];
+
+  const trafficSummary = computeTrafficSummary(todayTraffic);
+
+  const todayDevices = db.prepare(
+    `SELECT
+       timestamp, device_name, device_ip, device_mac,
+       upload_bytes, download_bytes,
+       delta_upload_bytes, delta_download_bytes
+     FROM device_data
+     WHERE timestamp >= ? AND timestamp < ?
+     ORDER BY device_mac, device_ip, timestamp ASC`,
+  ).all(todayIso, tomorrowIso) as DeviceReportRow[];
+
+  const topDevices = computeDeviceRankings(todayDevices);
 
   const intervalSetting = db.prepare(
     "SELECT value FROM system_settings WHERE key = 'scheduler_interval'",
@@ -200,14 +219,7 @@ export async function generateDailyReport(): Promise<DailyReport> {
   const avgSinr = average(todayTraffic.map((row) => row.sinr));
   const avgRssi = average(todayTraffic.map((row) => row.rssi));
   const qualitySignal = avgRsrp ?? avgSignalValue;
-
-  let networkQuality = '数据不足';
-  if (todayTraffic.length >= 3 && qualitySignal !== null) {
-    if (qualitySignal >= -80 && samplingRatio >= 0.7) networkQuality = '优秀';
-    else if (qualitySignal >= -95 && samplingRatio >= 0.5) networkQuality = '良好';
-    else if (qualitySignal >= -105 && samplingRatio >= 0.3) networkQuality = '一般';
-    else networkQuality = '差';
-  }
+  const networkQuality = computeNetworkQuality(todayTraffic.length, qualitySignal, samplingRatio);
 
   const connectedValues = todayTraffic
     .map((row) => row.connected_devices)
@@ -216,9 +228,9 @@ export async function generateDailyReport(): Promise<DailyReport> {
   return {
     id: 0,
     reportDate: todayStr,
-    totalUpload,
-    totalDownload,
-    peakHour,
+    totalUpload: trafficSummary.totalUpload,
+    totalDownload: trafficSummary.totalDownload,
+    peakHour: trafficSummary.peakHour,
     topDevices,
     avgSignal: avgSignalValue === null ? null : Math.round(avgSignalValue),
     uptimePercent,
@@ -230,7 +242,7 @@ export async function generateDailyReport(): Promise<DailyReport> {
     successfulCollections: countByStatus.success || 0,
     failedCollections: countByStatus.failed || 0,
     alertCount: Number(alertCountRow?.count || 0),
-    peakTrafficBytes,
+    peakTrafficBytes: trafficSummary.peakTrafficBytes,
     peakDownloadBps: Math.max(0, ...todayTraffic.map((row) => row.download_bps || 0)),
     peakUploadBps: Math.max(0, ...todayTraffic.map((row) => row.upload_bps || 0)),
     averageDevices: connectedValues.length > 0
@@ -241,8 +253,8 @@ export async function generateDailyReport(): Promise<DailyReport> {
     avgRsrq,
     avgSinr,
     avgRssi,
-    networkTypes: Array.from(networkTypes),
-    bands: Array.from(bands),
+    networkTypes: trafficSummary.networkTypes,
+    bands: trafficSummary.bands,
     generatedAt: now.toISOString(),
   };
 }

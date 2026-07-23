@@ -31,20 +31,20 @@ export default function NetworkHistoryGrid({ data }: NetworkHistoryGridProps) {
   ));
 
   return (
-    <div className="fluid-card-grid gap-5 [--fluid-card-min:26rem]">
+    <div className="grid gap-4 lg:grid-cols-2">
       <Card className="card-hover">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <span className="metric-icon size-9 rounded-xl text-warning"><RadioTower className="h-4 w-4" /></span>
             信号质量趋势
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
+          <p className="hidden text-sm text-muted-foreground sm:block">
             同时观察覆盖强度与链路质量，缺失采样点不会自动补零。
           </p>
         </CardHeader>
         <CardContent>
           {hasSignalData ? (
-            <div className="h-64 sm:h-72">
+            <div className="h-44 sm:h-64 lg:h-72">
               <SignalHistoryChart data={data} />
             </div>
           ) : (
@@ -59,13 +59,13 @@ export default function NetworkHistoryGrid({ data }: NetworkHistoryGridProps) {
             <span className="metric-icon size-9 rounded-xl text-success"><UsersRound className="h-4 w-4" /></span>
             在线设备趋势
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
+          <p className="hidden text-sm text-muted-foreground sm:block">
             使用阶梯曲线展示采集时刻的在线终端数量变化。
           </p>
         </CardHeader>
         <CardContent>
           {hasDeviceData ? (
-            <div className="h-64 sm:h-72">
+            <div className="h-44 sm:h-64 lg:h-72">
               <DeviceCountHistoryChart data={data} />
             </div>
           ) : (

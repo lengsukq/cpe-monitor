@@ -36,9 +36,6 @@ export function formatBytesPerSecond(bytesPerSecond: number): string {
   return formatBitsPerSecond(Math.max(0, bytesPerSecond) * 8);
 }
 
-/** @deprecated Prefer formatBytesPerSecond or formatBitsPerSecond to make units explicit. */
-export const formatRate = formatBytesPerSecond;
-
 export function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}秒`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}分钟`;

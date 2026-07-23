@@ -36,7 +36,7 @@ export function PageHeader({
         ) : null}
         <h1
           className={cn(
-            'flex min-w-0 flex-wrap items-center gap-2.5 text-2xl font-bold tracking-tight sm:text-3xl',
+            'flex min-w-0 flex-wrap items-center gap-2.5 text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl',
             eyebrow ? 'mt-2' : '',
           )}
         >
@@ -44,7 +44,7 @@ export function PageHeader({
           {title}
         </h1>
         {description ? (
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+          <p className="mt-2 hidden max-w-3xl text-sm leading-6 text-muted-foreground sm:block">
             {description}
           </p>
         ) : null}

@@ -79,6 +79,42 @@ function getConsecutiveCollectionFailures(): number {
   return failures;
 }
 
+const TRAFFIC_COLUMNS = `
+  collection_id,
+  delta_upload_bytes,
+  delta_download_bytes,
+  upload_bps,
+  download_bps,
+  connected_devices,
+  signal_strength,
+  rsrp,
+  rsrq,
+  sinr,
+  rssi,
+  network_type,
+  band,
+  cell_id,
+  pci
+`;
+
+function getLatestTrafficRow(collectionId?: number): AlertTrafficRow | undefined {
+  if (collectionId !== undefined) {
+    return db.prepare(
+      `SELECT ${TRAFFIC_COLUMNS}
+       FROM traffic_data
+       WHERE collection_id = ?
+       ORDER BY id DESC
+       LIMIT 1`,
+    ).get(collectionId) as AlertTrafficRow | undefined;
+  }
+  return db.prepare(
+    `SELECT ${TRAFFIC_COLUMNS}
+     FROM traffic_data
+     ORDER BY id DESC
+     LIMIT 1`,
+  ).get() as AlertTrafficRow | undefined;
+}
+
 function evaluateRule(rule: AlertRuleRow): AlertMetricEvaluation | null {
   if (!isAlertMetricType(rule.metric_type)) return null;
 
@@ -106,48 +142,7 @@ function evaluateRule(rule: AlertRuleRow): AlertMetricEvaluation | null {
     ).get() as { id: number; status: string } | undefined;
     if (latestRun && latestRun.status !== 'success') return null;
 
-    const latestTraffic = latestRun ? db.prepare(
-      `SELECT
-         collection_id,
-         delta_upload_bytes,
-         delta_download_bytes,
-         upload_bps,
-         download_bps,
-         connected_devices,
-         signal_strength,
-         rsrp,
-         rsrq,
-         sinr,
-         rssi,
-         network_type,
-         band,
-         cell_id,
-         pci
-       FROM traffic_data
-       WHERE collection_id = ?
-       ORDER BY id DESC
-       LIMIT 1`,
-    ).get(latestRun.id) as AlertTrafficRow | undefined : db.prepare(
-      `SELECT
-         collection_id,
-         delta_upload_bytes,
-         delta_download_bytes,
-         upload_bps,
-         download_bps,
-         connected_devices,
-         signal_strength,
-         rsrp,
-         rsrq,
-         sinr,
-         rssi,
-         network_type,
-         band,
-         cell_id,
-         pci
-       FROM traffic_data
-       ORDER BY id DESC
-       LIMIT 1`,
-    ).get() as AlertTrafficRow | undefined;
+    const latestTraffic = getLatestTrafficRow(latestRun?.id);
     if (!latestTraffic) return null;
 
     collectionId = latestTraffic.collection_id;

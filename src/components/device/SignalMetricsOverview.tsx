@@ -142,12 +142,12 @@ export default function SignalMetricsOverview({ cell }: SignalMetricsOverviewPro
           <RadioTower className="h-5 w-5 text-primary" />
           射频质量概览
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
+        <p className="hidden text-sm text-muted-foreground sm:block">
           数值与质量等级同时展示，便于快速判断覆盖强度、干扰和链路质量。
         </p>
       </CardHeader>
       <CardContent>
-        <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem]">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {metrics.map((metric, index) => {
             const value = resolveMetricValue(cell, metric.key);
             const quality = getQuality(value, metric.thresholds);

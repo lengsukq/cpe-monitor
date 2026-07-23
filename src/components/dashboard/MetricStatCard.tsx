@@ -35,26 +35,26 @@ export default function MetricStatCard({
   const reduce = useReducedMotion();
 
   const card = (
-    <Card className={cn('h-full min-h-[190px] min-w-0 shadow-card transition-[border-color] duration-200 hover:border-brand/20', href && 'cursor-pointer')}>
+    <Card className={cn('h-full min-h-[120px] min-w-0 shadow-card transition-[border-color] duration-200 hover:border-brand/20 sm:min-h-[160px] lg:min-h-[190px]', href && 'cursor-pointer')}>
       <CardContent className="flex h-full flex-col pt-0">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-2 sm:gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-muted-foreground">{label}</p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <p className={cn('text-2xl font-extrabold tracking-tight sm:text-3xl', color)}>{value}</p>
+            <p className="text-xs font-semibold text-muted-foreground sm:text-sm">{label}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 sm:mt-4">
+              <p className={cn('text-lg font-extrabold tracking-tight sm:text-2xl lg:text-3xl', color)}>{value}</p>
               {badge}
             </div>
-            {hint ? <p className="mt-2 text-xs text-muted-foreground">{hint}</p> : null}
+            {hint ? <p className="mt-2 hidden text-xs text-muted-foreground sm:block">{hint}</p> : null}
           </div>
           <span className={cn('metric-icon shrink-0', color)}>
             {icon}
           </span>
         </div>
-        <div className={cn('mt-auto pt-4', color)}>
+        <div className={cn('mt-auto hidden pt-2 sm:block sm:pt-4', color)}>
           <MiniSparkline points={points} />
         </div>
         {href ? (
-          <div className="mt-1 flex items-center justify-end gap-1 text-[11px] font-semibold text-muted-foreground">
+          <div className="mt-1 hidden items-center justify-end gap-1 text-[11px] font-semibold text-muted-foreground sm:flex">
             查看详情 <ArrowUpRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </div>
         ) : null}

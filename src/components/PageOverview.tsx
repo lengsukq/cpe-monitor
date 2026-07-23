@@ -43,7 +43,7 @@ export function PageOverview({
       actions={actions}
       stats={
         items.length > 0 ? (
-          <div className="fluid-card-grid gap-2 [--fluid-card-min:12.5rem] sm:gap-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
             {items.map((item) => (
               <HeroStatTile
                 key={item.label}

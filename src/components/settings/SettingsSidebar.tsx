@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SettingsNav } from '@/components/settings/SettingsNav';
 import { getUpdateStateLabel } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import type { SettingsSectionId, UpdateStatusState } from '@/features/settings/types';
 
 interface SettingsSidebarProps {
@@ -23,6 +24,7 @@ interface SettingsSidebarProps {
   onOpenSection: (section: SettingsSectionId) => void;
   onRefreshUpdate: () => void;
   onCheckUpdate: () => void;
+  className?: string;
 }
 
 export function SettingsSidebar({
@@ -31,9 +33,10 @@ export function SettingsSidebar({
   onOpenSection,
   onRefreshUpdate,
   onCheckUpdate,
+  className,
 }: SettingsSidebarProps) {
   return (
-    <aside className="space-y-4 lg:sticky lg:top-28">
+    <aside className={cn('space-y-4 lg:sticky lg:top-28', className)}>
       <Card className="overflow-hidden">
         <CardContent className="fluid-card-grid gap-1 p-2 [--fluid-card-min:9rem] lg:block">
           <p className="col-span-full px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">

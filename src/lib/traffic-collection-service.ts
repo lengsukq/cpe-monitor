@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db, type SqliteStatement } from './db';
 import { getOrCreateCpeClient } from './cpe-client';
 import { isCpeConfigured } from './settings-store';
 import { cleanupHistoricalData } from './data-retention';
@@ -7,10 +7,8 @@ import {
   bitsPerSecondFromByteDelta,
   computeCounterDelta,
 } from './traffic-units';
-
-function getCollectionErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '流量采集失败';
-}
+import { getErrorMessage } from './error-utils';
+import type { CpeDevice } from '@/types/cpe';
 
 interface PreviousTrafficSample {
   timestamp: string;
@@ -22,6 +20,54 @@ interface PreviousDeviceSample {
   timestamp: string;
   upload_bytes: number | null;
   download_bytes: number | null;
+}
+
+interface DevicePersistContext {
+  insertDevice: SqliteStatement;
+  findPreviousDevice: SqliteStatement;
+  collectionId: number;
+  collectedAtText: string;
+  collectedAt: Date;
+}
+
+function persistDeviceRows(devices: CpeDevice[], ctx: DevicePersistContext): void {
+  for (const device of devices) {
+    const previousDevice = device.mac
+      ? ctx.findPreviousDevice.get(device.mac) as PreviousDeviceSample | undefined
+      : undefined;
+    const previousDeviceTime = parseTimestampMs(previousDevice?.timestamp);
+    const deviceElapsedSeconds = previousDeviceTime === null
+      ? 0
+      : Math.max(0, (ctx.collectedAt.getTime() - previousDeviceTime) / 1000);
+    const deviceDeltaUpload = computeCounterDelta(
+      device.uploadBytes,
+      previousDevice?.upload_bytes,
+    );
+    const deviceDeltaDownload = computeCounterDelta(
+      device.downloadBytes,
+      previousDevice?.download_bytes,
+    );
+
+    ctx.insertDevice.run(
+      ctx.collectionId,
+      ctx.collectedAtText,
+      device.name,
+      device.ip,
+      device.mac,
+      device.uploadBytes,
+      device.downloadBytes,
+      deviceDeltaUpload,
+      deviceDeltaDownload,
+      bitsPerSecondFromByteDelta(deviceDeltaUpload, deviceElapsedSeconds),
+      bitsPerSecondFromByteDelta(deviceDeltaDownload, deviceElapsedSeconds),
+      device.onlineDuration,
+      device.online ? 1 : 0,
+      device.interfaceType,
+      device.frequency,
+      device.rssi,
+      JSON.stringify(device.raw),
+    );
+  }
 }
 
 export interface TrafficCollectionResult {
@@ -127,43 +173,13 @@ export async function collectTrafficData(
         trafficInfo.rssi,
       );
 
-      for (const device of trafficInfo.devices) {
-        const previousDevice = device.mac
-          ? findPreviousDevice.get(device.mac) as PreviousDeviceSample | undefined
-          : undefined;
-        const previousDeviceTime = parseTimestampMs(previousDevice?.timestamp);
-        const deviceElapsedSeconds = previousDeviceTime === null
-          ? 0
-          : Math.max(0, (collectedAt.getTime() - previousDeviceTime) / 1000);
-        const deviceDeltaUpload = computeCounterDelta(
-          device.uploadBytes,
-          previousDevice?.upload_bytes,
-        );
-        const deviceDeltaDownload = computeCounterDelta(
-          device.downloadBytes,
-          previousDevice?.download_bytes,
-        );
-
-        insertDevice.run(
-          collectionId,
-          collectedAtText,
-          device.name,
-          device.ip,
-          device.mac,
-          device.uploadBytes,
-          device.downloadBytes,
-          deviceDeltaUpload,
-          deviceDeltaDownload,
-          bitsPerSecondFromByteDelta(deviceDeltaUpload, deviceElapsedSeconds),
-          bitsPerSecondFromByteDelta(deviceDeltaDownload, deviceElapsedSeconds),
-          device.onlineDuration,
-          device.online ? 1 : 0,
-          device.interfaceType,
-          device.frequency,
-          device.rssi,
-          JSON.stringify(device.raw),
-        );
-      }
+      persistDeviceRows(trafficInfo.devices, {
+        insertDevice,
+        findPreviousDevice,
+        collectionId: collectionId!,
+        collectedAtText,
+        collectedAt,
+      });
 
       db.prepare(
         `UPDATE collection_runs
@@ -191,7 +207,7 @@ export async function collectTrafficData(
       success: true,
     };
   } catch (error) {
-    const errorMessage = getCollectionErrorMessage(error);
+    const errorMessage = getErrorMessage(error, '流量采集失败');
     if (collectionId !== null) {
       try {
         db.prepare(

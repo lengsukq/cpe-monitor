@@ -27,7 +27,7 @@ export function PageShell({
 
   if (reduce) {
     return (
-      <div className={cn('space-y-5 sm:space-y-6', maxWidthClass[maxWidth], className)}>
+      <div className={cn('space-y-3 sm:space-y-5 lg:space-y-6', maxWidthClass[maxWidth], className)}>
         {children}
       </div>
     );
@@ -35,7 +35,7 @@ export function PageShell({
 
   return (
     <motion.div
-      className={cn('space-y-5 sm:space-y-6', maxWidthClass[maxWidth], className)}
+      className={cn('space-y-3 sm:space-y-5 lg:space-y-6', maxWidthClass[maxWidth], className)}
       variants={staggerContainer}
       initial="hidden"
       animate="visible"

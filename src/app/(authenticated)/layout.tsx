@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { TopNav } from '@/components/TopNav';
+import { BottomTabBar } from '@/components/BottomTabBar';
 import { PageTransition } from '@/components/motion';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -52,7 +53,7 @@ export default function AuthenticatedLayout({
             </div>
           </div>
         </div>
-        <main className="mx-auto max-w-screen-2xl px-3 pb-10 pt-28 sm:px-5 lg:px-7">
+        <main className="mx-auto max-w-screen-2xl px-3 pb-10 pt-20 sm:px-5 lg:px-7 lg:pt-28">
           <div className="space-y-6">
             <div className="space-y-3">
               <Skeleton className="h-4 w-28 rounded-lg" />
@@ -77,13 +78,14 @@ export default function AuthenticatedLayout({
   return (
     <div className="min-h-screen bg-background">
       <TopNav />
-      <main className="mx-auto max-w-screen-2xl px-3 pt-28 sm:px-5 lg:px-7 pb-[max(2.5rem,env(safe-area-inset-bottom))]">
+      <main className="mx-auto max-w-screen-2xl px-3 pt-20 sm:px-5 lg:px-7 lg:pt-28 pb-20 lg:pb-[max(2.5rem,env(safe-area-inset-bottom))]">
         <AnimatePresence mode="wait" initial={false}>
           <PageTransition key={pathname}>
             {children}
           </PageTransition>
         </AnimatePresence>
       </main>
+      <BottomTabBar />
     </div>
   );
 }

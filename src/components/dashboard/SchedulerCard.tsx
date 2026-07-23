@@ -21,14 +21,14 @@ export default function SchedulerCard({
   onIntervalChange,
 }: SchedulerCardProps) {
   return (
-    <Card className="card-hover">
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+    <Card className="card-hover py-4 sm:py-5">
+      <CardHeader className="flex flex-col gap-2 px-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6">
         <div>
           <CardTitle className="flex items-center gap-2">
             <Clock3 className="h-4 w-4 text-warning" />
             定时监控
           </CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">采集流量、设备数和信号，并触发告警</p>
+          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">采集流量、设备数和信号，并触发告警</p>
         </div>
         <Switch
           checked={enabled}
@@ -37,7 +37,7 @@ export default function SchedulerCard({
           aria-label="启用定时监控"
         />
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 px-4 sm:space-y-4 sm:px-6">
         <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-medium">采集频率</p>
@@ -49,7 +49,7 @@ export default function SchedulerCard({
             value={String(interval || 60)}
             onValueChange={(value) => onIntervalChange(Number(value))}
           >
-            <SelectTrigger className="w-full sm:w-auto sm:min-w-28"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-auto sm:min-w-28"><SelectValue>{(value) => value ? `每 ${value} 分钟` : ''}</SelectValue></SelectTrigger>
             <SelectContent>
               {[5, 15, 30, 60].map((minutes) => (
                 <SelectItem key={minutes} value={String(minutes)}>每 {minutes} 分钟</SelectItem>

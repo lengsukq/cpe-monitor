@@ -129,7 +129,7 @@ export default function DashboardPage() {
         collectionHealthStatus={data.overview?.collectionHealth?.status || 'never'}
       />
 
-      <div className="fluid-card-grid gap-4 [--fluid-card-min:15rem]">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <MetricStatCard
           index={0}
           label="下载速率"
@@ -173,17 +173,17 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,.75fr)]">
+      <div className="grid gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,.75fr)]">
         <TrafficTrendCard
           timeRange={data.timeRange}
           onTimeRangeChange={data.setTimeRange}
           data={data.trafficHistory}
         />
-        <Card className="card-hover">
-          <CardHeader>
+        <Card className="card-hover py-4 sm:py-5">
+          <CardHeader className="px-4 sm:px-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <span className="metric-icon size-9 rounded-xl"><PackageOpen className="h-4 w-4" /></span>
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <span className="metric-icon size-8 rounded-xl sm:size-9"><PackageOpen className="h-4 w-4" /></span>
                 套餐用量
               </CardTitle>
               {data.startDate ? (
@@ -191,7 +191,7 @@ export default function DashboardPage() {
               ) : null}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 sm:px-6">
             {data.startDate && data.trafficStats ? (
               <DataPlanCard startDate={data.startDate} trafficStats={data.trafficStats} />
             ) : (
@@ -204,6 +204,7 @@ export default function DashboardPage() {
       <NetworkHistoryGrid data={data.trafficHistory} />
 
       <DashboardHero
+        className="hidden sm:block"
         isConnected={data.isConnected}
         source={data.overview?.source}
         connectedDevices={data.overview?.connectedDevices || 0}
@@ -217,7 +218,7 @@ export default function DashboardPage() {
         deviceName={data.deviceName}
       />
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]">
+      <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]">
         <CellSnapshotCard
           networkType={data.overview?.networkType}
           connectionStatus={data.overview?.connectionStatus}

@@ -10,7 +10,9 @@ import {
   alertMetricOptions,
   alertOperatorOptions,
   getAlertMetricHint,
+  getAlertMetricLabel,
   getAlertMetricUnit,
+  getAlertOperatorLabel,
   type AlertMetricType,
   type AlertOperator,
   type AlertRuleFormData,
@@ -47,7 +49,7 @@ export function AlertRuleDialog({
           </FieldGroup>
           <FieldGroup label="监控指标">
             <Select value={formData.metricType} onValueChange={(value) => update('metricType', (value ?? 'traffic_down') as AlertMetricType)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue>{(value) => getAlertMetricLabel(value)}</SelectValue></SelectTrigger>
               <SelectContent>
                 {alertMetricOptions.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
               </SelectContent>
@@ -56,7 +58,7 @@ export function AlertRuleDialog({
           <div className="fluid-card-grid gap-4 [--fluid-card-min:14rem]">
             <FieldGroup label="运算符">
               <Select value={formData.operator} onValueChange={(value) => update('operator', (value ?? '>') as AlertOperator)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue>{(value) => getAlertOperatorLabel(value)}</SelectValue></SelectTrigger>
                 <SelectContent>
                   {alertOperatorOptions.map((operator) => <SelectItem key={operator.value} value={operator.value}>{operator.label}</SelectItem>)}
                 </SelectContent>

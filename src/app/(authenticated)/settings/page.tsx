@@ -51,6 +51,7 @@ export default function SettingsPage() {
       />
 
       <PageOverview
+        className="hidden sm:block"
         eyebrow={<><Settings2 className="h-3.5 w-3.5" />System / readiness</>}
         title="配置就绪度"
         description="从连接、自动化、通知和数据保留四个维度检查系统是否已经可以稳定运行。"
@@ -128,6 +129,7 @@ export default function SettingsPage() {
 
       <div className="fluid-sidebar-grid gap-5">
         <SettingsSidebar
+          className="hidden lg:block"
           updateStatus={settings.updateStatus}
           checkingUpdate={settings.checkingUpdate}
           onOpenSection={settings.setOpenSection}

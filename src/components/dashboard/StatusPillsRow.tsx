@@ -31,7 +31,7 @@ export default function StatusPillsRow({
 
   return (
     <Card className="card-hover bg-gradient-to-br from-card/90 to-card/50">
-      <CardContent className="fluid-card-grid gap-2 p-3 [--fluid-card-min:13rem] sm:gap-3 sm:p-4">
+      <CardContent className="grid grid-cols-2 gap-2 p-3 sm:gap-3 sm:p-4 lg:grid-cols-4">
         <StatusPill
           icon={<Wifi className="h-4 w-4" />}
           label="蜂窝连接"

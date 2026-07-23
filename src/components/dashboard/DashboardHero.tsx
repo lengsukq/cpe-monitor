@@ -15,6 +15,7 @@ interface DashboardHeroProps {
   smsSyncLabel: string;
   smsSyncDetail: string;
   deviceName?: string;
+  className?: string;
 }
 
 export default function DashboardHero({
@@ -29,9 +30,11 @@ export default function DashboardHero({
   smsSyncLabel,
   smsSyncDetail,
   deviceName,
+  className,
 }: DashboardHeroProps) {
   return (
     <PageOverview
+      className={className}
       eyebrow={<><Gauge className="h-3.5 w-3.5" />CPE / runtime summary</>}
       title="运行摘要"
       description="把设备、网络、信号、终端和短信同步状态收拢在一处，方便快速判断当前是否需要处理。"

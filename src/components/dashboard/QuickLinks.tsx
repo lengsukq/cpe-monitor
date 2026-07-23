@@ -23,7 +23,7 @@ function QuickLink({
 
   const card = (
     <Card className="group h-full cursor-pointer py-0 shadow-card transition-[border-color] duration-200 hover:border-brand/25">
-      <CardContent className="flex min-h-20 items-center gap-4 p-4">
+      <CardContent className="flex min-h-20 items-center gap-3 p-3 sm:gap-4 sm:p-4">
         <div className="shrink-0 rounded-xl bg-muted p-3 transition-colors duration-200 group-hover:bg-primary/10 group-hover:text-primary">
           {icon}
         </div>
@@ -55,7 +55,7 @@ function QuickLink({
 
 export default function QuickLinks() {
   return (
-    <div className="fluid-card-grid gap-4 [--fluid-card-min:16rem]">
+    <div className="grid gap-3 sm:gap-4 lg:grid-cols-3">
       <QuickLink index={0} href="/device" icon={<Smartphone className="h-5 w-5" />} label="设备详情" description="查看设备信息、在线设备" />
       <QuickLink index={1} href="/alerts" icon={<Bell className="h-5 w-5" />} label="告警规则" description="管理流量告警阈值" />
       <QuickLink index={2} href="/settings" icon={<Settings className="h-5 w-5" />} label="系统设置" description="CPE 连接、通知配置" />

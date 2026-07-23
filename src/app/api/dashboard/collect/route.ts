@@ -5,9 +5,54 @@ import {
 } from '@/lib/api-route';
 import { checkAlerts, collectTrafficData } from '@/lib/scheduler';
 import { isCpeConfigured, readNotificationConfig } from '@/lib/settings-store';
-import { sendCollectionReport } from '@/lib/notifiers/email';
+import { sendCollectionReport, type CollectionReportData } from '@/lib/notifiers/email';
 import { parseTimestampMs } from '@/lib/date-time';
 import { getCollectionSnapshot } from '@/lib/repositories/collection-repository';
+
+interface CollectionContext {
+  collectionId: number | null;
+  collectionSucceeded: boolean;
+  collectionError?: string;
+  collectedDevices: number;
+  alertsTriggered: number;
+  startedAt: string;
+  snapshot: ReturnType<typeof getCollectionSnapshot>;
+}
+
+function buildCollectionReportPayload(ctx: CollectionContext): CollectionReportData {
+  const { traffic, run, devices } = ctx.snapshot;
+  const completedAt = run?.completedAt || new Date().toISOString();
+  const startedTime = new Date(ctx.startedAt).getTime();
+  const completedTime = parseTimestampMs(run?.completedAt) ?? Date.now();
+
+  return {
+    success: ctx.collectionSucceeded,
+    collectionId: ctx.collectionId,
+    source: run?.source || 'manual',
+    error: ctx.collectionSucceeded ? null : ctx.collectionError || run?.errorMessage || '采集失败',
+    collectedDevices: ctx.collectedDevices,
+    alertsTriggered: ctx.alertsTriggered,
+    trafficDelta: traffic
+      ? { uploadBytes: traffic.deltaUploadBytes, downloadBytes: traffic.deltaDownloadBytes }
+      : null,
+    cumulativeTraffic: traffic
+      ? { uploadBytes: traffic.uploadBytes || 0, downloadBytes: traffic.downloadBytes || 0 }
+      : null,
+    rates: traffic
+      ? { uploadBps: traffic.uploadBps || 0, downloadBps: traffic.downloadBps || 0 }
+      : null,
+    network: traffic
+      ? { networkType: traffic.networkType, band: traffic.band, cellId: traffic.cellId, pci: traffic.pci }
+      : null,
+    signal: traffic
+      ? { signalStrength: traffic.signalStrength, rsrp: traffic.rsrp, rsrq: traffic.rsrq, sinr: traffic.sinr, rssi: traffic.rssi }
+      : null,
+    topDevices: devices,
+    collectedAt: ctx.startedAt,
+    completedAt,
+    durationMs: Math.max(0, completedTime - startedTime),
+  };
+}
 
 export const POST = withApiHandler(async () => {
   await requireSession();
@@ -35,7 +80,6 @@ export const POST = withApiHandler(async () => {
     ? getCollectionSnapshot(collection.collectionId)
     : { traffic: null, run: null, devices: [] };
   const latestTraffic = snapshot.traffic;
-  const collectionRun = snapshot.run;
   const topDevices = snapshot.devices;
   const trafficDelta = latestTraffic
     ? { uploadBytes: latestTraffic.deltaUploadBytes, downloadBytes: latestTraffic.deltaDownloadBytes }
@@ -45,51 +89,15 @@ export const POST = withApiHandler(async () => {
   try {
     const emailConfig = readNotificationConfig('email');
     if (emailConfig) {
-      const completedAt = collectionRun?.completedAt || new Date().toISOString();
-      const startedTime = new Date(startedAt).getTime();
-      const completedTime = parseTimestampMs(collectionRun?.completedAt) ?? Date.now();
-      void sendCollectionReport(emailConfig, {
-        success: collectionSucceeded,
+      void sendCollectionReport(emailConfig, buildCollectionReportPayload({
         collectionId: collection.collectionId,
-        source: collectionRun?.source || 'manual',
-        error: collectionSucceeded ? null : collection.error || collectionRun?.errorMessage || '采集失败',
+        collectionSucceeded,
+        collectionError: collection.error,
         collectedDevices,
         alertsTriggered,
-        trafficDelta,
-        cumulativeTraffic: latestTraffic
-          ? {
-              uploadBytes: latestTraffic.uploadBytes || 0,
-              downloadBytes: latestTraffic.downloadBytes || 0,
-            }
-          : null,
-        rates: latestTraffic
-          ? {
-              uploadBps: latestTraffic.uploadBps || 0,
-              downloadBps: latestTraffic.downloadBps || 0,
-            }
-          : null,
-        network: latestTraffic
-          ? {
-              networkType: latestTraffic.networkType,
-              band: latestTraffic.band,
-              cellId: latestTraffic.cellId,
-              pci: latestTraffic.pci,
-            }
-          : null,
-        signal: latestTraffic
-          ? {
-              signalStrength: latestTraffic.signalStrength,
-              rsrp: latestTraffic.rsrp,
-              rsrq: latestTraffic.rsrq,
-              sinr: latestTraffic.sinr,
-              rssi: latestTraffic.rssi,
-            }
-          : null,
-        topDevices,
-        collectedAt: startedAt,
-        completedAt,
-        durationMs: Math.max(0, completedTime - startedTime),
-      });
+        startedAt,
+        snapshot,
+      }));
     }
   } catch (error) {
     // Email failure should not block the collection response

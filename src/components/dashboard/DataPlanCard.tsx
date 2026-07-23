@@ -38,49 +38,49 @@ export default function DataPlanCard({ startDate, trafficStats }: DataPlanCardPr
   ], [usedBytes, limitBytes, remaining, donutColor]);
 
   return (
-    <div className="fluid-card-grid min-h-[300px] items-center gap-6 [--fluid-card-min:15rem]">
-      <div className="flex justify-center">
-        <div className="w-[clamp(11rem,26vw,13rem)]">
+    <div className="flex items-center gap-4 sm:grid sm:grid-cols-[auto_1fr] sm:items-center sm:gap-6 lg:min-h-[260px]">
+      <div className="flex shrink-0 justify-center">
+        <div className="w-[7.5rem] sm:w-[clamp(10rem,22vw,13rem)]">
           <DonutChart
             segments={segments}
             centerLabel={`${percent.toFixed(1)}%`}
             centerSub="使用率"
-            height={210}
+            height={150}
             showLegend={false}
           />
         </div>
       </div>
 
-      <div className="min-w-0 space-y-5">
+      <div className="min-w-0 space-y-3 sm:space-y-5">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">已用 / 总量</p>
-          <p className="mt-2 break-words text-2xl font-extrabold tracking-tight">
+          <p className="text-xs font-medium text-muted-foreground sm:text-sm">已用 / 总量</p>
+          <p className="mt-1 break-words text-lg font-extrabold tracking-tight sm:mt-2 sm:text-2xl">
             <span className={isOver ? 'text-danger' : isWarning ? 'text-warning' : 'text-brand'}>
               {formatWithUnit(usedBytes, 'GB')}
             </span>
-            <span className="text-base font-normal text-muted-foreground"> / {formatWithUnit(limitBytes, 'GB')}</span>
+            <span className="text-sm font-normal text-muted-foreground sm:text-base"> / {formatWithUnit(limitBytes, 'GB')}</span>
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">剩余 {formatWithUnit(remaining, 'GB')}</p>
+          <p className="mt-1 text-xs text-muted-foreground sm:mt-2 sm:text-sm">剩余 {formatWithUnit(remaining, 'GB')}</p>
         </div>
 
-        <div className="fluid-card-grid gap-2 [--fluid-card-min:7.5rem]">
-          <div className="rounded-2xl bg-muted/45 p-3">
-            <p className="text-xs text-muted-foreground">日阈值</p>
-            <p className="mt-1 font-bold">{startDate.DayThreshold || 90}%</p>
+        <div className="flex flex-wrap gap-2 sm:fluid-card-grid sm:[--fluid-card-min:7.5rem]">
+          <div className="rounded-xl bg-muted/45 px-2.5 py-1.5 sm:rounded-2xl sm:p-3">
+            <p className="text-[10px] text-muted-foreground sm:text-xs">日阈值</p>
+            <p className="text-sm font-bold sm:mt-1">{startDate.DayThreshold || 90}%</p>
           </div>
-          <div className="rounded-2xl bg-muted/45 p-3">
-            <p className="text-xs text-muted-foreground">月阈值</p>
-            <p className="mt-1 font-bold">{startDate.MonthThreshold || 90}%</p>
+          <div className="rounded-xl bg-muted/45 px-2.5 py-1.5 sm:rounded-2xl sm:p-3">
+            <p className="text-[10px] text-muted-foreground sm:text-xs">月阈值</p>
+            <p className="text-sm font-bold sm:mt-1">{startDate.MonthThreshold || 90}%</p>
           </div>
-          <div className="rounded-2xl bg-muted/45 p-3">
-            <p className="text-xs text-muted-foreground">套餐</p>
-            <p className="mt-1 truncate font-bold" title={String(startDate.DataLimit || '-')}>
+          <div className="rounded-xl bg-muted/45 px-2.5 py-1.5 sm:rounded-2xl sm:p-3">
+            <p className="text-[10px] text-muted-foreground sm:text-xs">套餐</p>
+            <p className="truncate text-sm font-bold sm:mt-1" title={String(startDate.DataLimit || '-')}>
               {startDate.DataLimit || '-'}
             </p>
           </div>
         </div>
 
-        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted sm:h-2">
           <div
             className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-danger' : isWarning ? 'bg-warning' : 'bg-brand'}`}
             style={{ width: `${Math.min(percent, 100)}%` }}

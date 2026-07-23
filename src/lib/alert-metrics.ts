@@ -54,7 +54,7 @@ export const ALERT_METRIC_DEFINITIONS = {
     ],
   },
   rsrp: {
-    label: 'RSRP',
+    label: '参考信号接收功率 (RSRP)',
     unit: 'dBm',
     hint: '参考信号接收功率，数值越接近 0 越强。',
     guidance: [
@@ -64,7 +64,7 @@ export const ALERT_METRIC_DEFINITIONS = {
     ],
   },
   rsrq: {
-    label: 'RSRQ',
+    label: '参考信号接收质量 (RSRQ)',
     unit: 'dB',
     hint: '参考信号接收质量，数值越接近 0 越好。',
     guidance: [
@@ -74,7 +74,7 @@ export const ALERT_METRIC_DEFINITIONS = {
     ],
   },
   sinr: {
-    label: 'SINR',
+    label: '信噪比 (SINR)',
     unit: 'dB',
     hint: '信号与干扰噪声比，通常越高越好。',
     guidance: [
@@ -84,7 +84,7 @@ export const ALERT_METRIC_DEFINITIONS = {
     ],
   },
   rssi: {
-    label: 'RSSI',
+    label: '接收信号强度 (RSSI)',
     unit: 'dBm',
     hint: '接收信号总强度，数值越接近 0 越强。',
     guidance: [

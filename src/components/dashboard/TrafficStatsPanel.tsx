@@ -20,11 +20,11 @@ export default function TrafficStatsPanel({
   const rate = trafficStats || {};
 
   return (
-    <Card className="card-hover">
-      <CardHeader>
+    <Card className="card-hover py-4 sm:py-5">
+      <CardHeader className="px-4 sm:px-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <span className="metric-icon size-9 rounded-xl"><ChartNoAxesCombined className="h-4 w-4" /></span>
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <span className="metric-icon size-8 rounded-xl sm:size-9"><ChartNoAxesCombined className="h-4 w-4" /></span>
             流量统计
           </CardTitle>
           <div className="flex gap-1">
@@ -37,9 +37,9 @@ export default function TrafficStatsPanel({
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 sm:px-6">
         {trafficStats ? (
-          <div className="fluid-card-grid gap-3 [--fluid-card-min:14rem]">
+          <div className="grid grid-cols-2 gap-3 sm:fluid-card-grid sm:[--fluid-card-min:14rem]">
             <InfoField label="本次下载" value={formatWithUnit(parseInt(String(rate.CurrentDownload || '0'), 10), unit)} />
             <InfoField label="本次上传" value={formatWithUnit(parseInt(String(rate.CurrentUpload || '0'), 10), unit)} />
             <InfoField label="累计下载" value={formatWithUnit(parseInt(String(rate.TotalDownload || '0'), 10), unit)} />

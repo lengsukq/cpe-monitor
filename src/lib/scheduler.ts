@@ -1,136 +1,71 @@
-import cron, { ScheduledTask } from 'node-cron';
-import crypto from 'crypto';
-import { db, initializeDatabase } from './db';
-import { getOrCreateCpeClient } from './cpe-client';
+/**
+ * Scheduler — orchestration layer for traffic collection, daily reports,
+ * SMS sync, and device info sync scheduling.
+ *
+ * SMS and device-info sync logic lives in dedicated modules; this file
+ * re-exports their public API for backward compatibility and coordinates
+ * the traffic-collection cron and daily report generation.
+ */
+import cron, { type ScheduledTask } from 'node-cron';
+import { initializeDatabase } from './db';
 import { generateDailyReport } from './report-generator';
 import { formatBytes } from './format';
-import { sendDailyReport, sendSmsNotification } from './notifiers/email';
-import { sendDailyReportWechat, sendSmsWechat } from './notifiers/wechat';
-import {
-  getSettingsMap,
-  readNotificationConfig,
-  setSetting,
-} from './settings-store';
+import { sendDailyReport } from './notifiers/email';
+import { sendDailyReportWechat } from './notifiers/wechat';
+import { getSettingsMap, readNotificationConfig } from './settings-store';
 import { checkAlerts } from './alert-service';
-export { checkAlerts } from './alert-service';
 import { collectTrafficData } from './traffic-collection-service';
-export { collectTrafficData } from './traffic-collection-service';
-import {
-  collectDeviceInfo,
-  type DeviceInfoCollectionResult,
-} from './device-info-collection-service';
-export { collectDeviceInfo } from './device-info-collection-service';
 import { APP_TIME_ZONE } from './date-time';
-import {
-  markDailyReportSent,
-  upsertDailyReport,
-} from './repositories/report-repository';
+import { markDailyReportSent, upsertDailyReport } from './repositories/report-repository';
+import { ensureSmsSchedulerStarted } from './sms-sync-scheduler';
+import { ensureDeviceInfoSchedulerStarted } from './device-info-sync-scheduler';
 
-export const SMS_SYNC_MIN_INTERVAL = 1;
-export const SMS_SYNC_MAX_INTERVAL = 1440;
-export const DEVICE_INFO_SYNC_MIN_INTERVAL = 30;
-export const DEVICE_INFO_SYNC_MAX_INTERVAL = 10080;
-export const DEVICE_INFO_SYNC_DEFAULT_INTERVAL = 360;
+// ─── Re-exports for backward compatibility ──────────────────────────────
+export { checkAlerts } from './alert-service';
+export { collectTrafficData } from './traffic-collection-service';
+export { collectDeviceInfo } from './device-info-collection-service';
+export type { DeviceInfoCollectionResult } from './device-info-collection-service';
 
-export interface SmsSyncStatus {
-  enabled: boolean;
-  interval: number;
-  running: boolean;
-  lastSyncedAt: string | null;
-  lastError: string | null;
-}
+export {
+  SMS_SYNC_MIN_INTERVAL,
+  SMS_SYNC_MAX_INTERVAL,
+  getSmsSyncStatus,
+  isValidSmsSyncInterval,
+  restartSmsScheduler,
+  stopSmsScheduler,
+  ensureSmsSchedulerStarted,
+  syncSmsMessages,
+} from './sms-sync-scheduler';
+export type { SmsSyncStatus, SmsSyncResult } from './sms-sync-scheduler';
 
-export interface SmsSyncResult {
-  fetched: number;
-  inserted: number;
-  updated: number;
-  notificationsSent: number;
-  firstSync: boolean;
-  syncedAt: string;
-}
+export {
+  DEVICE_INFO_SYNC_MIN_INTERVAL,
+  DEVICE_INFO_SYNC_MAX_INTERVAL,
+  DEVICE_INFO_SYNC_DEFAULT_INTERVAL,
+  getDeviceInfoSyncStatus,
+  isValidDeviceInfoSyncInterval,
+  restartDeviceInfoScheduler,
+  stopDeviceInfoScheduler,
+  ensureDeviceInfoSchedulerStarted,
+  syncDeviceInfo,
+} from './device-info-sync-scheduler';
+export type { DeviceInfoSyncStatus } from './device-info-sync-scheduler';
 
-export interface DeviceInfoSyncStatus {
-  enabled: boolean;
-  interval: number;
-  running: boolean;
-  lastSyncedAt: string | null;
-  lastError: string | null;
-}
+// ─── Traffic collection & daily report scheduling ───────────────────────
 
 let hourlyTask: ScheduledTask | null = null;
 let dailyTask: ScheduledTask | null = null;
-let smsSyncTask: ReturnType<typeof setInterval> | null = null;
-let smsSyncPromise: Promise<SmsSyncResult> | null = null;
-let deviceInfoSyncTask: ReturnType<typeof setInterval> | null = null;
-let deviceInfoSyncPromise: Promise<DeviceInfoCollectionResult> | null = null;
 
-function getSmsSyncInterval(value: string | undefined): number {
-  const interval = Number(value || 15);
-  if (!Number.isInteger(interval)) return 15;
-  return Math.min(SMS_SYNC_MAX_INTERVAL, Math.max(SMS_SYNC_MIN_INTERVAL, interval));
+export function getSchedulerStatus(): { running: boolean } {
+  return { running: hourlyTask !== null };
 }
 
-function getDeviceInfoSyncInterval(value: string | undefined): number {
-  const interval = Number(value || DEVICE_INFO_SYNC_DEFAULT_INTERVAL);
-  if (!Number.isInteger(interval)) return DEVICE_INFO_SYNC_DEFAULT_INTERVAL;
-  return Math.min(
-    DEVICE_INFO_SYNC_MAX_INTERVAL,
-    Math.max(DEVICE_INFO_SYNC_MIN_INTERVAL, interval),
-  );
+export function stopScheduler(): void {
+  if (hourlyTask) { hourlyTask.stop(); hourlyTask = null; }
+  if (dailyTask) { dailyTask.stop(); dailyTask = null; }
 }
 
-function updateSmsSyncMetadata(lastSyncedAt: string | null, lastError: string | null) {
-  if (lastSyncedAt !== null) setSetting('sms_last_sync_at', lastSyncedAt);
-  if (lastError !== null) setSetting('sms_last_sync_error', lastError);
-}
-
-function updateDeviceInfoSyncMetadata(lastSyncedAt: string | null, lastError: string | null) {
-  if (lastSyncedAt !== null) setSetting('device_info_last_sync_at', lastSyncedAt);
-  if (lastError !== null) setSetting('device_info_last_sync_error', lastError);
-}
-
-export function getSmsSyncStatus(): SmsSyncStatus {
-  initializeDatabase();
-  const settings = getSettingsMap();
-  const lastSyncedAt = settings.sms_last_sync_at || null;
-  const lastError = settings.sms_last_sync_error || null;
-
-  return {
-    enabled: settings.sms_sync_enabled !== 'false',
-    interval: getSmsSyncInterval(settings.sms_sync_interval),
-    running: smsSyncTask !== null,
-    lastSyncedAt,
-    lastError,
-  };
-}
-
-export function getDeviceInfoSyncStatus(): DeviceInfoSyncStatus {
-  initializeDatabase();
-  const settings = getSettingsMap();
-  return {
-    enabled: settings.device_info_sync_enabled !== 'false',
-    interval: getDeviceInfoSyncInterval(settings.device_info_sync_interval),
-    running: deviceInfoSyncTask !== null,
-    lastSyncedAt: settings.device_info_last_sync_at || null,
-    lastError: settings.device_info_last_sync_error || null,
-  };
-}
-
-export function isValidSmsSyncInterval(value: unknown): value is number {
-  return typeof value === 'number'
-    && Number.isInteger(value)
-    && value >= SMS_SYNC_MIN_INTERVAL
-    && value <= SMS_SYNC_MAX_INTERVAL;
-}
-
-export function isValidDeviceInfoSyncInterval(value: unknown): value is number {
-  return typeof value === 'number'
-    && Number.isInteger(value)
-    && value >= DEVICE_INFO_SYNC_MIN_INTERVAL
-    && value <= DEVICE_INFO_SYNC_MAX_INTERVAL;
-}
-
-export async function startScheduler() {
+export async function startScheduler(): Promise<void> {
   initializeDatabase();
   const settingsMap = getSettingsMap();
   const enabled = settingsMap.scheduler_enabled === 'true';
@@ -141,7 +76,13 @@ export async function startScheduler() {
     const interval = parseInt(settingsMap.scheduler_interval || '60', 10);
     stopScheduler();
 
-    const cronExpression = interval <= 5 ? '*/5 * * * *' : interval <= 15 ? '*/15 * * * *' : interval <= 30 ? '*/30 * * * *' : '0 * * * *';
+    const cronExpression = interval <= 5
+      ? '*/5 * * * *'
+      : interval <= 15
+        ? '*/15 * * * *'
+        : interval <= 30
+          ? '*/30 * * * *'
+          : '0 * * * *';
 
     hourlyTask = cron.schedule(
       cronExpression,
@@ -169,17 +110,7 @@ export async function startScheduler() {
   await ensureDeviceInfoSchedulerStarted();
 }
 
-// This remains the existing flow/alert scheduler stop operation. SMS has its own independent lifecycle.
-export function stopScheduler() {
-  if (hourlyTask) { hourlyTask.stop(); hourlyTask = null; }
-  if (dailyTask) { dailyTask.stop(); dailyTask = null; }
-}
-
-export function getSchedulerStatus(): { running: boolean } {
-  return { running: hourlyTask !== null };
-}
-
-export async function ensureSchedulerStarted() {
+export async function ensureSchedulerStarted(): Promise<void> {
   initializeDatabase();
   const settings = getSettingsMap();
 
@@ -196,220 +127,9 @@ export async function ensureSchedulerStarted() {
   await ensureDeviceInfoSchedulerStarted();
 }
 
-export async function restartSmsScheduler(): Promise<SmsSyncStatus> {
-  initializeDatabase();
-  stopSmsScheduler();
+// ─── Daily Report ───────────────────────────────────────────────────────
 
-  const status = getSmsSyncStatus();
-  if (!status.enabled) {
-    console.log('SMS sync scheduler is disabled');
-    return status;
-  }
-
-  smsSyncTask = setInterval(() => {
-    void runScheduledSmsSync();
-  }, status.interval * 60 * 1000);
-
-  console.log(`SMS sync scheduler started with interval: ${status.interval} minutes`);
-  void runScheduledSmsSync();
-  return getSmsSyncStatus();
-}
-
-function stopSmsScheduler() {
-  if (smsSyncTask) {
-    clearInterval(smsSyncTask);
-    smsSyncTask = null;
-  }
-}
-
-async function ensureSmsSchedulerStarted() {
-  const status = getSmsSyncStatus();
-  if (status.enabled && !status.running) {
-    await restartSmsScheduler();
-  } else if (!status.enabled && status.running) {
-    stopSmsScheduler();
-  }
-}
-
-export async function restartDeviceInfoScheduler(): Promise<DeviceInfoSyncStatus> {
-  initializeDatabase();
-  stopDeviceInfoScheduler();
-
-  const status = getDeviceInfoSyncStatus();
-  if (!status.enabled) {
-    console.log('Device info sync scheduler is disabled');
-    return status;
-  }
-
-  deviceInfoSyncTask = setInterval(() => {
-    void runScheduledDeviceInfoSync();
-  }, status.interval * 60 * 1000);
-
-  console.log(`Device info sync scheduler started with interval: ${status.interval} minutes`);
-  void runScheduledDeviceInfoSync();
-  return getDeviceInfoSyncStatus();
-}
-
-function stopDeviceInfoScheduler() {
-  if (deviceInfoSyncTask) {
-    clearInterval(deviceInfoSyncTask);
-    deviceInfoSyncTask = null;
-  }
-}
-
-async function ensureDeviceInfoSchedulerStarted() {
-  const status = getDeviceInfoSyncStatus();
-  if (status.enabled && !status.running) {
-    await restartDeviceInfoScheduler();
-  } else if (!status.enabled && status.running) {
-    stopDeviceInfoScheduler();
-  }
-}
-
-async function runScheduledSmsSync() {
-  try {
-    await syncSmsMessages();
-  } catch (error) {
-    console.error('Failed to sync SMS messages:', error);
-  }
-}
-
-async function runScheduledDeviceInfoSync() {
-  try {
-    await syncDeviceInfo('scheduler');
-  } catch (error) {
-    console.error('Failed to sync device info:', error);
-  }
-}
-
-function getDeviceInfoSyncErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '设备信息同步失败';
-}
-
-export async function syncDeviceInfo(
-  source: 'scheduler' | 'manual' = 'scheduler',
-): Promise<DeviceInfoCollectionResult> {
-  if (deviceInfoSyncPromise) return deviceInfoSyncPromise;
-
-  const task = performDeviceInfoSync(source);
-  deviceInfoSyncPromise = task;
-  try {
-    return await task;
-  } finally {
-    if (deviceInfoSyncPromise === task) deviceInfoSyncPromise = null;
-  }
-}
-
-async function performDeviceInfoSync(
-  source: 'scheduler' | 'manual',
-): Promise<DeviceInfoCollectionResult> {
-  try {
-    initializeDatabase();
-    const result = await collectDeviceInfo(source);
-    if (result.success) {
-      updateDeviceInfoSyncMetadata(result.collectedAt || new Date().toISOString(), '');
-      console.log(
-        `Device info sync completed${result.deviceName ? `: ${result.deviceName}` : ''}`,
-      );
-    } else {
-      updateDeviceInfoSyncMetadata(null, result.error || '设备信息同步失败');
-    }
-    return result;
-  } catch (error) {
-    updateDeviceInfoSyncMetadata(null, getDeviceInfoSyncErrorMessage(error));
-    throw error;
-  }
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '短信同步失败';
-}
-
-export async function syncSmsMessages(): Promise<SmsSyncResult> {
-  if (smsSyncPromise) return smsSyncPromise;
-
-  const task = performSmsSync();
-  smsSyncPromise = task;
-  try {
-    return await task;
-  } finally {
-    if (smsSyncPromise === task) smsSyncPromise = null;
-  }
-}
-
-async function performSmsSync(): Promise<SmsSyncResult> {
-  try {
-    initializeDatabase();
-    const client = getOrCreateCpeClient();
-    const { messages } = await client.getSmsMessages();
-    const existingCount = (
-      db.prepare('SELECT COUNT(*) as count FROM sms_messages').get() as { count?: number } | undefined
-    )?.count || 0;
-    // Existing persisted messages from an upgrade are already a completed snapshot. A
-    // dedicated flag also handles the case where the first successful sync is empty.
-    const settings = getSettingsMap();
-    const firstSync = settings.sms_initial_sync_completed !== 'true' && existingCount === 0;
-    const emailConfig = readNotificationConfig('email');
-    const wechatConfig = readNotificationConfig('wechat');
-    let inserted = 0;
-    let updated = 0;
-    let notificationsSent = 0;
-
-    for (const sms of messages) {
-      const fingerprint = crypto.createHash('sha256')
-        .update(`${sms.id}|${sms.phone}|${sms.date}|${sms.content}`)
-        .digest('hex');
-      const existing = db.prepare('SELECT fingerprint FROM sms_messages WHERE fingerprint = ?').get(fingerprint);
-      if (existing) {
-        db.prepare('UPDATE sms_messages SET unread = ?, raw_json = ? WHERE fingerprint = ?')
-          .run(sms.unread ? 1 : 0, JSON.stringify(sms), fingerprint);
-        updated += 1;
-        continue;
-      }
-
-      let notified = firstSync ? 1 : 0;
-      if (!firstSync && sms.direction === 'inbound') {
-        let sent = false;
-        if (emailConfig?.to && (Array.isArray(emailConfig.to) ? emailConfig.to.length > 0 : Boolean(emailConfig.to))) {
-          sent = await sendSmsNotification(emailConfig, sms) || sent;
-        }
-        if (wechatConfig?.webhookUrl) {
-          sent = await sendSmsWechat(wechatConfig, sms) || sent;
-        }
-        notified = sent ? 1 : 0;
-        if (sent) notificationsSent += 1;
-      }
-
-      db.prepare(`
-        INSERT INTO sms_messages
-          (fingerprint, message_id, phone, content, received_at, unread, direction, notified, raw_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        fingerprint,
-        sms.id,
-        sms.phone,
-        sms.content,
-        sms.date,
-        sms.unread ? 1 : 0,
-        sms.direction,
-        notified,
-        JSON.stringify(sms),
-      );
-      inserted += 1;
-    }
-
-    const syncedAt = new Date().toISOString();
-    setSetting('sms_initial_sync_completed', 'true');
-    updateSmsSyncMetadata(syncedAt, '');
-    console.log(`SMS sync completed: ${messages.length} messages${firstSync ? ' (initial snapshot)' : ''}`);
-    return { fetched: messages.length, inserted, updated, notificationsSent, firstSync, syncedAt };
-  } catch (error) {
-    updateSmsSyncMetadata(null, getErrorMessage(error));
-    throw error;
-  }
-}
-
-async function generateAndSendDailyReport() {
+async function generateAndSendDailyReport(): Promise<void> {
   try {
     const report = await generateDailyReport();
     upsertDailyReport(report);
