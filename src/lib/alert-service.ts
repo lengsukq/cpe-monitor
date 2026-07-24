@@ -15,6 +15,7 @@ import { sendAlertWechat } from './notifiers/wechat';
 import { sendAlertTelegram } from './notifiers/telegram';
 import { sendAlertDingtalk } from './notifiers/dingtalk';
 import { sendAlertBark } from './notifiers/bark';
+import type { AlertPayload } from './notifiers/types';
 import { eventBus } from './event-bus';
 import { writeSystemLog } from './system-log';
 import { getSetting, setSetting } from './settings-store';
@@ -210,6 +211,85 @@ function evaluateRule(rule: AlertRuleRow): AlertMetricEvaluation | null {
   };
 }
 
+// ─── Alert Helpers ──────────────────────────────────────────────────────
+
+function isInCooldown(ruleId: number, cooldownMinutes: number | null): boolean {
+  const recentAlert = db.prepare(
+    'SELECT triggered_at FROM alert_logs WHERE rule_id = ? ORDER BY triggered_at DESC LIMIT 1',
+  ).get(ruleId) as AlertLogTimestampRow | undefined;
+  if (!recentAlert) return false;
+  const lastAlertTime = parseAlertTimestamp(recentAlert.triggered_at);
+  const cooldownMs = (cooldownMinutes || 30) * 60 * 1000;
+  return Date.now() - lastAlertTime < cooldownMs;
+}
+
+function formatAlertMessage(rule: AlertRuleRow, evaluation: AlertMetricEvaluation): string {
+  const displayValue = Number.isInteger(evaluation.value)
+    ? String(evaluation.value)
+    : evaluation.value.toFixed(2);
+  return `CPE 监控规则“${rule.name}”已触发：${evaluation.label}当前为 ${displayValue} ${evaluation.unit}，条件为 ${rule.operator} ${rule.threshold} ${evaluation.unit}`;
+}
+
+async function dispatchAlertNotifications(
+  rule: AlertRuleRow,
+  evaluation: AlertMetricEvaluation,
+  message: string,
+  timestamp: string,
+): Promise<boolean> {
+  let notified = false;
+  const simpleAlert: AlertPayload = { ruleName: rule.name, message, timestamp };
+
+  if (rule.notify_email) {
+    const emailConfig = readNotificationConfig('email');
+    if (emailConfig) {
+      notified = await sendAlertNotification(emailConfig, {
+        ruleName: rule.name,
+        message,
+        timestamp,
+        metricType: evaluation.metricType,
+        metricLabel: evaluation.label,
+        currentValue: evaluation.value,
+        unit: evaluation.unit,
+        operator: rule.operator,
+        threshold: rule.threshold,
+        severity: evaluation.severity,
+        networkType: evaluation.networkType,
+        band: evaluation.band,
+        cellId: evaluation.cellId,
+        pci: evaluation.pci,
+        collectionId: evaluation.collectionId,
+        guidance: evaluation.guidance,
+      }) || notified;
+    }
+  }
+
+  if (rule.notify_wechat) {
+    const wechatConfig = readNotificationConfig('wechat');
+    if (wechatConfig?.webhookUrl) {
+      notified = await sendAlertWechat(wechatConfig, simpleAlert) || notified;
+    }
+  }
+
+  const telegramConfig = readNotificationConfig('telegram');
+  if (telegramConfig?.botToken && telegramConfig?.chatId) {
+    notified = await sendAlertTelegram(telegramConfig, simpleAlert) || notified;
+  }
+
+  const dingtalkConfig = readNotificationConfig('dingtalk');
+  if (dingtalkConfig?.webhookUrl) {
+    notified = await sendAlertDingtalk(dingtalkConfig, simpleAlert) || notified;
+  }
+
+  const barkConfig = readNotificationConfig('bark');
+  if (barkConfig?.deviceKey) {
+    notified = await sendAlertBark(barkConfig, simpleAlert) || notified;
+  }
+
+  return notified;
+}
+
+// ─── Main Alert Check ───────────────────────────────────────────────────
+
 export async function checkAlerts(): Promise<number> {
   let triggeredCount = 0;
   try {
@@ -218,91 +298,21 @@ export async function checkAlerts(): Promise<number> {
     for (const rule of rules) {
       const evaluation = evaluateRule(rule);
       if (!evaluation?.triggered) continue;
+      if (isInCooldown(rule.id, rule.cooldown_minutes)) continue;
 
-      const recentAlert = db.prepare(
-        'SELECT triggered_at FROM alert_logs WHERE rule_id = ? ORDER BY triggered_at DESC LIMIT 1',
-      ).get(rule.id) as AlertLogTimestampRow | undefined;
-      if (recentAlert) {
-        const lastAlertTime = parseAlertTimestamp(recentAlert.triggered_at);
-        const cooldownMs = (rule.cooldown_minutes || 30) * 60 * 1000;
-        if (Date.now() - lastAlertTime < cooldownMs) continue;
-      }
-
-      const displayValue = Number.isInteger(evaluation.value)
-        ? String(evaluation.value)
-        : evaluation.value.toFixed(2);
-      const message = `CPE 监控规则“${rule.name}”已触发：${evaluation.label}当前为 ${displayValue} ${evaluation.unit}，条件为 ${rule.operator} ${rule.threshold} ${evaluation.unit}`;
+      const message = formatAlertMessage(rule, evaluation);
       const log = db.prepare(
         'INSERT INTO alert_logs (rule_id, message, notified) VALUES (?, ?, ?)',
       ).run(rule.id, message, 0);
-      let notified = false;
 
       const timestamp = new Date().toLocaleString('zh-CN', { timeZone: APP_TIME_ZONE });
-      if (rule.notify_email) {
-        const emailConfig = readNotificationConfig('email');
-        if (emailConfig) {
-          notified = await sendAlertNotification(
-            emailConfig,
-            {
-              ruleName: rule.name,
-              message,
-              timestamp,
-              metricType: evaluation.metricType,
-              metricLabel: evaluation.label,
-              currentValue: evaluation.value,
-              unit: evaluation.unit,
-              operator: rule.operator,
-              threshold: rule.threshold,
-              severity: evaluation.severity,
-              networkType: evaluation.networkType,
-              band: evaluation.band,
-              cellId: evaluation.cellId,
-              pci: evaluation.pci,
-              collectionId: evaluation.collectionId,
-              guidance: evaluation.guidance,
-            },
-          ) || notified;
-        }
-      }
-      if (rule.notify_wechat) {
-        const wechatConfig = readNotificationConfig('wechat');
-        if (wechatConfig?.webhookUrl) {
-          notified = await sendAlertWechat(
-            wechatConfig,
-            { ruleName: rule.name, message, timestamp },
-          ) || notified;
-        }
-      }
-      // Telegram
-      const telegramConfig = readNotificationConfig('telegram');
-      if (telegramConfig?.botToken && telegramConfig?.chatId) {
-        notified = await sendAlertTelegram(
-          telegramConfig,
-          { ruleName: rule.name, message, timestamp },
-        ) || notified;
-      }
-      // DingTalk
-      const dingtalkConfig = readNotificationConfig('dingtalk');
-      if (dingtalkConfig?.webhookUrl) {
-        notified = await sendAlertDingtalk(
-          dingtalkConfig,
-          { ruleName: rule.name, message, timestamp },
-        ) || notified;
-      }
-      // Bark
-      const barkConfig = readNotificationConfig('bark');
-      if (barkConfig?.deviceKey) {
-        notified = await sendAlertBark(
-          barkConfig,
-          { ruleName: rule.name, message, timestamp },
-        ) || notified;
-      }
+      const notified = await dispatchAlertNotifications(rule, evaluation, message, timestamp);
+
       db.prepare('UPDATE alert_logs SET notified = ? WHERE id = ?')
         .run(notified ? 1 : 0, log.lastInsertRowid);
       writeSystemLog('warn', `告警触发: ${rule.name} — ${message}`);
       console.log(`Alert triggered: ${rule.name}`);
 
-      // Broadcast alert event to SSE clients
       eventBus.broadcast('alert', {
         ruleId: rule.id,
         ruleName: rule.name,

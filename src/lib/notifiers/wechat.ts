@@ -1,5 +1,6 @@
 import type { WechatConfig } from '@/types';
 import type { CpeSmsMessage } from '@/lib/cpe-client';
+import type { AlertPayload, DailyReportPayload } from './types';
 
 export async function sendWechatMessage(webhookUrl: string, content: string): Promise<boolean> {
   try {
@@ -22,14 +23,7 @@ export async function sendWechatMessage(webhookUrl: string, content: string): Pr
   }
 }
 
-export async function sendDailyReportWechat(config: WechatConfig, report: {
-  date: string;
-  totalDownload: string;
-  totalUpload: string;
-  deviceCount: number;
-  networkQuality: string;
-  avgSignal: number;
-}) {
+export async function sendDailyReportWechat(config: WechatConfig, report: DailyReportPayload) {
   const content = `## CPE 流量日报 - ${report.date}
 
 ### 今日概览
@@ -47,11 +41,7 @@ export async function sendDailyReportWechat(config: WechatConfig, report: {
   return sendWechatMessage(config.webhookUrl, content);
 }
 
-export async function sendAlertWechat(config: WechatConfig, alert: {
-  ruleName: string;
-  message: string;
-  timestamp: string;
-}) {
+export async function sendAlertWechat(config: WechatConfig, alert: AlertPayload) {
   const content = `## CPE 告警通知
 
 ### ${alert.ruleName}

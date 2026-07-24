@@ -30,6 +30,7 @@ export type { DeviceInfoCollectionResult } from './device-info-collection-servic
 export {
   SMS_SYNC_MIN_INTERVAL,
   SMS_SYNC_MAX_INTERVAL,
+  SMS_SYNC_DEFAULT_INTERVAL,
   getSmsSyncStatus,
   isValidSmsSyncInterval,
   restartSmsScheduler,

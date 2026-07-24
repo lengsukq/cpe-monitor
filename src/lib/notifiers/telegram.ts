@@ -2,6 +2,7 @@
  * Telegram Bot API notifier.
  * Uses sendMessage endpoint: https://api.telegram.org/bot<token>/sendMessage
  */
+import type { AlertPayload, DailyReportPayload } from './types';
 
 export interface TelegramConfig {
   botToken: string;
@@ -28,11 +29,7 @@ export async function sendTelegramMessage(config: TelegramConfig, text: string):
   }
 }
 
-export async function sendAlertTelegram(config: TelegramConfig, alert: {
-  ruleName: string;
-  message: string;
-  timestamp: string;
-}): Promise<boolean> {
+export async function sendAlertTelegram(config: TelegramConfig, alert: AlertPayload): Promise<boolean> {
   const text = `🚨 *CPE 告警通知*
 
 *${alert.ruleName}*
@@ -47,14 +44,7 @@ _请及时检查设备状态_`;
   return sendTelegramMessage(config, text);
 }
 
-export async function sendDailyReportTelegram(config: TelegramConfig, report: {
-  date: string;
-  totalDownload: string;
-  totalUpload: string;
-  deviceCount: number;
-  networkQuality: string;
-  avgSignal: number;
-}): Promise<boolean> {
+export async function sendDailyReportTelegram(config: TelegramConfig, report: DailyReportPayload): Promise<boolean> {
   const text = `📊 *CPE 流量日报 - ${report.date}*
 
 *今日概览*

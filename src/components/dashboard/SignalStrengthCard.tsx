@@ -1,6 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
+const BADGE_VARIANTS = ['default', 'secondary', 'destructive', 'outline', 'success', 'info', 'warning', 'danger'] as const;
+type BadgeVariant = (typeof BADGE_VARIANTS)[number];
+
+function toBadgeVariant(variant: string | undefined): BadgeVariant {
+  return BADGE_VARIANTS.includes(variant as BadgeVariant) ? (variant as BadgeVariant) : 'secondary';
+}
+
 interface SignalStrengthCardProps {
   signalStrength?: number;
   signalQuality?: {
@@ -13,17 +20,7 @@ export default function SignalStrengthCard({
   signalStrength,
   signalQuality,
 }: SignalStrengthCardProps) {
-  const badgeVariant = (
-    signalQuality?.variant === 'success'
-      || signalQuality?.variant === 'info'
-      || signalQuality?.variant === 'warning'
-      || signalQuality?.variant === 'danger'
-      || signalQuality?.variant === 'default'
-      || signalQuality?.variant === 'secondary'
-      || signalQuality?.variant === 'destructive'
-      || signalQuality?.variant === 'outline'
-  ) ? signalQuality.variant as 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'info' | 'warning' | 'danger'
-    : 'secondary';
+  const badgeVariant = toBadgeVariant(signalQuality?.variant);
 
   return (
     <Card className="card-hover">

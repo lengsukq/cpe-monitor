@@ -2,6 +2,7 @@
  * DingTalk (钉钉) custom robot webhook notifier.
  * Docs: https://open.dingtalk.com/document/orgapp/custom-robot-access
  */
+import type { AlertPayload, DailyReportPayload } from './types';
 
 export interface DingtalkConfig {
   webhookUrl: string;
@@ -46,11 +47,7 @@ export async function sendDingtalkMessage(config: DingtalkConfig, title: string,
   }
 }
 
-export async function sendAlertDingtalk(config: DingtalkConfig, alert: {
-  ruleName: string;
-  message: string;
-  timestamp: string;
-}): Promise<boolean> {
+export async function sendAlertDingtalk(config: DingtalkConfig, alert: AlertPayload): Promise<boolean> {
   const text = `## CPE 告警通知
 
 ### ${alert.ruleName}
@@ -65,14 +62,7 @@ export async function sendAlertDingtalk(config: DingtalkConfig, alert: {
   return sendDingtalkMessage(config, 'CPE 告警', text);
 }
 
-export async function sendDailyReportDingtalk(config: DingtalkConfig, report: {
-  date: string;
-  totalDownload: string;
-  totalUpload: string;
-  deviceCount: number;
-  networkQuality: string;
-  avgSignal: number;
-}): Promise<boolean> {
+export async function sendDailyReportDingtalk(config: DingtalkConfig, report: DailyReportPayload): Promise<boolean> {
   const text = `## CPE 流量日报 - ${report.date}
 
 ### 今日概览

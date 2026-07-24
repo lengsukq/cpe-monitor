@@ -26,7 +26,7 @@ export interface WechatConfigForm {
   webhookUrl: string;
 }
 
-export interface SmsSyncConfigForm {
+export interface SyncConfigForm {
   enabled: boolean;
   interval: string;
   running: boolean;
@@ -34,13 +34,11 @@ export interface SmsSyncConfigForm {
   lastError: string | null;
 }
 
-export interface DeviceInfoSyncConfigForm {
-  enabled: boolean;
-  interval: string;
-  running: boolean;
-  lastSyncedAt: string | null;
-  lastError: string | null;
-}
+/** @deprecated Use SyncConfigForm instead */
+export type SmsSyncConfigForm = SyncConfigForm;
+
+/** @deprecated Use SyncConfigForm instead */
+export type DeviceInfoSyncConfigForm = SyncConfigForm;
 
 export interface DataRetentionForm {
   historyDays: string;

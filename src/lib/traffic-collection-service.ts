@@ -13,13 +13,7 @@ import { writeSystemLog } from './system-log';
 import { evaluateQuotaAlert } from './alert-service';
 import type { CpeDevice } from '@/types/cpe';
 
-interface PreviousTrafficSample {
-  timestamp: string;
-  upload_bytes: number | null;
-  download_bytes: number | null;
-}
-
-interface PreviousDeviceSample {
+interface PreviousSample {
   timestamp: string;
   upload_bytes: number | null;
   download_bytes: number | null;
@@ -36,7 +30,7 @@ interface DevicePersistContext {
 function persistDeviceRows(devices: CpeDevice[], ctx: DevicePersistContext): void {
   for (const device of devices) {
     const previousDevice = device.mac
-      ? ctx.findPreviousDevice.get(device.mac) as PreviousDeviceSample | undefined
+      ? ctx.findPreviousDevice.get(device.mac) as PreviousSample | undefined
       : undefined;
     const previousDeviceTime = parseTimestampMs(previousDevice?.timestamp);
     const deviceElapsedSeconds = previousDeviceTime === null
@@ -110,7 +104,7 @@ export async function collectTrafficData(
        FROM traffic_data
        ORDER BY id DESC
        LIMIT 1`,
-    ).get() as PreviousTrafficSample | undefined;
+    ).get() as PreviousSample | undefined;
     const previousTrafficTime = parseTimestampMs(previousTraffic?.timestamp);
     const elapsedSeconds = previousTrafficTime === null
       ? 0

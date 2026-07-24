@@ -3,6 +3,7 @@
  * Bark is an iOS app that allows you to send custom notifications to your iPhone.
  * Docs: https://github.com/Finb/Bark
  */
+import type { AlertPayload, DailyReportPayload } from './types';
 
 export interface BarkConfig {
   serverUrl: string; // e.g. https://api.day.app or self-hosted
@@ -38,11 +39,7 @@ export async function sendBarkMessage(config: BarkConfig, title: string, body: s
   }
 }
 
-export async function sendAlertBark(config: BarkConfig, alert: {
-  ruleName: string;
-  message: string;
-  timestamp: string;
-}): Promise<boolean> {
+export async function sendAlertBark(config: BarkConfig, alert: AlertPayload): Promise<boolean> {
   return sendBarkMessage(
     config,
     `CPE 告警: ${alert.ruleName}`,
@@ -51,13 +48,7 @@ export async function sendAlertBark(config: BarkConfig, alert: {
   );
 }
 
-export async function sendDailyReportBark(config: BarkConfig, report: {
-  date: string;
-  totalDownload: string;
-  totalUpload: string;
-  deviceCount: number;
-  networkQuality: string;
-}): Promise<boolean> {
+export async function sendDailyReportBark(config: BarkConfig, report: DailyReportPayload): Promise<boolean> {
   const body = `下载 ${report.totalDownload} / 上传 ${report.totalUpload}
 设备 ${report.deviceCount} 台 / 质量 ${report.networkQuality}`;
 

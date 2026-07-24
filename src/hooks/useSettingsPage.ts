@@ -19,6 +19,7 @@ export type {
   EmailConfigForm,
   SettingsSectionId,
   SmsSyncConfigForm,
+  SyncConfigForm,
   TestResultState,
   UpdateStatusState,
   WechatConfigForm,
