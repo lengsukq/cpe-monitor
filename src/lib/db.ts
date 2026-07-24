@@ -374,6 +374,17 @@ const migrations: Array<{ version: number; migrate: Migration }> = [
       for (const [key, value] of defaults) insertDefault.run(key, value);
     },
   },
+  {
+    version: 6,
+    migrate(database) {
+      ensureColumn(database, 'daily_reports', 'period_type', "TEXT DEFAULT 'daily'");
+      database.exec(`
+        DROP INDEX IF EXISTS idx_daily_reports_date_unique;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_reports_date_period_unique
+        ON daily_reports (report_date, period_type);
+      `);
+    },
+  },
 ];
 
 function readSchemaVersion(database: SqliteDatabase): number {

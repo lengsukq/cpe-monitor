@@ -4,8 +4,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { formatSyncTime, maskSecret } from '@/lib/format';
 import { useCpeSettings } from '@/features/settings/hooks/useCpeSettings';
 import { useDataRetentionSettings } from '@/features/settings/hooks/useDataRetentionSettings';
+import { useDataQuotaSettings } from '@/features/settings/hooks/useDataQuotaSettings';
 import { useNotificationSettings } from '@/features/settings/hooks/useNotificationSettings';
-import { usePasswordSettings } from '@/features/settings/hooks/usePasswordSettings';
 import { useSmsSyncSettings } from '@/features/settings/hooks/useSmsSyncSettings';
 import { useDeviceInfoSyncSettings } from '@/features/settings/hooks/useDeviceInfoSyncSettings';
 import { useSystemUpdate } from '@/features/settings/hooks/useSystemUpdate';
@@ -13,10 +13,10 @@ import type { SettingsActionContext, SettingsMessage, SettingsSectionId } from '
 
 export type {
   CpeConfigForm,
+  DataQuotaForm,
   DataRetentionForm,
   DeviceInfoSyncConfigForm,
   EmailConfigForm,
-  PasswordFormState,
   SettingsSectionId,
   SmsSyncConfigForm,
   TestResultState,
@@ -36,15 +36,16 @@ export function useSettingsPage() {
   const sms = useSmsSyncSettings(actionContext);
   const deviceInfoSync = useDeviceInfoSyncSettings(actionContext);
   const retention = useDataRetentionSettings(actionContext);
-  const password = usePasswordSettings(actionContext);
+  const quota = useDataQuotaSettings(actionContext);
   const update = useSystemUpdate();
 
   const pageLoading = cpe.initialLoading
     || notifications.initialLoading
     || sms.initialLoading
     || deviceInfoSync.initialLoading
-    || retention.initialLoading;
-  const loading = cpe.saving || notifications.savingEmail || notifications.savingWechat || password.savingPassword;
+    || retention.initialLoading
+    || quota.initialLoading;
+  const loading = cpe.saving || notifications.savingEmail || notifications.savingWechat;
 
   const overviewMeta = useMemo(() => ({
     cpeConfigured: Boolean(cpe.cpeConfig.cpeUrl),
@@ -69,7 +70,7 @@ export function useSettingsPage() {
     ...sms,
     ...deviceInfoSync,
     ...retention,
-    ...password,
+    ...quota,
     ...update,
     pageLoading,
     loading,

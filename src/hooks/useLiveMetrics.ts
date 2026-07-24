@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { bytesPerSecondToBitsPerSecond } from '@/lib/traffic-units';
+import { useSSE, type SSEEvent } from './useSSE';
 import type {
   DashboardOverviewResponse,
   DataPlanConfig,
@@ -25,7 +26,8 @@ export interface DeviceSnapshot {
   };
 }
 
-const LIVE_METRIC_INTERVAL_MS = 5000;
+/** Fallback polling interval when SSE is disconnected. */
+const FALLBACK_POLL_INTERVAL_MS = 15_000;
 const MAX_LIVE_POINTS = 72;
 
 export function useLiveMetrics() {
@@ -160,23 +162,51 @@ export function useLiveMetrics() {
     ]);
   }, [fetchLiveMetrics, fetchStartDate, fetchDeviceSnapshot, fetchSmsSyncStatus]);
 
-  useEffect(() => {
-    const initialTimer = window.setTimeout(() => {
+  // ─── SSE-driven updates with fallback polling ─────────────────────────
+  const handleSSEEvent = useCallback((event: SSEEvent) => {
+    if (event.type === 'collection' || event.type === 'metrics') {
+      // New data collected on server — refresh dashboard data
       void fetchLiveMetrics();
-      void fetchStartDate();
-      void fetchDeviceSnapshot();
-      void fetchSmsSyncStatus();
-    }, 0);
+    }
+  }, [fetchLiveMetrics]);
 
-    const intervalId = window.setInterval(() => {
-      void fetchLiveMetrics();
-    }, LIVE_METRIC_INTERVAL_MS);
+  const { status: sseStatus } = useSSE({ onEvent: handleSSEEvent });
+  const sseConnected = sseStatus === 'connected';
+  const fallbackTimerRef = useRef<number | null>(null);
+
+  // Initial load
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void refreshAll();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refreshAll]);
+
+  // Fallback polling only when SSE is not connected
+  useEffect(() => {
+    if (sseConnected) {
+      // SSE active — stop fallback polling
+      if (fallbackTimerRef.current) {
+        window.clearInterval(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+      return;
+    }
+
+    // SSE not connected — start fallback polling
+    if (!fallbackTimerRef.current) {
+      fallbackTimerRef.current = window.setInterval(() => {
+        void fetchLiveMetrics();
+      }, FALLBACK_POLL_INTERVAL_MS);
+    }
 
     return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(intervalId);
+      if (fallbackTimerRef.current) {
+        window.clearInterval(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
     };
-  }, [fetchLiveMetrics, fetchStartDate, fetchDeviceSnapshot, fetchSmsSyncStatus]);
+  }, [sseConnected, fetchLiveMetrics]);
 
   return {
     overview,
@@ -191,5 +221,6 @@ export function useLiveMetrics() {
     smsSync,
     lastRefreshAt,
     refreshAll,
+    sseStatus,
   };
 }

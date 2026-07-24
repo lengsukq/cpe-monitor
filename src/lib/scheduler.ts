@@ -8,7 +8,7 @@
  */
 import cron, { type ScheduledTask } from 'node-cron';
 import { initializeDatabase } from './db';
-import { generateDailyReport } from './report-generator';
+import { generateDailyReport, generateWeeklyReport, generateMonthlyReport } from './report-generator';
 import { formatBytes } from './format';
 import { sendDailyReport } from './notifiers/email';
 import { sendDailyReportWechat } from './notifiers/wechat';
@@ -16,9 +16,10 @@ import { getSettingsMap, readNotificationConfig } from './settings-store';
 import { checkAlerts } from './alert-service';
 import { collectTrafficData } from './traffic-collection-service';
 import { APP_TIME_ZONE } from './date-time';
-import { markDailyReportSent, upsertDailyReport } from './repositories/report-repository';
+import { markDailyReportSent, upsertDailyReport, upsertPeriodReport } from './repositories/report-repository';
 import { ensureSmsSchedulerStarted } from './sms-sync-scheduler';
 import { ensureDeviceInfoSchedulerStarted } from './device-info-sync-scheduler';
+import { writeSystemLog } from './system-log';
 
 // ─── Re-exports for backward compatibility ──────────────────────────────
 export { checkAlerts } from './alert-service';
@@ -55,6 +56,8 @@ export type { DeviceInfoSyncStatus } from './device-info-sync-scheduler';
 
 let hourlyTask: ScheduledTask | null = null;
 let dailyTask: ScheduledTask | null = null;
+let weeklyTask: ScheduledTask | null = null;
+let monthlyTask: ScheduledTask | null = null;
 
 export function getSchedulerStatus(): { running: boolean } {
   return { running: hourlyTask !== null };
@@ -63,6 +66,8 @@ export function getSchedulerStatus(): { running: boolean } {
 export function stopScheduler(): void {
   if (hourlyTask) { hourlyTask.stop(); hourlyTask = null; }
   if (dailyTask) { dailyTask.stop(); dailyTask = null; }
+  if (weeklyTask) { weeklyTask.stop(); weeklyTask = null; }
+  if (monthlyTask) { monthlyTask.stop(); monthlyTask = null; }
 }
 
 export async function startScheduler(): Promise<void> {
@@ -88,6 +93,7 @@ export async function startScheduler(): Promise<void> {
       cronExpression,
       async () => {
         console.log('Running traffic collection...');
+        writeSystemLog('info', `定时采集开始 (interval: ${interval}min)`);
         await collectTrafficData();
         await checkAlerts();
       },
@@ -103,7 +109,28 @@ export async function startScheduler(): Promise<void> {
       { timezone: APP_TIME_ZONE },
     );
 
+    // Weekly report: Sunday 22:30
+    weeklyTask = cron.schedule(
+      '30 22 * * 0',
+      () => {
+        console.log('Generating weekly report...');
+        generateAndStoreWeeklyReport();
+      },
+      { timezone: APP_TIME_ZONE },
+    );
+
+    // Monthly report: 1st of month 00:30
+    monthlyTask = cron.schedule(
+      '30 0 1 * *',
+      () => {
+        console.log('Generating monthly report...');
+        generateAndStoreMonthlyReport();
+      },
+      { timezone: APP_TIME_ZONE },
+    );
+
     console.log(`Scheduler started with interval: ${interval} minutes`);
+    writeSystemLog('info', `调度器已启动，采集间隔 ${interval} 分钟`);
   }
 
   await ensureSmsSchedulerStarted();
@@ -150,7 +177,30 @@ async function generateAndSendDailyReport(): Promise<void> {
     if (sent) markDailyReportSent(report.reportDate);
 
     console.log('Daily report generated and stored');
+    writeSystemLog('info', `日报生成完成: ${report.reportDate}`);
   } catch (error) {
     console.error('Failed to generate daily report:', error);
+  }
+}
+
+function generateAndStoreWeeklyReport(): void {
+  try {
+    const report = generateWeeklyReport();
+    upsertPeriodReport(report);
+    writeSystemLog('info', `周报生成完成: ${report.periodKey}`);
+    console.log('Weekly report generated:', report.periodKey);
+  } catch (error) {
+    console.error('Failed to generate weekly report:', error);
+  }
+}
+
+function generateAndStoreMonthlyReport(): void {
+  try {
+    const report = generateMonthlyReport();
+    upsertPeriodReport(report);
+    writeSystemLog('info', `月报生成完成: ${report.periodKey}`);
+    console.log('Monthly report generated:', report.periodKey);
+  } catch (error) {
+    console.error('Failed to generate monthly report:', error);
   }
 }

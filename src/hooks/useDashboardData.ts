@@ -38,6 +38,7 @@ export function useDashboardData() {
     smsSync,
     lastRefreshAt,
     refreshAll,
+    sseStatus,
   } = useLiveMetrics();
 
   const { schedulerSaving, updateScheduler } = useSchedulerControl(overview, setOverview);
@@ -139,5 +140,6 @@ export function useDashboardData() {
     updateScheduler,
     collecting,
     collectNow,
+    sseStatus,
   };
 }

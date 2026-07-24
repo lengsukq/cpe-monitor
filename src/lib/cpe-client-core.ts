@@ -33,15 +33,45 @@ function isActiveFlag(value: unknown): boolean {
   return value === true || value === 1 || value === '1';
 }
 
+export type CpeConnectionState = 'online' | 'reconnecting' | 'offline';
+
+const MAX_CONSECUTIVE_FAILURES = 5;
+
 export class CpeClient {
   private auth: CpeAuthenticator;
   private network: CpeNetworkReader;
   private sms: CpeSmsReader;
+  private consecutiveFailures = 0;
+  private _connectionState: CpeConnectionState = 'online';
 
   constructor(baseUrl: string, username: string, password: string) {
     this.auth = new CpeAuthenticator(baseUrl, username, password);
     this.network = new CpeNetworkReader(this.auth);
     this.sms = new CpeSmsReader(this.auth);
+  }
+
+  get connectionState(): CpeConnectionState {
+    return this._connectionState;
+  }
+
+  get isDegraded(): boolean {
+    return this._connectionState === 'offline';
+  }
+
+  private trackSuccess(): void {
+    if (this.consecutiveFailures > 0 || this._connectionState !== 'online') {
+      this.consecutiveFailures = 0;
+      this._connectionState = 'online';
+    }
+  }
+
+  private trackFailure(): void {
+    this.consecutiveFailures += 1;
+    if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+      this._connectionState = 'offline';
+    } else if (this.consecutiveFailures >= 2) {
+      this._connectionState = 'reconnecting';
+    }
   }
 
   matchesCredentials(baseUrl: string, username: string, password: string): boolean {
@@ -53,7 +83,15 @@ export class CpeClient {
   }
 
   async ensureLogin(): Promise<boolean> {
-    return this.auth.ensureLogin();
+    try {
+      const result = await this.auth.ensureLogin();
+      if (result) this.trackSuccess();
+      else this.trackFailure();
+      return result;
+    } catch {
+      this.trackFailure();
+      return false;
+    }
   }
 
   getLastLoginError(): string {

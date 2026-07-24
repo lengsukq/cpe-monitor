@@ -77,3 +77,58 @@ export function listRecentAlertLogs(limit = 100): AlertLog[] {
   `).all(safeLimit) as AlertLogRow[];
   return mapAlertLogRows(rows);
 }
+
+export interface AlertLogsPaginatedParams {
+  page: number;
+  pageSize: number;
+  notified?: number;
+  ruleId?: number;
+}
+
+export interface AlertLogsPaginatedResult {
+  logs: AlertLog[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export function listAlertLogsPaginated(params: AlertLogsPaginatedParams): AlertLogsPaginatedResult {
+  ensureDatabaseReady();
+  const { page, pageSize, notified, ruleId } = params;
+  const offset = (page - 1) * pageSize;
+
+  const conditions: string[] = [];
+  const bindings: unknown[] = [];
+
+  if (notified !== undefined) {
+    conditions.push('al.notified = ?');
+    bindings.push(notified);
+  }
+  if (ruleId !== undefined) {
+    conditions.push('al.rule_id = ?');
+    bindings.push(ruleId);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countRow = db.prepare(
+    `SELECT COUNT(*) AS count FROM alert_logs al ${whereClause}`,
+  ).get(...bindings) as { count: number };
+  const total = countRow.count;
+
+  const rows = db.prepare(`
+    SELECT al.id, al.rule_id, al.triggered_at, al.message, al.notified, ar.name AS rule_name
+    FROM alert_logs al
+    LEFT JOIN alert_rules ar ON al.rule_id = ar.id
+    ${whereClause}
+    ORDER BY al.triggered_at DESC
+    LIMIT ? OFFSET ?
+  `).all(...bindings, pageSize, offset) as AlertLogRow[];
+
+  return {
+    logs: mapAlertLogRows(rows),
+    total,
+    page,
+    pageSize,
+  };
+}

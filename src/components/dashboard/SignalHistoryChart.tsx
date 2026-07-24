@@ -81,6 +81,11 @@ export default function SignalHistoryChart({ data }: SignalHistoryChartProps) {
   const { resolvedTheme } = useTheme();
   const { hue } = useThemeColor();
   const [colors, setColors] = useState<ThemeColors>(() => readThemeColors());
+  const [visible, setVisible] = useState({ rsrp: true, rsrq: true, sinr: true, rssi: false });
+
+  const toggleMetric = (key: keyof typeof visible) => {
+    setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setColors(readThemeColors()));
@@ -99,7 +104,7 @@ export default function SignalHistoryChart({ data }: SignalHistoryChartProps) {
     return {
       labels: data.map((entry) => formatLabel(entry.timestamp, showDate)),
       datasets: [
-        {
+        ...(visible.rsrp ? [{
           label: 'RSRP',
           data: data.map((entry) => entry.rsrp ?? null),
           borderColor: colors.rsrp,
@@ -110,8 +115,8 @@ export default function SignalHistoryChart({ data }: SignalHistoryChartProps) {
           borderWidth: 2,
           tension: 0.25,
           spanGaps: false,
-        },
-        {
+        }] : []),
+        ...(visible.rssi ? [{
           label: 'RSSI',
           data: data.map((entry) => entry.rssi ?? null),
           borderColor: colors.rssi,
@@ -122,8 +127,8 @@ export default function SignalHistoryChart({ data }: SignalHistoryChartProps) {
           borderWidth: 1.5,
           tension: 0.25,
           spanGaps: false,
-        },
-        {
+        }] : []),
+        ...(visible.rsrq ? [{
           label: 'RSRQ',
           data: data.map((entry) => entry.rsrq ?? null),
           borderColor: colors.rsrq,
@@ -134,8 +139,8 @@ export default function SignalHistoryChart({ data }: SignalHistoryChartProps) {
           borderWidth: 1.5,
           tension: 0.25,
           spanGaps: false,
-        },
-        {
+        }] : []),
+        ...(visible.sinr ? [{
           label: 'SINR',
           data: data.map((entry) => entry.sinr ?? null),
           borderColor: colors.sinr,
@@ -146,10 +151,10 @@ export default function SignalHistoryChart({ data }: SignalHistoryChartProps) {
           borderWidth: 2,
           tension: 0.25,
           spanGaps: false,
-        },
+        }] : []),
       ],
     };
-  }, [colors, data]);
+  }, [colors, data, visible]);
 
   const options = useMemo(() => ({
     responsive: true,
@@ -228,5 +233,33 @@ export default function SignalHistoryChart({ data }: SignalHistoryChartProps) {
     },
   }), [colors]);
 
-  return <Line data={chartData} options={options} />;
+  return (
+    <div className="flex h-full flex-col gap-2">
+      <div className="flex flex-wrap gap-1.5">
+        {([
+          { key: 'rsrp' as const, label: 'RSRP', color: colors.rsrp },
+          { key: 'rsrq' as const, label: 'RSRQ', color: colors.rsrq },
+          { key: 'sinr' as const, label: 'SINR', color: colors.sinr },
+          { key: 'rssi' as const, label: 'RSSI', color: colors.rssi },
+        ]).map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            onClick={() => toggleMetric(m.key)}
+            className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+              visible[m.key]
+                ? 'border-transparent text-white'
+                : 'border-border text-muted-foreground opacity-50'
+            }`}
+            style={visible[m.key] ? { backgroundColor: m.color } : undefined}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <div className="min-h-0 flex-1">
+        <Line data={chartData} options={options} />
+      </div>
+    </div>
+  );
 }

@@ -12,6 +12,7 @@ import { Callout } from '@/components/Callout';
 import { PageShell } from '@/components/PageShell';
 import { LoadingBlock } from '@/components/LoadingBlock';
 import RefreshButton from '@/components/RefreshButton';
+import { RefreshIndicator } from '@/components/dashboard/RefreshIndicator';
 import { CollectionReportDialog, type CollectionReportData } from '@/components/dashboard/CollectionReportDialog';
 import DashboardHero from '@/components/dashboard/DashboardHero';
 import StatusPillsRow from '@/components/dashboard/StatusPillsRow';
@@ -22,9 +23,10 @@ import DataPlanCard from '@/components/dashboard/DataPlanCard';
 import TrafficStatsPanel from '@/components/dashboard/TrafficStatsPanel';
 import TrafficTrendCard from '@/components/dashboard/TrafficTrendCard';
 import NetworkHistoryGrid from '@/components/dashboard/NetworkHistoryGrid';
+import TrafficCompareCard from '@/components/dashboard/TrafficCompareCard';
 import QuickLinks from '@/components/dashboard/QuickLinks';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import { formatBytesPerSecond, formatLocalTime } from '@/lib/format';
+import { formatBytesPerSecond } from '@/lib/format';
 
 export default function DashboardPage() {
   const data = useDashboardData();
@@ -54,10 +56,11 @@ export default function DashboardPage() {
         icon={<Gauge className="h-6 w-6" />}
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-            <div className="order-last text-xs text-muted-foreground sm:order-first">
-              {data.lastRefreshAt
-                ? `更新于 ${formatLocalTime(data.lastRefreshAt)}`
-                : '正在同步'}
+            <div className="order-last sm:order-first">
+              <RefreshIndicator
+                sseStatus={data.sseStatus}
+                lastRefreshAt={data.lastRefreshAt}
+              />
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge
@@ -202,6 +205,8 @@ export default function DashboardPage() {
       </div>
 
       <NetworkHistoryGrid data={data.trafficHistory} />
+
+      <TrafficCompareCard />
 
       <DashboardHero
         className="hidden sm:block"

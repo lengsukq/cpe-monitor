@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { BarChart3, Mail, MessageSquareText, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
 import { Callout } from '@/components/Callout';
@@ -17,6 +17,7 @@ import { ThemedBarChart } from '@/components/charts/BarChart';
 import { ScrollReveal } from '@/components/motion';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingBlock } from '@/components/LoadingBlock';
+import { SwipeableItem } from '@/components/SwipeableItem';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -77,30 +78,46 @@ export default function SmsPage() {
   const [keywordInput, setKeywordInput] = useState('');
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
   const [sync, setSync] = useState<SmsSyncStatus | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  async function loadMessages() {
-    setLoading(true);
+  const loadMessages = useCallback(async (pageNum = 1, append = false) => {
+    if (pageNum === 1) setLoading(true);
+    else setLoadingMore(true);
     setError('');
     try {
+      const params = new URLSearchParams({
+        page: String(pageNum),
+        pageSize: '50',
+        filter: filter,
+        direction: direction,
+      });
+      if (keyword) params.set('keyword', keyword);
       const data = await apiFetch<{
         messages?: SmsMessage[];
         total?: number;
         unread?: number;
         sync?: SmsSyncStatus | null;
-      }>('/api/dashboard/sms', undefined, '获取短信失败');
-      setMessages(data.messages || []);
+        hasMore?: boolean;
+      }>(`/api/dashboard/sms?${params.toString()}`, undefined, '获取短信失败');
+      setMessages((prev) => append ? [...prev, ...(data.messages || [])] : (data.messages || []));
       setTotal(data.total || 0);
       setUnread(data.unread || 0);
       setSync(data.sync || null);
+      setHasMore(data.hasMore || false);
+      setPage(pageNum);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '获取短信失败');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }
+  }, [filter, direction, keyword]);
 
   async function syncAndLoadMessages() {
     setSyncing(true);
@@ -112,7 +129,7 @@ export default function SmsPage() {
         '同步短信失败',
       );
       setSync(data.sync || null);
-      await loadMessages();
+      await loadMessages(1, false);
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : '同步短信失败');
     } finally {
@@ -121,9 +138,25 @@ export default function SmsPage() {
   }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => { void loadMessages(); }, 0);
+    const timer = window.setTimeout(() => { void loadMessages(1, false); }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [loadMessages]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMore || loading || loadingMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void loadMessages(page + 1, true);
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, page, loadMessages]);
 
   function applyQuery(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -138,21 +171,7 @@ export default function SmsPage() {
   }
 
   const hasActiveQuery = Boolean(keyword || filter !== 'all' || direction !== 'all');
-  const visibleMessages = useMemo(
-    () => {
-      const normalizedKeyword = keyword.toLocaleLowerCase();
-      return messages.filter((message) => {
-        const matchesKeyword = !normalizedKeyword || [message.phone, message.content, message.date]
-          .join(' ')
-          .toLocaleLowerCase()
-          .includes(normalizedKeyword);
-        const matchesReadStatus = filter === 'all' || (filter === 'unread' ? message.unread : !message.unread);
-        const matchesDirection = direction === 'all' || message.direction === direction;
-        return matchesKeyword && matchesReadStatus && matchesDirection;
-      });
-    },
-    [direction, filter, keyword, messages],
-  );
+  const visibleMessages = messages;
   const inboundCount = messages.filter((message) => message.direction === 'inbound').length;
   const outboundCount = messages.filter((message) => message.direction === 'outbound').length;
   const recentDailyCounts = getRecentDailyCounts(messages);
@@ -260,7 +279,7 @@ export default function SmsPage() {
             <p className="mt-1 text-sm text-muted-foreground">数据来自本地持久化副本；可按号码、内容和状态查询</p>
           </div>
           <span className="shrink-0 rounded-full bg-muted px-3 py-1.5 text-xs text-muted-foreground">
-            显示 {visibleMessages.length} / {total} 条
+            已加载 {visibleMessages.length} / {total} 条
           </span>
         </div>
 
@@ -342,6 +361,7 @@ export default function SmsPage() {
           <motion.div className="mt-5 grid gap-3" layout={reduce ? undefined : true}>
             <AnimatePresence mode="popLayout" initial={false}>
               {visibleMessages.map((message, index) => (
+                <SwipeableItem key={`${message.id}-${index}`} onCopy={() => { void navigator.clipboard?.writeText(message.content || ''); }}>
                 <motion.article
                   key={`${message.id}-${index}`}
                   layout={reduce ? undefined : 'position'}
@@ -366,8 +386,14 @@ export default function SmsPage() {
                     <span>{message.date || '未知时间'}</span>
                   </div>
                 </motion.article>
+                </SwipeableItem>
               ))}
             </AnimatePresence>
+            {hasMore && (
+              <div ref={sentinelRef} className="flex justify-center py-4">
+                {loadingMore && <span className="text-sm text-muted-foreground">加载更多…</span>}
+              </div>
+            )}
           </motion.div>
         )}
       </section>

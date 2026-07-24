@@ -4,10 +4,12 @@ import { useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import Callout from '@/components/Callout';
 import TableSkeleton from '@/components/TableSkeleton';
+import { ExportCsvButton } from '@/components/ExportCsvButton';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -74,6 +76,7 @@ export default function OnlineDevicesTable({
   const [keyword, setKeyword] = useState('');
   const [connectionFilter, setConnectionFilter] = useState<ConnectionFilter>('all');
   const [sortMode, setSortMode] = useState<SortMode>('download');
+  const [displayCount, setDisplayCount] = useState(20);
 
   const visibleDevices = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLocaleLowerCase();
@@ -108,6 +111,9 @@ export default function OnlineDevicesTable({
     });
   }, [connectionFilter, devices, keyword, sortMode]);
 
+  const paginatedDevices = visibleDevices.slice(0, displayCount);
+  const hasMoreDevices = visibleDevices.length > displayCount;
+
   return (
     <Card id="online-devices" className="card-hover scroll-mt-32">
       <CardHeader className="gap-3">
@@ -118,9 +124,12 @@ export default function OnlineDevicesTable({
               搜索终端并按流量、信号或在线时长排序，点击设备查看历史使用情况。
             </p>
           </div>
-          <Badge variant="secondary" className="w-fit">
-            显示 {visibleDevices.length} / {devices.length} 台
-          </Badge>
+          <div className="flex items-center gap-2">
+            <ExportCsvButton href="/api/export/devices" />
+            <Badge variant="secondary" className="w-fit">
+              显示 {visibleDevices.length} / {devices.length} 台
+            </Badge>
+          </div>
         </div>
 
         {!loading && devices.length > 0 ? (
@@ -176,7 +185,7 @@ export default function OnlineDevicesTable({
         ) : (
           <>
             <div className="space-y-3 md:hidden">
-              {visibleDevices.map((device, index) => {
+              {paginatedDevices.map((device, index) => {
                 const signal = getSignalValue(device);
                 return (
                   <motion.button
@@ -229,7 +238,7 @@ export default function OnlineDevicesTable({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {visibleDevices.map((device, index) => {
+                  {paginatedDevices.map((device, index) => {
                     const signal = getSignalValue(device);
                     return (
                       <motion.tr
@@ -261,6 +270,17 @@ export default function OnlineDevicesTable({
                 </TableBody>
               </Table>
             </div>
+            {hasMoreDevices && (
+              <div className="mt-4 flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDisplayCount((prev) => prev + 20)}
+                >
+                  加载更多（剩余 {visibleDevices.length - displayCount} 台）
+                </Button>
+              </div>
+            )}
           </>
         )}
       </CardContent>

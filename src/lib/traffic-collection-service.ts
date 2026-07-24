@@ -8,6 +8,9 @@ import {
   computeCounterDelta,
 } from './traffic-units';
 import { getErrorMessage } from './error-utils';
+import { eventBus } from './event-bus';
+import { writeSystemLog } from './system-log';
+import { evaluateQuotaAlert } from './alert-service';
 import type { CpeDevice } from '@/types/cpe';
 
 interface PreviousTrafficSample {
@@ -201,6 +204,22 @@ export async function collectTrafficData(
     }
 
     console.log(`Collected traffic data: ${trafficInfo.connectedDevices} devices`);
+    writeSystemLog('info', `流量采集成功：${trafficInfo.connectedDevices} 台设备，来源 ${source}`);
+
+    // Broadcast collection event to SSE clients
+    eventBus.broadcast('collection', {
+      collectionId,
+      connectedDevices: trafficInfo.connectedDevices,
+      signalStrength: trafficInfo.signalStrength,
+      uploadBps: bitsPerSecondFromByteDelta(deltaUploadBytes, elapsedSeconds),
+      downloadBps: bitsPerSecondFromByteDelta(deltaDownloadBytes, elapsedSeconds),
+      networkType: trafficInfo.networkType,
+      source,
+    });
+
+    // Check data quota after successful collection
+    evaluateQuotaAlert();
+
     return {
       collectionId,
       collectedDevices: trafficInfo.connectedDevices,
@@ -220,6 +239,7 @@ export async function collectTrafficData(
       }
     }
     console.error('Failed to collect traffic data:', error);
+    writeSystemLog('error', `流量采集失败：${errorMessage}`);
     return {
       collectionId,
       collectedDevices: 0,

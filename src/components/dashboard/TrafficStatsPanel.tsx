@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import InfoField from '@/components/InfoField';
+import { ExportCsvButton } from '@/components/ExportCsvButton';
 import { formatDuration, formatWithUnit } from '@/lib/format';
 import type { TrafficStatsResponse } from '@/types';
 
@@ -27,13 +28,16 @@ export default function TrafficStatsPanel({
             <span className="metric-icon size-8 rounded-xl sm:size-9"><ChartNoAxesCombined className="h-4 w-4" /></span>
             流量统计
           </CardTitle>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-2">
+            <ExportCsvButton href="/api/export/traffic" />
+            <div className="flex gap-1">
             <Button size="sm" variant={unit === 'MB' ? 'default' : 'outline'} onClick={() => onUnitChange('MB')}>
               MB
             </Button>
             <Button size="sm" variant={unit === 'GB' ? 'default' : 'outline'} onClick={() => onUnitChange('GB')}>
               GB
             </Button>
+            </div>
           </div>
         </div>
       </CardHeader>

@@ -21,8 +21,19 @@ const tabItems = [
   { href: '/settings', label: '设置', icon: Settings },
 ];
 
-export function BottomTabBar() {
+interface BottomTabBarProps {
+  smsUnread?: number;
+  alertUnread?: number;
+}
+
+export function BottomTabBar({ smsUnread = 0, alertUnread = 0 }: BottomTabBarProps) {
   const pathname = usePathname();
+
+  const getBadge = (href: string): number => {
+    if (href === '/sms') return smsUnread;
+    if (href === '/alerts') return alertUnread;
+    return 0;
+  };
 
   return (
     <nav
@@ -47,11 +58,16 @@ export function BottomTabBar() {
             >
               <span
                 className={cn(
-                  'inline-flex size-7 items-center justify-center rounded-lg transition-colors',
+                  'relative inline-flex size-7 items-center justify-center rounded-lg transition-colors',
                   isActive && 'bg-brand/10',
                 )}
               >
                 <Icon className="h-4 w-4" aria-hidden />
+                {getBadge(item.href) > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-danger px-0.5 text-[9px] font-bold text-white">
+                    {getBadge(item.href) > 99 ? '99+' : getBadge(item.href)}
+                  </span>
+                )}
               </span>
               <span className="truncate">{item.label}</span>
             </Link>

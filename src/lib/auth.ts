@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from 'jose';
-import { hash, compare } from 'bcryptjs';
+import { compare } from 'bcryptjs';
 import { cookies } from 'next/headers';
 
 function resolveJwtSecret(): Uint8Array {
@@ -12,12 +12,34 @@ function resolveJwtSecret(): Uint8Array {
 
 const JWT_SECRET = resolveJwtSecret();
 
-export async function hashPassword(password: string): Promise<string> {
-  return hash(password, 12);
+/**
+ * Resolves the admin password hash from environment.
+ * Supports ADMIN_PASSWORD_HASH (bcrypt hash, recommended) or
+ * legacy ADMIN_PASSWORD (plaintext, hashed at runtime for comparison).
+ */
+function resolveAdminPasswordHash(): string {
+  const hash = process.env.ADMIN_PASSWORD_HASH?.trim();
+  if (hash) return hash;
+  // Legacy fallback: plaintext password in env (not recommended for production)
+  const plain = process.env.ADMIN_PASSWORD?.trim();
+  if (plain) return plain;
+  throw new Error(
+    'ADMIN_PASSWORD_HASH is required. Generate one with: npx tsx scripts/hash-password.ts <password>',
+  );
 }
 
-export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
-  return compare(password, hashedPassword);
+/**
+ * Verify the input password against the environment-configured admin credential.
+ * If ADMIN_PASSWORD_HASH is set (starts with $2), uses bcrypt compare.
+ * If only legacy ADMIN_PASSWORD is set, does a direct string comparison.
+ */
+export async function verifyAdminPassword(inputPassword: string): Promise<boolean> {
+  const stored = resolveAdminPasswordHash();
+  if (stored.startsWith('$2')) {
+    return compare(inputPassword, stored);
+  }
+  // Legacy plaintext comparison
+  return inputPassword === stored;
 }
 
 export async function createToken(payload: { userId: number; username: string }): Promise<string> {

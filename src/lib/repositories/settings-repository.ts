@@ -93,7 +93,7 @@ export function listNotificationConfigs(): NotificationConfigRow[] {
   ).all() as NotificationConfigRow[];
 }
 
-export function findNotificationConfig(type: 'email' | 'wechat'): NotificationConfigRow | null {
+export function findNotificationConfig(type: string): NotificationConfigRow | null {
   ensureDatabaseReady();
   return (
     db.prepare(
@@ -107,7 +107,7 @@ export function findNotificationConfig(type: 'email' | 'wechat'): NotificationCo
 }
 
 export function saveNotificationConfig(input: {
-  type: 'email' | 'wechat';
+  type: string;
   config: string;
   enabled: boolean;
 }): void {

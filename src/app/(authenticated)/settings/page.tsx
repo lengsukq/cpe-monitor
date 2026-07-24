@@ -16,9 +16,10 @@ import { CpeConnectionSection } from '@/components/settings/CpeConnectionSection
 import { SmsSyncSection } from '@/components/settings/SmsSyncSection';
 import { DeviceInfoSyncSection } from '@/components/settings/DeviceInfoSyncSection';
 import { DataRetentionSection } from '@/components/settings/DataRetentionSection';
+import { DataQuotaSection } from '@/components/settings/DataQuotaSection';
+import { DataBackupSection } from '@/components/settings/DataBackupSection';
 import { EmailNotificationSection } from '@/components/settings/EmailNotificationSection';
 import { WechatNotificationSection } from '@/components/settings/WechatNotificationSection';
-import { PasswordSection } from '@/components/settings/PasswordSection';
 import { ThemeColorSection } from '@/components/settings/ThemeColorSection';
 import { useSettingsPage } from '@/hooks/useSettingsPage';
 
@@ -178,6 +179,14 @@ export default function SettingsPage() {
             saving={settings.savingDataRetention}
             onSave={(cleanupNow) => { void settings.saveDataRetention(cleanupNow); }}
           />
+          <DataQuotaSection
+            open={settings.openSection === 'quota'}
+            onOpenChange={(open) => settings.setOpenSection(open ? 'quota' : null)}
+            value={settings.dataQuota}
+            onChange={settings.setDataQuota}
+            saving={settings.savingQuota}
+            onSave={() => { void settings.saveDataQuota(); }}
+          />
           <EmailNotificationSection
             open={settings.openSection === 'email'}
             onOpenChange={(open) => settings.setOpenSection(open ? 'email' : null)}
@@ -198,14 +207,7 @@ export default function SettingsPage() {
             loading={settings.loading}
             onSave={() => { void settings.saveWechatConfig(); }}
           />
-          <PasswordSection
-            open={settings.openSection === 'security'}
-            onOpenChange={(open) => settings.setOpenSection(open ? 'security' : null)}
-            passwordForm={settings.passwordForm}
-            setPasswordForm={settings.setPasswordForm}
-            loading={settings.loading}
-            onSave={() => { void settings.changePassword(); }}
-          />
+          <DataBackupSection />
         </div>
       </div>
     </PageShell>

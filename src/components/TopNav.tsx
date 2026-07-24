@@ -30,7 +30,13 @@ const navItems = [
   { href: '/settings', label: '设置', icon: Settings, tone: 'text-slate-600 bg-slate-500/10 dark:text-slate-300' },
 ];
 
-export function TopNav() {
+interface TopNavProps {
+  alertUnreadCount?: number;
+  onAlertBellClick?: () => void;
+  connectionStatus?: 'connecting' | 'connected' | 'disconnected';
+}
+
+export function TopNav({ alertUnreadCount = 0, onAlertBellClick, connectionStatus = 'disconnected' }: TopNavProps) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
   const { hue, setHue } = useThemeColor();
@@ -92,6 +98,20 @@ export function TopNav() {
         </nav>
 
         <div className="flex items-center gap-1.5">
+          <Link
+            href="/alerts/history"
+            onClick={onAlertBellClick}
+            className="relative inline-flex size-10 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="告警通知"
+            title="告警通知"
+          >
+            <Bell className="h-4 w-4" aria-hidden />
+            {alertUnreadCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
+                {alertUnreadCount > 99 ? '99+' : alertUnreadCount}
+              </span>
+            )}
+          </Link>
           <div className="relative">
             <button
               ref={paletteBtnRef}
@@ -148,6 +168,19 @@ export function TopNav() {
             </AnimatePresence>
           </div>
           <ThemeToggle />
+          <span
+            className={cn(
+              'inline-block size-2.5 rounded-full transition-colors',
+              connectionStatus === 'connected' && 'bg-success',
+              connectionStatus === 'connecting' && 'bg-warning animate-pulse',
+              connectionStatus === 'disconnected' && 'bg-danger',
+            )}
+            title={
+              connectionStatus === 'connected' ? '实时连接正常'
+                : connectionStatus === 'connecting' ? '重连中…'
+                : '连接断开'
+            }
+          />
           <Link
             href="/api/auth/logout"
             className="hidden size-10 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger sm:inline-flex"

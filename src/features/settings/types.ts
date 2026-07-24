@@ -3,9 +3,9 @@ export type SettingsSectionId =
   | 'automation'
   | 'deviceInfo'
   | 'retention'
+  | 'quota'
   | 'email'
-  | 'wechat'
-  | 'security';
+  | 'wechat';
 
 export interface CpeConfigForm {
   cpeUrl: string;
@@ -24,12 +24,6 @@ export interface EmailConfigForm {
 
 export interface WechatConfigForm {
   webhookUrl: string;
-}
-
-export interface PasswordFormState {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
 }
 
 export interface SmsSyncConfigForm {
@@ -94,4 +88,11 @@ export interface PublicEmailApiConfig {
 export interface PublicWechatApiConfig {
   webhookUrl?: string;
   webhookConfigured?: boolean;
+}
+
+export interface DataQuotaForm {
+  enabled: boolean;
+  quotaGb: string;
+  alertLevels: string; // comma-separated percentages e.g. "80,90,100"
+  resetDay: string;
 }

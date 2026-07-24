@@ -13,6 +13,8 @@ import {
   Legend,
   Filler,
 } from 'chart.js';
+import zoomPlugin from 'chartjs-plugin-zoom';
+import 'hammerjs';
 import {
   useChartTheme,
   buildTooltipOptions,
@@ -29,6 +31,7 @@ ChartJS.register(
   Tooltip,
   Legend,
   Filler,
+  zoomPlugin,
 );
 
 const DOWNLOAD_FILL_ALPHA = 18;
@@ -40,6 +43,9 @@ interface TrafficData {
   downloadBytes?: number | null;
   uploadBps?: number | null;
   downloadBps?: number | null;
+  networkType?: string | null;
+  band?: string | null;
+  connectedDevices?: number | null;
 }
 
 interface TrafficChartProps {
@@ -120,6 +126,30 @@ export function TrafficChart({ data }: TrafficChartProps) {
             label: (context: { dataset: { label?: string }; parsed: { y: number | null } }) => {
               return `${context.dataset.label || ''}: ${context.parsed.y ?? 0} Mbps`;
             },
+            afterBody: (items: { dataIndex: number }[]) => {
+              if (!items.length) return [];
+              const idx = items[0].dataIndex;
+              const point = data[idx];
+              if (!point) return [];
+              const lines: string[] = [];
+              if (point.networkType) lines.push(`网络制式: ${point.networkType}`);
+              if (point.band) lines.push(`频段: ${point.band}`);
+              if (point.connectedDevices != null) lines.push(`在线设备: ${point.connectedDevices}`);
+              return lines;
+            },
+          },
+        },
+        zoom: {
+          pan: {
+            enabled: true,
+            mode: 'x' as const,
+          },
+          zoom: {
+            drag: {
+              enabled: true,
+              backgroundColor: `color-mix(in oklch, ${themeColors.primary} 15%, transparent)`,
+            },
+            mode: 'x' as const,
           },
         },
       },
@@ -144,7 +174,7 @@ export function TrafficChart({ data }: TrafficChartProps) {
         },
       },
     }),
-    [themeColors],
+    [themeColors, data],
   );
 
   return <Line data={chartData} options={options} />;

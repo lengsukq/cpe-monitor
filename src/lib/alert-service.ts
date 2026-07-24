@@ -1,5 +1,5 @@
 import { db } from './db';
-import { APP_TIME_ZONE, parseTimestampMs } from './date-time';
+import { APP_TIME_ZONE, parseTimestampMs, toSqliteTimestamp } from './date-time';
 import { bitsPerSecondToMegabits, bytesToMebibytes } from './traffic-units';
 import {
   getAlertMetricDefinition,
@@ -12,6 +12,12 @@ import type { AlertRuleRow } from './mappers/alert-rule';
 import { readNotificationConfig } from './settings-store';
 import { sendAlertNotification } from './notifiers/email';
 import { sendAlertWechat } from './notifiers/wechat';
+import { sendAlertTelegram } from './notifiers/telegram';
+import { sendAlertDingtalk } from './notifiers/dingtalk';
+import { sendAlertBark } from './notifiers/bark';
+import { eventBus } from './event-bus';
+import { writeSystemLog } from './system-log';
+import { getSetting, setSetting } from './settings-store';
 
 interface AlertLogTimestampRow {
   triggered_at: string;
@@ -267,14 +273,126 @@ export async function checkAlerts(): Promise<number> {
           ) || notified;
         }
       }
+      // Telegram
+      const telegramConfig = readNotificationConfig('telegram');
+      if (telegramConfig?.botToken && telegramConfig?.chatId) {
+        notified = await sendAlertTelegram(
+          telegramConfig,
+          { ruleName: rule.name, message, timestamp },
+        ) || notified;
+      }
+      // DingTalk
+      const dingtalkConfig = readNotificationConfig('dingtalk');
+      if (dingtalkConfig?.webhookUrl) {
+        notified = await sendAlertDingtalk(
+          dingtalkConfig,
+          { ruleName: rule.name, message, timestamp },
+        ) || notified;
+      }
+      // Bark
+      const barkConfig = readNotificationConfig('bark');
+      if (barkConfig?.deviceKey) {
+        notified = await sendAlertBark(
+          barkConfig,
+          { ruleName: rule.name, message, timestamp },
+        ) || notified;
+      }
       db.prepare('UPDATE alert_logs SET notified = ? WHERE id = ?')
         .run(notified ? 1 : 0, log.lastInsertRowid);
+      writeSystemLog('warn', `告警触发: ${rule.name} — ${message}`);
       console.log(`Alert triggered: ${rule.name}`);
+
+      // Broadcast alert event to SSE clients
+      eventBus.broadcast('alert', {
+        ruleId: rule.id,
+        ruleName: rule.name,
+        message,
+        metricType: evaluation.metricType,
+        value: evaluation.value,
+        unit: evaluation.unit,
+        severity: evaluation.severity,
+        notified,
+      });
+
       triggeredCount += 1;
     }
   } catch (error) {
     console.error('Failed to check alerts:', error);
   }
   return triggeredCount;
+}
+
+// ─── Data Quota Alert ────────────────────────────────────────────────────
+
+export function evaluateQuotaAlert(): void {
+  try {
+    const enabled = getSetting('data_quota_enabled') === 'true';
+    if (!enabled) return;
+
+    const quotaGb = parseFloat(getSetting('data_quota_gb', ''));
+    if (!quotaGb || quotaGb <= 0) return;
+
+    const alertLevels = getSetting('data_quota_alert_levels', '80,90,100')
+      .split(',')
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => Number.isFinite(n) && n > 0 && n <= 100)
+      .sort((a, b) => a - b);
+    if (alertLevels.length === 0) return;
+
+    const resetDay = Math.min(28, Math.max(1, parseInt(getSetting('data_quota_reset_day', '1'), 10) || 1));
+
+    // Calculate current billing period start
+    const now = new Date();
+    let periodStart: Date;
+    if (now.getDate() >= resetDay) {
+      periodStart = new Date(now.getFullYear(), now.getMonth(), resetDay);
+    } else {
+      periodStart = new Date(now.getFullYear(), now.getMonth() - 1, resetDay);
+    }
+    const periodStartIso = toSqliteTimestamp(periodStart);
+
+    // Sum traffic since period start
+    const row = db.prepare(
+      `SELECT COALESCE(SUM(delta_upload_bytes), 0) + COALESCE(SUM(delta_download_bytes), 0) AS total
+       FROM traffic_data WHERE timestamp >= ?`,
+    ).get(periodStartIso) as { total: number };
+
+    const usedBytes = row.total || 0;
+    const quotaBytes = quotaGb * 1024 * 1024 * 1024;
+    const usagePercent = (usedBytes / quotaBytes) * 100;
+
+    // Find the highest threshold that has been crossed
+    const crossedLevel = alertLevels.filter((level) => usagePercent >= level).pop();
+    if (crossedLevel === undefined) return;
+
+    // Check cooldown - only alert once per level per period
+    const levelKey = `quota_alert_${crossedLevel}_${periodStart.toISOString().slice(0, 10)}`;
+    const alreadyAlerted = getSetting(levelKey);
+    if (alreadyAlerted) return;
+
+    // Record that we've alerted for this level
+    setSetting(levelKey, 'true');
+
+    const usedGb = (usedBytes / (1024 * 1024 * 1024)).toFixed(2);
+    const severity = crossedLevel >= 100 ? '严重' : crossedLevel >= 90 ? '警告' : '提醒';
+    const message = `流量配额${severity}：本月已使用 ${usedGb} GB / ${quotaGb} GB (${usagePercent.toFixed(1)}%)，已达到 ${crossedLevel}% 阈值`;
+
+    writeSystemLog(crossedLevel >= 100 ? 'error' : 'warn', message);
+
+    // Broadcast to SSE
+    eventBus.broadcast('alert', {
+      type: 'quota',
+      message,
+      usagePercent: Math.round(usagePercent * 10) / 10,
+      usedGb: parseFloat(usedGb),
+      quotaGb,
+      level: crossedLevel,
+      severity,
+    });
+
+    console.log(`Quota alert: ${message}`);
+  } catch (error) {
+    console.error('Failed to evaluate quota alert:', error);
+  }
 }
 

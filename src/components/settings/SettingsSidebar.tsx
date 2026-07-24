@@ -1,12 +1,15 @@
 import {
   BellRing,
   Database,
+  DatabaseBackup,
+  Gauge,
   HardDrive,
   KeyRound,
   Mail,
   MessageSquareText,
   Palette,
   RefreshCw,
+  ScrollText,
   Wifi,
   Wrench,
 } from 'lucide-react';
@@ -77,6 +80,13 @@ export function SettingsSidebar({
             onClick={() => onOpenSection('retention')}
           />
           <SettingsNav
+            href="#data-quota"
+            icon={<Gauge className="h-3.5 w-3.5" />}
+            label="流量配额"
+            detail="预算告警"
+            onClick={() => onOpenSection('quota')}
+          />
+          <SettingsNav
             href="#email"
             icon={<Mail className="h-3.5 w-3.5" />}
             label="邮件通知"
@@ -91,11 +101,16 @@ export function SettingsSidebar({
             onClick={() => onOpenSection('wechat')}
           />
           <SettingsNav
-            href="#security"
-            icon={<KeyRound className="h-3.5 w-3.5" />}
-            label="访问安全"
-            detail="管理密码"
-            onClick={() => onOpenSection('security')}
+            href="#data-backup"
+            icon={<DatabaseBackup className="h-3.5 w-3.5" />}
+            label="数据备份"
+            detail="备份/恢复"
+          />
+          <SettingsNav
+            href="/settings/logs"
+            icon={<ScrollText className="h-3.5 w-3.5" />}
+            label="系统日志"
+            detail="运行记录"
           />
         </CardContent>
       </Card>

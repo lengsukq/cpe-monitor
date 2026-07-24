@@ -1,4 +1,7 @@
 import type { EmailConfig, WechatConfig } from '@/types';
+import type { TelegramConfig } from '@/lib/notifiers/telegram';
+import type { DingtalkConfig } from '@/lib/notifiers/dingtalk';
+import type { BarkConfig } from '@/lib/notifiers/bark';
 import {
   decryptSecureValue,
   encryptSecureValue,
@@ -211,14 +214,15 @@ export function getNotificationConfigRow(type: NotificationType): NotificationCo
 
 export function readNotificationConfig(type: 'email'): EmailConfig | null;
 export function readNotificationConfig(type: 'wechat'): WechatConfig | null;
-export function readNotificationConfig(type: NotificationType): EmailConfig | WechatConfig | null {
+export function readNotificationConfig(type: 'telegram'): TelegramConfig | null;
+export function readNotificationConfig(type: 'dingtalk'): DingtalkConfig | null;
+export function readNotificationConfig(type: 'bark'): BarkConfig | null;
+export function readNotificationConfig(type: NotificationType): EmailConfig | WechatConfig | TelegramConfig | DingtalkConfig | BarkConfig | null {
   const row = getNotificationConfigRow(type);
   if (!row || !row.enabled) return null;
 
   try {
-    const config = type === 'email'
-      ? readNotificationConfigForDelivery('email', row.config)
-      : readNotificationConfigForDelivery('wechat', row.config);
+    const config = readNotificationConfigForDelivery(type, row.config);
     if (notificationConfigNeedsMigration(type, row.config)) {
       saveNotificationConfig({
         type,

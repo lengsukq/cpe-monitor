@@ -4,6 +4,7 @@ import {
   getAppDayRange,
   getAppHour,
   toSqliteTimestamp,
+  APP_TIME_ZONE,
 } from './date-time';
 import { computeCounterDelta } from './traffic-units';
 
@@ -257,4 +258,129 @@ export async function generateDailyReport(): Promise<DailyReport> {
     bands: trafficSummary.bands,
     generatedAt: now.toISOString(),
   };
+}
+
+// ─── Weekly / Monthly report generation ──────────────────────────────────
+
+export interface PeriodReport {
+  periodType: 'weekly' | 'monthly';
+  periodKey: string; // e.g. '2024-W03' or '2024-01'
+  startDate: string;
+  endDate: string;
+  totalUpload: number;
+  totalDownload: number;
+  dailyAvgUpload: number;
+  dailyAvgDownload: number;
+  peakDay: string | null;
+  peakDayTraffic: number;
+  avgSignal: number | null;
+  networkQuality: string;
+  topDevices: DeviceRanking[];
+  dayCount: number;
+  generatedAt: string;
+}
+
+function getWeekRange(now: Date): { start: Date; end: Date; key: string } {
+  const day = now.getDay(); // 0=Sun
+  const diffToMonday = day === 0 ? 6 : day - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+  const nextMonday = new Date(monday);
+  nextMonday.setDate(monday.getDate() + 7);
+  // ISO week number
+  const jan1 = new Date(monday.getFullYear(), 0, 1);
+  const weekNum = Math.ceil(((monday.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
+  const key = `${monday.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+  return { start: monday, end: nextMonday, key };
+}
+
+function getMonthRange(now: Date): { start: Date; end: Date; key: string } {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return { start, end, key };
+}
+
+function generatePeriodReport(periodType: 'weekly' | 'monthly', range: { start: Date; end: Date; key: string }): PeriodReport {
+  const startIso = toSqliteTimestamp(range.start);
+  const endIso = toSqliteTimestamp(range.end);
+
+  const trafficRows = db.prepare(
+    `SELECT timestamp, upload_bytes, download_bytes, delta_upload_bytes, delta_download_bytes,
+            upload_bps, download_bps, connected_devices, signal_strength,
+            network_type, band, rsrp, rsrq, sinr, rssi
+     FROM traffic_data WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp ASC`,
+  ).all(startIso, endIso) as TrafficReportRow[];
+
+  const deviceRows = db.prepare(
+    `SELECT timestamp, device_name, device_ip, device_mac, upload_bytes, download_bytes,
+            delta_upload_bytes, delta_download_bytes
+     FROM device_data WHERE timestamp >= ? AND timestamp < ? ORDER BY device_mac, timestamp ASC`,
+  ).all(startIso, endIso) as DeviceReportRow[];
+
+  const summary = computeTrafficSummary(trafficRows);
+  const topDevices = computeDeviceRankings(deviceRows);
+
+  // Compute daily aggregates for peak day and averages
+  const dailyMap = new Map<string, { upload: number; download: number }>();
+  let prevRow: TrafficReportRow | undefined;
+  for (const row of trafficRows) {
+    const dayKey = row.timestamp.slice(0, 10);
+    const upDelta = row.delta_upload_bytes ?? computeCounterDelta(row.upload_bytes, prevRow?.upload_bytes);
+    const downDelta = row.delta_download_bytes ?? computeCounterDelta(row.download_bytes, prevRow?.download_bytes);
+    const entry = dailyMap.get(dayKey) || { upload: 0, download: 0 };
+    entry.upload += upDelta;
+    entry.download += downDelta;
+    dailyMap.set(dayKey, entry);
+    prevRow = row;
+  }
+
+  let peakDay: string | null = null;
+  let peakDayTraffic = 0;
+  for (const [day, val] of dailyMap) {
+    const total = val.upload + val.download;
+    if (total > peakDayTraffic) { peakDayTraffic = total; peakDay = day; }
+  }
+
+  const dayCount = Math.max(1, dailyMap.size);
+  const avgSignal = average(trafficRows.map((r) => r.signal_strength));
+  const avgRsrp = average(trafficRows.map((r) => r.rsrp));
+  const qualitySignal = avgRsrp ?? avgSignal;
+  const networkQuality = computeNetworkQuality(trafficRows.length, qualitySignal, dayCount > 0 ? 0.7 : 0);
+
+  return {
+    periodType,
+    periodKey: range.key,
+    startDate: startIso.slice(0, 10),
+    endDate: endIso.slice(0, 10),
+    totalUpload: summary.totalUpload,
+    totalDownload: summary.totalDownload,
+    dailyAvgUpload: Math.round(summary.totalUpload / dayCount),
+    dailyAvgDownload: Math.round(summary.totalDownload / dayCount),
+    peakDay,
+    peakDayTraffic,
+    avgSignal: avgSignal === null ? null : Math.round(avgSignal),
+    networkQuality,
+    topDevices,
+    dayCount,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+export function generateWeeklyReport(forDate?: Date): PeriodReport {
+  const now = forDate || new Date();
+  // Generate for the previous week
+  const lastWeek = new Date(now);
+  lastWeek.setDate(now.getDate() - 7);
+  const range = getWeekRange(lastWeek);
+  return generatePeriodReport('weekly', range);
+}
+
+export function generateMonthlyReport(forDate?: Date): PeriodReport {
+  const now = forDate || new Date();
+  // Generate for the previous month
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+  const range = getMonthRange(lastMonth);
+  return generatePeriodReport('monthly', range);
 }
