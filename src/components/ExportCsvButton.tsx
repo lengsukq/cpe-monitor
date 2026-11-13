@@ -2,6 +2,7 @@
 
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { withBasePath } from '@/lib/base-path';
 
 interface ExportCsvButtonProps {
   href: string;
@@ -17,7 +18,7 @@ interface ExportCsvButtonProps {
 export function ExportCsvButton({ href, label = '导出 CSV', size = 'sm', variant = 'outline' }: ExportCsvButtonProps) {
   const handleExport = () => {
     const a = document.createElement('a');
-    a.href = href;
+    a.href = withBasePath(href);
     a.download = '';
     document.body.appendChild(a);
     a.click();

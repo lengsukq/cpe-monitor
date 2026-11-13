@@ -12,6 +12,18 @@ export async function GET() {
 
   const encoder = new TextEncoder();
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let listener: ((event: CpeEvent) => void) | null = null;
+
+  const cleanup = () => {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+    if (listener) {
+      eventBus.off('message', listener);
+      listener = null;
+    }
+  };
 
   const stream = new ReadableStream({
     start(controller) {
@@ -21,9 +33,11 @@ export async function GET() {
             encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
           );
         } catch {
-          // Client disconnected
+          cleanup();
         }
       };
+
+      listener = send;
 
       // Send initial connection event
       send({
@@ -40,13 +54,12 @@ export async function GET() {
         try {
           controller.enqueue(encoder.encode(': heartbeat\n\n'));
         } catch {
-          // Client disconnected
+          cleanup();
         }
       }, 30_000);
     },
     cancel() {
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
-      eventBus.removeAllListeners('message');
+      cleanup();
     },
   });
 

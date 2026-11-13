@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Loader2, RadioTower, ShieldCheck } from 'lucide-react';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Callout } from '@/components/Callout';
+import { withBasePath } from '@/lib/base-path';
 
 export default function LoginPage() {
   const [password, setPassword] = useState('');
@@ -18,13 +19,27 @@ export default function LoginPage() {
   const router = useRouter();
   const reduce = useReducedMotion();
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch(withBasePath('/api/auth/me'))
+      .then((res) => {
+        if (res.ok && !cancelled) {
+          router.replace('/dashboard');
+        }
+      })
+      .catch(() => { /* ignore */ });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(withBasePath('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),

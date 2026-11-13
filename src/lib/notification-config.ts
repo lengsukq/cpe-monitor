@@ -114,6 +114,14 @@ function readSecret(value: unknown, purpose: string): string {
     : raw;
 }
 
+function tryReadSecret(value: unknown, purpose: string): string {
+  try {
+    return readSecret(value, purpose);
+  } catch {
+    return '';
+  }
+}
+
 function storeSecret(value: string, purpose: string): string {
   return value ? encryptSecureValue(value, purpose) : '';
 }
@@ -166,9 +174,10 @@ export function prepareEmailConfigForStorage(
   existingRaw?: unknown,
 ): StoredEmailConfig {
   const next = asObject(input);
-  const existing = existingRaw === undefined ? null : readEmailConfig(existingRaw);
+  const existingObj = existingRaw === undefined ? null : asObject(existingRaw);
   const submittedPassword = stringValue(next.smtpPass);
-  const smtpPass = submittedPassword || existing?.smtpPass || '';
+  const existingPass = existingObj ? tryReadSecret(existingObj.smtpPass, EMAIL_PASSWORD_PURPOSE) : '';
+  const smtpPass = submittedPassword || existingPass || '';
 
   return {
     smtpHost: stringValue(next.smtpHost),
@@ -185,9 +194,10 @@ export function prepareWechatConfigForStorage(
   existingRaw?: unknown,
 ): StoredWechatConfig {
   const next = asObject(input);
-  const existing = existingRaw === undefined ? null : readWechatConfig(existingRaw);
+  const existingObj = existingRaw === undefined ? null : asObject(existingRaw);
   const submittedWebhook = stringValue(next.webhookUrl);
-  const webhookUrl = submittedWebhook || existing?.webhookUrl || '';
+  const existingWebhook = existingObj ? tryReadSecret(existingObj.webhookUrl, WECHAT_WEBHOOK_PURPOSE) : '';
+  const webhookUrl = submittedWebhook || existingWebhook || '';
   return {
     webhookUrl: storeSecret(webhookUrl, WECHAT_WEBHOOK_PURPOSE),
   };
@@ -198,12 +208,13 @@ export function prepareTelegramConfigForStorage(
   existingRaw?: unknown,
 ): StoredTelegramConfig {
   const next = asObject(input);
-  const existing = existingRaw === undefined ? null : readTelegramConfig(existingRaw);
+  const existingObj = existingRaw === undefined ? null : asObject(existingRaw);
   const submittedToken = stringValue(next.botToken);
-  const botToken = submittedToken || existing?.botToken || '';
+  const existingToken = existingObj ? tryReadSecret(existingObj.botToken, TELEGRAM_TOKEN_PURPOSE) : '';
+  const botToken = submittedToken || existingToken || '';
   return {
     botToken: storeSecret(botToken, TELEGRAM_TOKEN_PURPOSE),
-    chatId: stringValue(next.chatId) || existing?.chatId || '',
+    chatId: stringValue(next.chatId) || stringValue(existingObj?.chatId) || '',
   };
 }
 
@@ -212,11 +223,13 @@ export function prepareDingtalkConfigForStorage(
   existingRaw?: unknown,
 ): StoredDingtalkConfig {
   const next = asObject(input);
-  const existing = existingRaw === undefined ? null : readDingtalkConfig(existingRaw);
+  const existingObj = existingRaw === undefined ? null : asObject(existingRaw);
   const submittedWebhook = stringValue(next.webhookUrl);
-  const webhookUrl = submittedWebhook || existing?.webhookUrl || '';
+  const existingWebhook = existingObj ? tryReadSecret(existingObj.webhookUrl, DINGTALK_WEBHOOK_PURPOSE) : '';
+  const webhookUrl = submittedWebhook || existingWebhook || '';
   const submittedSecret = stringValue(next.secret);
-  const secret = submittedSecret || existing?.secret || '';
+  const existingSecret = existingObj ? tryReadSecret(existingObj.secret, DINGTALK_SECRET_PURPOSE) : '';
+  const secret = submittedSecret || existingSecret || '';
   return {
     webhookUrl: storeSecret(webhookUrl, DINGTALK_WEBHOOK_PURPOSE),
     secret: storeSecret(secret, DINGTALK_SECRET_PURPOSE),
@@ -228,11 +241,12 @@ export function prepareBarkConfigForStorage(
   existingRaw?: unknown,
 ): StoredBarkConfig {
   const next = asObject(input);
-  const existing = existingRaw === undefined ? null : readBarkConfig(existingRaw);
+  const existingObj = existingRaw === undefined ? null : asObject(existingRaw);
   const submittedKey = stringValue(next.deviceKey);
-  const deviceKey = submittedKey || existing?.deviceKey || '';
+  const existingKey = existingObj ? tryReadSecret(existingObj.deviceKey, BARK_KEY_PURPOSE) : '';
+  const deviceKey = submittedKey || existingKey || '';
   return {
-    serverUrl: stringValue(next.serverUrl) || existing?.serverUrl || 'https://api.day.app',
+    serverUrl: stringValue(next.serverUrl) || stringValue(existingObj?.serverUrl) || 'https://api.day.app',
     deviceKey: storeSecret(deviceKey, BARK_KEY_PURPOSE),
   };
 }
@@ -330,46 +344,56 @@ export function readNotificationConfigForDelivery(
 }
 
 export function toPublicEmailConfig(raw: unknown): PublicEmailConfig {
-  const config = readEmailConfig(raw);
+  const obj = asObject(raw);
+  const secret = tryReadSecret(obj.smtpPass, EMAIL_PASSWORD_PURPOSE);
   return {
-    ...config,
+    smtpHost: stringValue(obj.smtpHost),
+    smtpPort: normalizePort(obj.smtpPort),
+    smtpUser: stringValue(obj.smtpUser),
     smtpPass: '',
-    smtpPasswordSet: Boolean(config.smtpPass),
+    smtpPasswordSet: Boolean(secret),
+    from: stringValue(obj.from),
+    to: normalizeRecipients(obj.to),
   };
 }
 
 export function toPublicWechatConfig(raw: unknown): PublicWechatConfig {
-  const config = readWechatConfig(raw);
+  const obj = asObject(raw);
+  const webhookUrl = tryReadSecret(obj.webhookUrl, WECHAT_WEBHOOK_PURPOSE);
   return {
     webhookUrl: '',
-    webhookConfigured: Boolean(config.webhookUrl),
+    webhookConfigured: Boolean(webhookUrl),
   };
 }
 
 export function toPublicTelegramConfig(raw: unknown): PublicTelegramConfig {
-  const config = readTelegramConfig(raw);
+  const obj = asObject(raw);
+  const botToken = tryReadSecret(obj.botToken, TELEGRAM_TOKEN_PURPOSE);
   return {
     botToken: '',
-    chatId: config.chatId,
-    botTokenSet: Boolean(config.botToken),
+    chatId: stringValue(obj.chatId),
+    botTokenSet: Boolean(botToken),
   };
 }
 
 export function toPublicDingtalkConfig(raw: unknown): PublicDingtalkConfig {
-  const config = readDingtalkConfig(raw);
+  const obj = asObject(raw);
+  const webhookUrl = tryReadSecret(obj.webhookUrl, DINGTALK_WEBHOOK_PURPOSE);
+  const secret = tryReadSecret(obj.secret, DINGTALK_SECRET_PURPOSE);
   return {
     webhookUrl: '',
-    webhookConfigured: Boolean(config.webhookUrl),
-    secretConfigured: Boolean(config.secret),
+    webhookConfigured: Boolean(webhookUrl),
+    secretConfigured: Boolean(secret),
   };
 }
 
 export function toPublicBarkConfig(raw: unknown): PublicBarkConfig {
-  const config = readBarkConfig(raw);
+  const obj = asObject(raw);
+  const deviceKey = tryReadSecret(obj.deviceKey, BARK_KEY_PURPOSE);
   return {
-    serverUrl: config.serverUrl,
+    serverUrl: stringValue(obj.serverUrl) || 'https://api.day.app',
     deviceKey: '',
-    deviceKeySet: Boolean(config.deviceKey),
+    deviceKeySet: Boolean(deviceKey),
   };
 }
 

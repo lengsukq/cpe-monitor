@@ -1,3 +1,5 @@
+import { withBasePath } from './base-path.ts';
+
 export class ClientApiError extends Error {
   readonly status: number;
   readonly payload: unknown;
@@ -34,7 +36,7 @@ export async function apiFetch<T>(
   init?: RequestInit,
   fallbackError = '请求失败',
 ): Promise<T> {
-  const response = await fetch(url, init);
+  const response = await fetch(withBasePath(url), init);
   let payload: unknown = null;
 
   const contentType = response.headers.get('content-type') || '';

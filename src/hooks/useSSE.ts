@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { withBasePath } from '@/lib/base-path';
 
 export interface SSEEvent {
   type: 'metrics' | 'alert' | 'collection' | 'connection';
@@ -34,7 +35,11 @@ export function useSSE({ onEvent, enabled = true }: UseSSEOptions = {}): UseSSER
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onEventRef = useRef(onEvent);
-  onEventRef.current = onEvent;
+  const connectRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  }, [onEvent]);
 
   const connect = useCallback(() => {
     if (eventSourceRef.current) {
@@ -42,7 +47,7 @@ export function useSSE({ onEvent, enabled = true }: UseSSEOptions = {}): UseSSER
     }
 
     setStatus('connecting');
-    const es = new EventSource('/api/dashboard/stream');
+    const es = new EventSource(withBasePath('/api/dashboard/stream'));
     eventSourceRef.current = es;
 
     es.onopen = () => {
@@ -72,10 +77,14 @@ export function useSSE({ onEvent, enabled = true }: UseSSEOptions = {}): UseSSER
       );
       retryCountRef.current += 1;
       retryTimerRef.current = setTimeout(() => {
-        connect();
+        connectRef.current();
       }, delay);
     };
   }, []);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   const reconnect = useCallback(() => {
     retryCountRef.current = 0;
@@ -88,13 +97,15 @@ export function useSSE({ onEvent, enabled = true }: UseSSEOptions = {}): UseSSER
 
   useEffect(() => {
     if (!enabled) {
-      setStatus('disconnected');
       return;
     }
 
-    connect();
+    const initTimer = setTimeout(() => {
+      connect();
+    }, 0);
 
     return () => {
+      clearTimeout(initTimer);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
@@ -106,5 +117,5 @@ export function useSSE({ onEvent, enabled = true }: UseSSEOptions = {}): UseSSER
     };
   }, [enabled, connect]);
 
-  return { status, lastEvent, reconnect };
+  return { status: enabled ? status : 'disconnected', lastEvent, reconnect };
 }

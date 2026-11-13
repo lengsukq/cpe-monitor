@@ -5,5 +5,6 @@ export const GET = withApiHandler(async () => {
   return jsonOk({
     userId: session.userId,
     username: session.username,
+    managedAuth: session.authSource === 'lightisle-proxy',
   });
 }, '认证失败');

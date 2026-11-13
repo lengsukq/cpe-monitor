@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useSSE, type SSEEvent } from '@/hooks/useSSE';
+import { withBasePath } from '@/lib/base-path';
 
 const LAST_SEEN_KEY = 'cpeye-alerts-last-seen';
 
@@ -21,27 +22,30 @@ export function useAlertNotification(): UseAlertNotificationResult {
   const [unreadCount, setUnreadCount] = useState(0);
   const lastSeenRef = useRef<string | null>(null);
 
-  // Load last-seen timestamp from localStorage
-  useEffect(() => {
-    try {
-      lastSeenRef.current = localStorage.getItem(LAST_SEEN_KEY);
-    } catch { /* ignore */ }
-    void fetchUnreadCount();
-  }, []);
-
   const fetchUnreadCount = useCallback(async () => {
     try {
       const since = lastSeenRef.current;
       const url = since
         ? `/api/alerts/unread-count?since=${encodeURIComponent(since)}`
         : '/api/alerts/unread-count';
-      const res = await fetch(url);
+      const res = await fetch(withBasePath(url));
       if (res.ok) {
         const data = await res.json();
         setUnreadCount(data.count ?? 0);
       }
     } catch { /* ignore */ }
   }, []);
+
+  // Load last-seen timestamp from localStorage
+  useEffect(() => {
+    try {
+      lastSeenRef.current = localStorage.getItem(LAST_SEEN_KEY);
+    } catch { /* ignore */ }
+    const timer = window.setTimeout(() => {
+      void fetchUnreadCount();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchUnreadCount]);
 
   const handleSSEEvent = useCallback((event: SSEEvent) => {
     if (event.type === 'alert') {

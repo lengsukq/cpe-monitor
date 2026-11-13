@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { BarChart3, Mail, MessageSquareText, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
 import { Callout } from '@/components/Callout';
 import { PageHeader } from '@/components/PageHeader';
@@ -22,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { apiFetch } from '@/lib/client-api';
+import { getAppDateKey, parseDateTime } from '@/lib/date-time';
 import { formatSyncTime } from '@/lib/format';
 
 interface SmsMessage {
@@ -44,16 +44,30 @@ interface SmsSyncStatus {
 type Filter = 'all' | 'unread' | 'read';
 type DirectionFilter = 'all' | 'inbound' | 'outbound';
 
+function getRecentDailyDateKeys(dayCount = 7) {
+  const todayKey = getAppDateKey(new Date());
+  const todayMidnight = new Date(`${todayKey}T00:00:00+08:00`).getTime();
+  return Array.from({ length: dayCount }, (_, index) => {
+    const dayDate = new Date(todayMidnight - (dayCount - 1 - index) * 24 * 60 * 60 * 1000);
+    return getAppDateKey(dayDate);
+  });
+}
+
 function getRecentDailyCounts(messages: SmsMessage[], dayCount = 7) {
-  const now = Date.now();
+  const keys = getRecentDailyDateKeys(dayCount);
+  const indexByKey = new Map(keys.map((key, index) => [key, index]));
   const counts = Array.from({ length: dayCount }, () => 0);
 
   for (const message of messages) {
-    const parsed = new Date(message.date.replace(' ', 'T')).getTime();
-    if (!Number.isFinite(parsed)) continue;
-    const diffDays = Math.floor((now - parsed) / (24 * 60 * 60 * 1000));
-    if (diffDays >= 0 && diffDays < dayCount) {
-      counts[dayCount - 1 - diffDays] += 1;
+    const trimmed = (message.date || '').trim();
+    if (!trimmed) continue;
+    // CPE SMS timestamps are local Asia/Shanghai strings (`YYYY-MM-DD HH:MM:SS`); extract calendar date when present.
+    const datePrefix = trimmed.match(/^(\d{4}-\d{2}-\d{2})/)?.[1];
+    const parsedDate = parseDateTime(trimmed);
+    const key = datePrefix || (parsedDate ? getAppDateKey(parsedDate) : '');
+    const slot = indexByKey.get(key);
+    if (slot !== undefined) {
+      counts[slot] += 1;
     }
   }
 
@@ -61,15 +75,10 @@ function getRecentDailyCounts(messages: SmsMessage[], dayCount = 7) {
 }
 
 function getRecentDailyLabels(dayCount = 7) {
-  const now = Date.now();
-  return Array.from({ length: dayCount }, (_, index) => {
-    const date = new Date(now - (dayCount - 1 - index) * 24 * 60 * 60 * 1000);
-    return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
-  });
+  return getRecentDailyDateKeys(dayCount).map((key) => key.slice(5).replace('-', '/'));
 }
 
 export default function SmsPage() {
-  const reduce = useReducedMotion();
   const [messages, setMessages] = useState<SmsMessage[]>([]);
   const [total, setTotal] = useState(0);
   const [unread, setUnread] = useState(0);
@@ -358,17 +367,13 @@ export default function SmsPage() {
             />
           </div>
         ) : (
-          <motion.div className="mt-5 grid gap-3" layout={reduce ? undefined : true}>
-            <AnimatePresence mode="popLayout" initial={false}>
-              {visibleMessages.map((message, index) => (
-                <SwipeableItem key={`${message.id}-${index}`} onCopy={() => { void navigator.clipboard?.writeText(message.content || ''); }}>
-                <motion.article
-                  key={`${message.id}-${index}`}
-                  layout={reduce ? undefined : 'position'}
-                  initial={reduce ? undefined : { opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduce ? undefined : { opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.25, delay: reduce ? 0 : Math.min(index * 0.03, 0.3) }}
+          <div className="mt-5 grid gap-3">
+            {visibleMessages.map((message, index) => (
+              <SwipeableItem
+                key={`${message.id || message.date}-${message.phone}-${index}`}
+                onCopy={() => { void navigator.clipboard?.writeText(message.content || ''); }}
+              >
+                <article
                   className="group grid min-w-0 gap-4 rounded-2xl border border-border/65 bg-muted/25 p-4 transition-colors hover:border-brand/20 hover:bg-muted/40 md:grid-cols-[minmax(0,.4fr)_minmax(0,1fr)] md:items-start xl:grid-cols-[minmax(0,.3fr)_minmax(0,1fr)_minmax(0,.25fr)]"
                 >
                   <div className="flex items-center gap-3">
@@ -385,16 +390,15 @@ export default function SmsPage() {
                     {message.unread ? <Badge variant="info">未读</Badge> : <Badge variant="secondary">已读</Badge>}
                     <span>{message.date || '未知时间'}</span>
                   </div>
-                </motion.article>
-                </SwipeableItem>
-              ))}
-            </AnimatePresence>
+                </article>
+              </SwipeableItem>
+            ))}
             {hasMore && (
               <div ref={sentinelRef} className="flex justify-center py-4">
                 {loadingMore && <span className="text-sm text-muted-foreground">加载更多…</span>}
               </div>
             )}
-          </motion.div>
+          </div>
         )}
       </section>
     </PageShell>

@@ -34,9 +34,10 @@ interface TopNavProps {
   alertUnreadCount?: number;
   onAlertBellClick?: () => void;
   connectionStatus?: 'connecting' | 'connected' | 'disconnected';
+  managedAuth?: boolean;
 }
 
-export function TopNav({ alertUnreadCount = 0, onAlertBellClick, connectionStatus = 'disconnected' }: TopNavProps) {
+export function TopNav({ alertUnreadCount = 0, onAlertBellClick, connectionStatus = 'disconnected', managedAuth = false }: TopNavProps) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
   const { hue, setHue } = useThemeColor();
@@ -181,14 +182,16 @@ export function TopNav({ alertUnreadCount = 0, onAlertBellClick, connectionStatu
                 : '连接断开'
             }
           />
-          <Link
-            href="/api/auth/logout"
-            className="hidden size-10 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger sm:inline-flex"
-            aria-label="退出登录"
-            title="退出登录"
-          >
-            <LogOut className="h-4 w-4" aria-hidden />
-          </Link>
+          {!managedAuth && (
+            <Link
+              href="/api/auth/logout"
+              className="hidden size-10 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger sm:inline-flex"
+              aria-label="退出登录"
+              title="退出登录"
+            >
+              <LogOut className="h-4 w-4" aria-hidden />
+            </Link>
+          )}
         </div>
       </div>
     </header>

@@ -1,5 +1,5 @@
 import { db } from './db';
-import { APP_TIME_ZONE, parseTimestampMs, toSqliteTimestamp } from './date-time';
+import { APP_TIME_ZONE, getAppDateKey, parseTimestampMs, toSqliteTimestamp } from './date-time';
 import { bitsPerSecondToMegabits, bytesToMebibytes } from './traffic-units';
 import {
   getAlertMetricDefinition,
@@ -351,14 +351,21 @@ export function evaluateQuotaAlert(): void {
 
     const resetDay = Math.min(28, Math.max(1, parseInt(getSetting('data_quota_reset_day', '1'), 10) || 1));
 
-    // Calculate current billing period start
-    const now = new Date();
-    let periodStart: Date;
-    if (now.getDate() >= resetDay) {
-      periodStart = new Date(now.getFullYear(), now.getMonth(), resetDay);
-    } else {
-      periodStart = new Date(now.getFullYear(), now.getMonth() - 1, resetDay);
+    // Calculate current billing period start in Asia/Shanghai
+    const todayKey = getAppDateKey(new Date());
+    const [yearStr, monthStr, dayStr] = todayKey.split('-');
+    let periodYear = Number(yearStr);
+    let periodMonth = Number(monthStr);
+    const currentDay = Number(dayStr);
+    if (currentDay < resetDay) {
+      periodMonth -= 1;
+      if (periodMonth < 1) {
+        periodMonth = 12;
+        periodYear -= 1;
+      }
     }
+    const periodDateKey = `${String(periodYear).padStart(4, '0')}-${String(periodMonth).padStart(2, '0')}-${String(resetDay).padStart(2, '0')}`;
+    const periodStart = new Date(`${periodDateKey}T00:00:00+08:00`);
     const periodStartIso = toSqliteTimestamp(periodStart);
 
     // Sum traffic since period start
@@ -376,7 +383,7 @@ export function evaluateQuotaAlert(): void {
     if (crossedLevel === undefined) return;
 
     // Check cooldown - only alert once per level per period
-    const levelKey = `quota_alert_${crossedLevel}_${periodStart.toISOString().slice(0, 10)}`;
+    const levelKey = `quota_alert_${crossedLevel}_${periodDateKey}`;
     const alreadyAlerted = getSetting(levelKey);
     if (alreadyAlerted) return;
 

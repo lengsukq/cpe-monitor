@@ -77,10 +77,12 @@ export function createIntervalScheduler(options: IntervalSchedulerOptions): Inte
   function getStatus(): SyncStatus {
     initializeDatabase();
     const settings = getSettingsMap();
+    const enabled = settings[enabledKey] !== 'false';
+    const externalCron = process.env.CPE_DISABLE_IN_APP_SCHEDULER === 'true';
     return {
-      enabled: settings[enabledKey] !== 'false',
+      enabled,
       interval: parseInterval(settings[intervalKey]),
-      running: timerTask !== null,
+      running: externalCron ? enabled : timerTask !== null,
       lastSyncedAt: settings[lastSyncAtKey] || null,
       lastError: settings[lastSyncErrorKey] || null,
     };
@@ -111,6 +113,10 @@ export function createIntervalScheduler(options: IntervalSchedulerOptions): Inte
       return status;
     }
 
+    if (process.env.CPE_DISABLE_IN_APP_SCHEDULER === 'true') {
+      return status;
+    }
+
     timerTask = setInterval(() => {
       void runScheduled();
     }, status.interval * 60 * 1000);
@@ -128,6 +134,10 @@ export function createIntervalScheduler(options: IntervalSchedulerOptions): Inte
   }
 
   async function ensureStarted(): Promise<void> {
+    if (process.env.CPE_DISABLE_IN_APP_SCHEDULER === 'true') {
+      stop();
+      return;
+    }
     const status = getStatus();
     if (status.enabled && !status.running) {
       await restart();

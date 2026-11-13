@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
-import { AnimatePresence } from 'framer-motion';
 import { TopNav } from '@/components/TopNav';
 import { BottomTabBar } from '@/components/BottomTabBar';
 import { PageTransition } from '@/components/motion';
@@ -13,6 +12,7 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAlertNotification } from '@/hooks/useAlertNotification';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { withBasePath } from '@/lib/base-path';
 
 export default function AuthenticatedLayout({
   children,
@@ -20,6 +20,7 @@ export default function AuthenticatedLayout({
   children: React.ReactNode;
 }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [managedAuth, setManagedAuth] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [smsUnread, setSmsUnread] = useState(0);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -35,12 +36,14 @@ export default function AuthenticatedLayout({
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await fetch('/api/auth/me');
+        const res = await fetch(withBasePath('/api/auth/me'));
         if (res.ok) {
+          const authData = await res.json().catch(() => null) as { managedAuth?: boolean } | null;
+          setManagedAuth(Boolean(authData?.managedAuth));
           setIsAuthenticated(true);
           // Check setup status
           try {
-            const setupRes = await fetch('/api/system/setup-status');
+            const setupRes = await fetch(withBasePath('/api/system/setup-status'));
             if (setupRes.ok) {
               const data = await setupRes.json();
               if (!data.completed) setShowSetup(true);
@@ -61,7 +64,7 @@ export default function AuthenticatedLayout({
     if (!isAuthenticated) return;
     const fetchSmsUnread = async () => {
       try {
-        const res = await fetch('/api/dashboard/sms?page=1&pageSize=1');
+        const res = await fetch(withBasePath('/api/dashboard/sms?page=1&pageSize=1'));
         if (res.ok) {
           const data = await res.json();
           setSmsUnread(data.unread || 0);
@@ -116,14 +119,12 @@ export default function AuthenticatedLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <TopNav alertUnreadCount={unreadCount} onAlertBellClick={markAsRead} connectionStatus={sseStatus} />
+      <TopNav alertUnreadCount={unreadCount} onAlertBellClick={markAsRead} connectionStatus={sseStatus} managedAuth={managedAuth} />
       <main className="mx-auto max-w-screen-2xl px-3 pt-20 sm:px-5 lg:px-7 lg:pt-28 pb-20 lg:pb-[max(2.5rem,env(safe-area-inset-bottom))]">
-        <ErrorBoundary>
-          <AnimatePresence mode="wait" initial={false}>
-            <PageTransition key={pathname}>
-              {children}
-            </PageTransition>
-          </AnimatePresence>
+        <ErrorBoundary key={pathname}>
+          <PageTransition key={pathname}>
+            {children}
+          </PageTransition>
         </ErrorBoundary>
       </main>
       <BottomTabBar smsUnread={smsUnread} alertUnread={unreadCount} />

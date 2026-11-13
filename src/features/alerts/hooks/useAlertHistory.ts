@@ -49,7 +49,10 @@ export function useAlertHistory() {
   }, []);
 
   useEffect(() => {
-    void fetchLogs(page, notifiedFilter);
+    const timer = window.setTimeout(() => {
+      void fetchLogs(page, notifiedFilter);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [page, notifiedFilter, fetchLogs]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));

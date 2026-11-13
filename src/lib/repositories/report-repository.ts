@@ -9,6 +9,7 @@ export function upsertDailyReport(report: DailyReport): void {
   db.prepare(
     `INSERT INTO daily_reports (
        report_date,
+       period_type,
        total_upload,
        total_download,
        peak_hour,
@@ -16,8 +17,8 @@ export function upsertDailyReport(report: DailyReport): void {
        avg_signal,
        uptime_percent,
        network_quality
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(report_date) DO UPDATE SET
+     ) VALUES (?, 'daily', ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(report_date, period_type) DO UPDATE SET
        total_upload = excluded.total_upload,
        total_download = excluded.total_download,
        peak_hour = excluded.peak_hour,
@@ -41,7 +42,7 @@ export function upsertDailyReport(report: DailyReport): void {
 export function markDailyReportSent(reportDate: string, sentAt = new Date()): void {
   ensureDatabaseReady();
   db.prepare(
-    'UPDATE daily_reports SET sent_at = ? WHERE report_date = ?',
+    "UPDATE daily_reports SET sent_at = ? WHERE report_date = ? AND period_type = 'daily'",
   ).run(toSqliteTimestamp(sentAt), reportDate);
 }
 

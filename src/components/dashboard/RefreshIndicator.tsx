@@ -23,19 +23,22 @@ export function RefreshIndicator({
   pollIntervalMs = 15_000,
   className,
 }: RefreshIndicatorProps) {
-  const [countdown, setCountdown] = useState(Math.round(pollIntervalMs / 1000));
+  const intervalSeconds = Math.max(1, Math.round(pollIntervalMs / 1000));
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
     if (sseStatus === 'connected') return;
 
-    // Reset countdown on refresh
-    setCountdown(Math.round(pollIntervalMs / 1000));
     const timer = setInterval(() => {
-      setCountdown((prev) => (prev <= 1 ? Math.round(pollIntervalMs / 1000) : prev - 1));
+      setNowMs(Date.now());
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [sseStatus, lastRefreshAt, pollIntervalMs]);
+  }, [sseStatus]);
+
+  const baseMs = lastRefreshAt ? lastRefreshAt.getTime() : nowMs;
+  const elapsedSeconds = Math.max(0, Math.floor((nowMs - baseMs) / 1000));
+  const countdown = intervalSeconds - (elapsedSeconds % intervalSeconds);
 
   if (sseStatus === 'connected') {
     return (

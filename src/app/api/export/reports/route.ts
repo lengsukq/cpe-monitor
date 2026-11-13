@@ -1,4 +1,5 @@
 import { requireSession, withApiHandler } from '@/lib/api-route';
+import { getAppDateKey } from '@/lib/date-time';
 import { db, ensureDatabaseReady } from '@/lib/db';
 
 interface ReportExportRow {
@@ -30,11 +31,11 @@ export const GET = withApiHandler(async (request) => {
 
   ensureDatabaseReady();
 
-  const conditions: string[] = [];
+  const conditions: string[] = ["period_type = 'daily'"];
   const bindings: string[] = [];
   if (start) { conditions.push('report_date >= ?'); bindings.push(start); }
   if (end) { conditions.push('report_date <= ?'); bindings.push(end); }
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
   const rows = db.prepare(
     `SELECT report_date, total_upload, total_download, peak_hour,
@@ -57,7 +58,7 @@ export const GET = withApiHandler(async (request) => {
   ].map(escapeCsv).join(','));
 
   const csv = [header, ...csvRows].join('\n');
-  const filename = `reports_export_${new Date().toISOString().slice(0, 10)}.csv`;
+  const filename = `reports_export_${getAppDateKey()}.csv`;
 
   return new Response('\uFEFF' + csv, {
     headers: {

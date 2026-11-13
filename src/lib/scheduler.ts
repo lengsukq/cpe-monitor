@@ -60,7 +60,16 @@ let dailyTask: ScheduledTask | null = null;
 let weeklyTask: ScheduledTask | null = null;
 let monthlyTask: ScheduledTask | null = null;
 
+export function isInAppSchedulerDisabled(): boolean {
+  return process.env.CPE_DISABLE_IN_APP_SCHEDULER === 'true';
+}
+
 export function getSchedulerStatus(): { running: boolean } {
+  if (isInAppSchedulerDisabled()) {
+    initializeDatabase();
+    const settingsMap = getSettingsMap();
+    return { running: settingsMap.scheduler_enabled === 'true' };
+  }
   return { running: hourlyTask !== null };
 }
 
@@ -77,6 +86,8 @@ export async function startScheduler(): Promise<void> {
   const enabled = settingsMap.scheduler_enabled === 'true';
 
   if (!enabled) {
+    stopScheduler();
+  } else if (isInAppSchedulerDisabled()) {
     stopScheduler();
   } else {
     const interval = parseInt(settingsMap.scheduler_interval || '60', 10);
@@ -140,6 +151,13 @@ export async function startScheduler(): Promise<void> {
 
 export async function ensureSchedulerStarted(): Promise<void> {
   initializeDatabase();
+  if (isInAppSchedulerDisabled()) {
+    stopScheduler();
+    await ensureSmsSchedulerStarted();
+    await ensureDeviceInfoSchedulerStarted();
+    return;
+  }
+
   const settings = getSettingsMap();
 
   if (settings.scheduler_enabled === 'true' && !getSchedulerStatus().running) {
@@ -157,7 +175,7 @@ export async function ensureSchedulerStarted(): Promise<void> {
 
 // ─── Daily Report ───────────────────────────────────────────────────────
 
-async function generateAndSendDailyReport(): Promise<void> {
+export async function generateAndSendDailyReport(): Promise<void> {
   try {
     const report = await generateDailyReport();
     upsertDailyReport(report);
@@ -184,7 +202,7 @@ async function generateAndSendDailyReport(): Promise<void> {
   }
 }
 
-function generateAndStoreWeeklyReport(): void {
+export function generateAndStoreWeeklyReport(): void {
   try {
     const report = generateWeeklyReport();
     upsertPeriodReport(report);
@@ -195,7 +213,7 @@ function generateAndStoreWeeklyReport(): void {
   }
 }
 
-function generateAndStoreMonthlyReport(): void {
+export function generateAndStoreMonthlyReport(): void {
   try {
     const report = generateMonthlyReport();
     upsertPeriodReport(report);

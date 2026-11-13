@@ -36,6 +36,8 @@ export interface DeviceHistoryRow {
 export interface LatestTrafficOverviewRow {
   upload_bytes: number | null;
   download_bytes: number | null;
+  upload_bps: number | null;
+  download_bps: number | null;
   connected_devices: number | null;
   signal_strength: number | null;
 }
@@ -86,7 +88,7 @@ export function listDeviceHistoryBetween(mac: string, start: string, end: string
 export function findLatestTrafficOverview(): LatestTrafficOverviewRow | null {
   ensureDatabaseReady();
   return (db.prepare(
-    `SELECT upload_bytes, download_bytes, connected_devices, signal_strength
+    `SELECT upload_bytes, download_bytes, upload_bps, download_bps, connected_devices, signal_strength
      FROM traffic_data ORDER BY timestamp DESC LIMIT 1`,
   ).get() as LatestTrafficOverviewRow | undefined) || null;
 }

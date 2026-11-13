@@ -75,13 +75,14 @@ class FakeDatabase implements SqliteDatabase {
 
 test('database migrations advance once and remain idempotent', () => {
   const database = new FakeDatabase();
-  assert.equal(runDatabaseMigrations(database), 5);
-  assert.equal(database.userVersion, 5);
+  assert.equal(runDatabaseMigrations(database), 6);
+  assert.equal(database.userVersion, 6);
   assert.ok(database.columns.get('traffic_data')?.has('collection_id'));
   assert.ok(database.columns.get('traffic_data')?.has('rsrp'));
   assert.ok(database.columns.get('device_data')?.has('raw_json'));
+  assert.ok(database.columns.get('daily_reports')?.has('period_type'));
 
   const execCount = database.execCount;
-  assert.equal(runDatabaseMigrations(database), 5);
+  assert.equal(runDatabaseMigrations(database), 6);
   assert.equal(database.execCount, execCount);
 });

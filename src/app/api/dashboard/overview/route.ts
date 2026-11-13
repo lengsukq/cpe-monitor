@@ -64,8 +64,8 @@ export const GET = withApiHandler(async () => {
     try {
       const latestTraffic = findLatestTrafficOverview();
       if (latestTraffic) {
-        currentUpload = latestTraffic.upload_bytes || 0;
-        currentDownload = latestTraffic.download_bytes || 0;
+        currentUpload = Math.round((latestTraffic.upload_bps || 0) / 8);
+        currentDownload = Math.round((latestTraffic.download_bps || 0) / 8);
         connectedDevices = latestTraffic.connected_devices || 0;
         signalStrength = latestTraffic.signal_strength || 0;
       }

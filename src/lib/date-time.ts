@@ -79,6 +79,28 @@ export function getAppDayRange(date = new Date()): {
   return { dateKey, start, end };
 }
 
+/**
+ * Parses a YYYY-MM-DD calendar date range in Asia/Shanghai (inclusive of full end day).
+ */
+export function parseAppDateKeyRange(
+  startKey: string | null | undefined,
+  endKey: string | null | undefined,
+): { start: Date; end: Date } | null {
+  const dateKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
+  const trimmedStart = (startKey || '').trim();
+  const trimmedEnd = (endKey || '').trim();
+  if (!dateKeyPattern.test(trimmedStart) || !dateKeyPattern.test(trimmedEnd)) {
+    return null;
+  }
+  const start = new Date(`${trimmedStart}T00:00:00+08:00`);
+  const endDayStart = new Date(`${trimmedEnd}T00:00:00+08:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(endDayStart.getTime()) || endDayStart < start) {
+    return null;
+  }
+  const end = new Date(endDayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+  return { start, end };
+}
+
 export function getAppHour(value: string | Date): number | null {
   const date = parseDateTime(value);
   if (!date) return null;
@@ -88,5 +110,6 @@ export function getAppHour(value: string | Date): number | null {
     hour12: false,
   }).format(date);
   const parsed = Number(hour);
-  return Number.isInteger(parsed) ? parsed : null;
+  if (!Number.isInteger(parsed)) return null;
+  return parsed === 24 ? 0 : parsed;
 }

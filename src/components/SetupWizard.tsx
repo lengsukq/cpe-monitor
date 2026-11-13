@@ -221,7 +221,7 @@ export function SetupWizard({ open, onComplete }: SetupWizardProps) {
                 <Check className="h-8 w-8 text-success" />
               </div>
               <p className="text-sm text-muted-foreground">
-                一切就绪！点击"开始使用"进入仪表盘。
+                一切就绪！点击「开始使用」进入仪表盘。
               </p>
             </div>
           )}

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { PWARegister } from "@/components/PWARegister";
+import { withBasePath } from "@/lib/base-path";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -17,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "CPEye - 5G CPE 流量监控",
   description: "H153-381 5G CPE 流量监控、告警通知、每日报告",
-  manifest: "/manifest.json",
+  manifest: withBasePath("/manifest.json"),
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

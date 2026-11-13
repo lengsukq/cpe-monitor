@@ -7,7 +7,7 @@ import {
   withApiHandler,
 } from '@/lib/api-route';
 import { startScheduler, stopScheduler, getSchedulerStatus } from '@/lib/scheduler';
-import { getSettingsMap, setSetting } from '@/lib/settings-store';
+import { getSetting, getSettingsMap, setSetting } from '@/lib/settings-store';
 
 export const GET = withApiHandler(async () => {
   await requireSession();
@@ -29,9 +29,15 @@ export const POST = withApiHandler(async (request) => {
   }
 
   setSetting('scheduler_enabled', String(body.enabled));
-  if (body.interval) {
-    setSetting('scheduler_interval', String(body.interval));
+  if (body.interval !== undefined) {
+    const parsedInterval = Number(body.interval);
+    if (!Number.isInteger(parsedInterval) || parsedInterval < 1 || parsedInterval > 1440) {
+      throw new ApiError('采集间隔必须是 1 到 1440 分钟之间的整数', 400);
+    }
+    setSetting('scheduler_interval', String(parsedInterval));
   }
+
+  const persistedInterval = parseInt(getSetting('scheduler_interval', '60'), 10) || 60;
 
   if (body.enabled) {
     await startScheduler();
@@ -43,7 +49,7 @@ export const POST = withApiHandler(async (request) => {
     success: true,
     status: {
       enabled: Boolean(body.enabled),
-      interval: Number(body.interval || 60),
+      interval: persistedInterval,
       running: getSchedulerStatus().running,
     },
   });

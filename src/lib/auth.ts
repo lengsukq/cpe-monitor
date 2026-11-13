@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { compare } from 'bcryptjs';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { resolveLightIsleProxySession, type AppSession } from './proxy-auth';
 
 function resolveJwtSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET?.trim();
@@ -9,8 +10,6 @@ function resolveJwtSecret(): Uint8Array {
   }
   return new TextEncoder().encode(secret);
 }
-
-const JWT_SECRET = resolveJwtSecret();
 
 /**
  * Resolves the admin password hash from environment.
@@ -47,19 +46,28 @@ export async function createToken(payload: { userId: number; username: string })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('24h')
-    .sign(JWT_SECRET);
+    .sign(resolveJwtSecret());
 }
 
-export async function verifyToken(token: string) {
+export async function verifyToken(token: string): Promise<AppSession | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return payload as { userId: number; username: string };
+    const { payload } = await jwtVerify(token, resolveJwtSecret());
+    return {
+      ...(payload as { userId: number; username: string }),
+      authSource: 'jwt',
+    };
   } catch {
     return null;
   }
 }
 
-export async function getSession() {
+export async function getSession(): Promise<AppSession | null> {
+  const headerStore = await headers();
+  const proxySession = resolveLightIsleProxySession(headerStore);
+  if (proxySession) {
+    return proxySession;
+  }
+
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
   if (!token) return null;

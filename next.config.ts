@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
+const rawBasePath = process.env.BASE_PATH?.trim() || '';
+const basePath = rawBasePath && rawBasePath !== '/' ? rawBasePath.replace(/\/+$/, '') : undefined;
+
 const nextConfig: NextConfig = {
+  ...(basePath ? { basePath } : {}),
   output: 'standalone',
   serverExternalPackages: ['better-sqlite3'],
   // Next.js 16 blocks cross-origin access to /_next/* in development.

@@ -46,7 +46,10 @@ export function PeriodReportsView({ type }: PeriodReportsViewProps) {
   }, [type]);
 
   useEffect(() => {
-    void fetchReports();
+    const timer = window.setTimeout(() => {
+      void fetchReports();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchReports]);
 
   const Icon = type === 'weekly' ? CalendarDays : CalendarRange;

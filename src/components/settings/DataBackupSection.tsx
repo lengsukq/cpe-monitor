@@ -5,6 +5,7 @@ import { DatabaseBackup, Download, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SettingsAccordionSection } from '@/components/settings/SettingsAccordionSection';
+import { withBasePath } from '@/lib/base-path';
 
 export function DataBackupSection() {
   const [open, setOpen] = useState(false);
@@ -15,7 +16,7 @@ export function DataBackupSection() {
 
   const handleDownloadBackup = () => {
     const a = document.createElement('a');
-    a.href = '/api/system/backup';
+    a.href = withBasePath('/api/system/backup');
     a.download = '';
     document.body.appendChild(a);
     a.click();
@@ -26,10 +27,10 @@ export function DataBackupSection() {
     setBackingUp(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/system/backup', { method: 'POST' });
+      const res = await fetch(withBasePath('/api/system/backup'), { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        setMessage({ type: 'success', text: '备份已创建到 data/backups 目录' });
+        setMessage({ type: 'success', text: '备份已创建到 backups 目录' });
       } else {
         setMessage({ type: 'error', text: data.error || '备份失败' });
       }
@@ -54,7 +55,7 @@ export function DataBackupSection() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch('/api/system/restore', { method: 'POST', body: formData });
+      const res = await fetch(withBasePath('/api/system/restore'), { method: 'POST', body: formData });
       const data = await res.json();
       if (res.ok) {
         setMessage({ type: 'success', text: data.message || '恢复成功，请刷新页面' });

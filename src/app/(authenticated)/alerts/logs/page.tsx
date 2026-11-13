@@ -17,19 +17,25 @@ import { Input } from '@/components/ui/input';
 import { Bell, CheckCircle2, Clock3, Search, SlidersHorizontal, XCircle } from 'lucide-react';
 import { TableCell, TableHead, TableRow } from '@/components/ui/table';
 import { apiFetch } from '@/lib/client-api';
+import { getAppDateKey, parseDateTime } from '@/lib/date-time';
 import { formatDateTimeShanghai } from '@/lib/format';
 import type { AlertLogWithRuleName } from '@/types';
 
 function getRecentDailyCounts(logs: AlertLogWithRuleName[], dayCount = 7) {
-  const now = Date.now();
+  const todayKey = getAppDateKey(new Date());
+  const todayMidnight = new Date(`${todayKey}T00:00:00+08:00`).getTime();
+  const keys = Array.from({ length: dayCount }, (_, index) => (
+    getAppDateKey(new Date(todayMidnight - (dayCount - 1 - index) * 24 * 60 * 60 * 1000))
+  ));
+  const indexByKey = new Map(keys.map((key, index) => [key, index]));
   const counts = Array.from({ length: dayCount }, () => 0);
 
   for (const log of logs) {
-    const timestamp = new Date(log.triggeredAt || '').getTime();
-    if (!Number.isFinite(timestamp)) continue;
-    const diffDays = Math.floor((now - timestamp) / (24 * 60 * 60 * 1000));
-    if (diffDays >= 0 && diffDays < dayCount) {
-      counts[dayCount - 1 - diffDays] += 1;
+    const parsed = parseDateTime(log.triggeredAt);
+    if (!parsed) continue;
+    const slot = indexByKey.get(getAppDateKey(parsed));
+    if (slot !== undefined) {
+      counts[slot] += 1;
     }
   }
 
@@ -47,8 +53,12 @@ export default function AlertLogsPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await apiFetch<AlertLogWithRuleName[]>('/api/alerts/logs', undefined, '获取告警日志失败');
-      setLogs(Array.isArray(data) ? data : []);
+      const data = await apiFetch<AlertLogWithRuleName[] | { logs?: AlertLogWithRuleName[] }>(
+        '/api/alerts/logs?pageSize=100',
+        undefined,
+        '获取告警日志失败',
+      );
+      setLogs(Array.isArray(data) ? data : (data?.logs ?? []));
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : '获取告警日志失败');
     } finally {

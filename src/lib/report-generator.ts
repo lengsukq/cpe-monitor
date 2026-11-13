@@ -4,7 +4,6 @@ import {
   getAppDayRange,
   getAppHour,
   toSqliteTimestamp,
-  APP_TIME_ZONE,
 } from './date-time';
 import { computeCounterDelta } from './traffic-units';
 
@@ -280,7 +279,7 @@ export interface PeriodReport {
   generatedAt: string;
 }
 
-function getWeekRange(now: Date): { start: Date; end: Date; key: string } {
+export function getWeekRange(now: Date): { start: Date; end: Date; key: string } {
   const day = now.getDay(); // 0=Sun
   const diffToMonday = day === 0 ? 6 : day - 1;
   const monday = new Date(now);
@@ -295,7 +294,7 @@ function getWeekRange(now: Date): { start: Date; end: Date; key: string } {
   return { start: monday, end: nextMonday, key };
 }
 
-function getMonthRange(now: Date): { start: Date; end: Date; key: string } {
+export function getMonthRange(now: Date): { start: Date; end: Date; key: string } {
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;

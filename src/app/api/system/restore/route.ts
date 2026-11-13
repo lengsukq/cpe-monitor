@@ -1,12 +1,12 @@
 import { requireSession, withApiHandler, jsonOk, ApiError } from '@/lib/api-route';
+import { getDatabasePath } from '@/lib/db';
 import { writeSystemLog } from '@/lib/system-log';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'cpe-monitor.db');
-
 export const POST = withApiHandler(async (request) => {
   await requireSession();
+  const dbPath = getDatabasePath();
 
   const formData = await request.formData();
   const file = formData.get('file') as File | null;
@@ -30,7 +30,7 @@ export const POST = withApiHandler(async (request) => {
   }
 
   // Create a backup of the current database before restoring
-  const backupDir = path.join(process.cwd(), 'data', 'backups');
+  const backupDir = path.join(path.dirname(dbPath), 'backups');
   if (!fs.existsSync(backupDir)) {
     fs.mkdirSync(backupDir, { recursive: true });
   }
@@ -38,16 +38,16 @@ export const POST = withApiHandler(async (request) => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const preRestoreBackup = path.join(backupDir, `pre-restore-${timestamp}.db`);
 
-  if (fs.existsSync(DB_PATH)) {
-    fs.copyFileSync(DB_PATH, preRestoreBackup);
+  if (fs.existsSync(dbPath)) {
+    fs.copyFileSync(dbPath, preRestoreBackup);
   }
 
   // Write the new database file
-  fs.writeFileSync(DB_PATH, buffer);
+  fs.writeFileSync(dbPath, buffer);
 
   // Remove WAL and SHM files if they exist
-  const walPath = `${DB_PATH}-wal`;
-  const shmPath = `${DB_PATH}-shm`;
+  const walPath = `${dbPath}-wal`;
+  const shmPath = `${dbPath}-shm`;
   if (fs.existsSync(walPath)) fs.unlinkSync(walPath);
   if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath);
 

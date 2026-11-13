@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { withBasePath } from '@/lib/base-path';
 
 /**
  * Registers the service worker for PWA support.
@@ -10,7 +11,7 @@ export function PWARegister() {
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
-        .register('/sw.js')
+        .register(withBasePath('/sw.js'))
         .catch((error) => {
           console.warn('SW registration failed:', error);
         });

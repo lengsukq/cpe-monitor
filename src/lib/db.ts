@@ -28,7 +28,7 @@ let databaseInstance: SqliteDatabase | null = null;
 let databaseInitialized = false;
 let databaseInitializing = false;
 
-function getDatabasePath(): string {
+export function getDatabasePath(): string {
   return process.env.CPE_DATABASE_PATH
     ? path.resolve(process.env.CPE_DATABASE_PATH)
     : path.join(process.cwd(), 'data', 'cpe-monitor.db');
@@ -45,6 +45,7 @@ export function getDb(): SqliteDatabase {
 
   databaseInstance = new Database(dbPath);
   databaseInstance.pragma('journal_mode = WAL');
+  databaseInstance.pragma('busy_timeout = 5000');
   databaseInstance.pragma('foreign_keys = ON');
   return databaseInstance;
 }

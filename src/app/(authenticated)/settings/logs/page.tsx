@@ -59,7 +59,10 @@ export default function SystemLogsPage() {
   }, []);
 
   useEffect(() => {
-    void fetchLogs(page, level);
+    const timer = window.setTimeout(() => {
+      void fetchLogs(page, level);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [page, level, fetchLogs]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));

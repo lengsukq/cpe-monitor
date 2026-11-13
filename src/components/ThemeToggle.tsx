@@ -14,7 +14,7 @@ const THEME_CYCLE: Array<{ value: string; label: string }> = [
 ];
 
 export function ThemeToggle() {
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(subscribe, () => true, () => false);
 
   if (!mounted) {

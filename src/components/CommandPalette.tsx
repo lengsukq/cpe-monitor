@@ -35,7 +35,7 @@ const COMMANDS: CommandItem[] = [
   { label: '告警', href: '/alerts', icon: <Bell className="h-4 w-4" />, shortcut: '4', keywords: 'alert warning' },
   { label: '报告', href: '/reports', icon: <FileText className="h-4 w-4" />, shortcut: '5', keywords: 'report daily weekly' },
   { label: '设置', href: '/settings', icon: <Settings className="h-4 w-4" />, shortcut: '6', keywords: 'settings config' },
-  { label: '告警历史', href: '/alerts/history', icon: <Bell className="h-4 w-4" />, keywords: 'alert history log' },
+  { label: '告警历史', href: '/alerts/logs', icon: <Bell className="h-4 w-4" />, keywords: 'alert history log' },
   { label: '系统日志', href: '/settings/logs', icon: <FileText className="h-4 w-4" />, keywords: 'system log' },
 ];
 
@@ -58,21 +58,23 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     );
   }, [query]);
 
-  useEffect(() => {
-    if (open) {
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
       setQuery('');
       setActiveIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [open]);
+    onOpenChange(nextOpen);
+  };
 
   useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
+    if (!open) return;
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 50);
+    return () => window.clearTimeout(timer);
+  }, [open]);
 
   const navigate = (href: string) => {
     router.push(href);
-    onOpenChange(false);
+    handleOpenChange(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -89,7 +91,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="top-[20%] max-w-md gap-0 overflow-hidden p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>快速导航</DialogTitle>
@@ -99,7 +101,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           <Input
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActiveIndex(0);
+            }}
             onKeyDown={handleKeyDown}
             placeholder="搜索页面…"
             className="h-8 border-0 p-0 shadow-none focus-visible:ring-0"

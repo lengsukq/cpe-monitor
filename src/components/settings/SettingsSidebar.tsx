@@ -4,7 +4,6 @@ import {
   DatabaseBackup,
   Gauge,
   HardDrive,
-  KeyRound,
   Mail,
   MessageSquareText,
   Palette,

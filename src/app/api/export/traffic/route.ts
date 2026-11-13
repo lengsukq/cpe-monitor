@@ -1,4 +1,5 @@
 import { requireSession, withApiHandler } from '@/lib/api-route';
+import { getAppDateKey } from '@/lib/date-time';
 import { db, ensureDatabaseReady } from '@/lib/db';
 
 interface TrafficExportRow {
@@ -68,7 +69,7 @@ export const GET = withApiHandler(async (request) => {
   ].map(escapeCsv).join(','));
 
   const csv = [header, ...csvRows].join('\n');
-  const filename = `traffic_export_${new Date().toISOString().slice(0, 10)}.csv`;
+  const filename = `traffic_export_${getAppDateKey()}.csv`;
 
   return new Response('\uFEFF' + csv, {
     headers: {

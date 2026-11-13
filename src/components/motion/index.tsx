@@ -3,7 +3,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import {
   motion,
-  useInView,
   useReducedMotion,
   type Variants,
 } from 'framer-motion';
@@ -54,19 +53,20 @@ interface PageTransitionProps {
   className?: string;
 }
 
-/** Wraps page content with enter/exit transitions for AnimatePresence. */
+/** Wraps page content with a non-blocking subtle entrance transition. */
 export function PageTransition({ children, className }: PageTransitionProps) {
   const reduce = useReducedMotion();
 
   if (reduce) return <div className={className}>{children}</div>;
 
+  // Never start from opacity: 0 inside Next.js App Router transitions so a
+  // cancelled or re-parented transition cannot trap the viewport on a blank screen.
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0.99, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+      transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
     >
       {children}
     </motion.div>
@@ -112,21 +112,18 @@ interface ScrollRevealProps {
   delay?: number;
 }
 
-/** Reveals content with a fade-up when it scrolls into the viewport. */
+/** Reveals content with a non-blocking entrance motion that never stays hidden. */
 export function ScrollReveal({ children, className, delay = 0 }: ScrollRevealProps) {
   const reduce = useReducedMotion();
-  const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-40px' });
 
   if (reduce) return <div className={className}>{children}</div>;
 
   return (
     <motion.div
-      ref={ref}
       className={className}
-      initial={{ opacity: 0, y: 24 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
-      transition={{ duration: 0.5, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
+      initial={{ opacity: 0.99, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
     >
       {children}
     </motion.div>

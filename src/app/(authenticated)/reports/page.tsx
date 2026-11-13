@@ -39,7 +39,7 @@ export default function ReportsPage() {
           <div className="flex items-center gap-2">
             <ExportCsvButton href="/api/export/reports" />
             {tab === 'daily' && (
-              <Button onClick={() => { void reports.generatePreview(); }}>生成今日预览</Button>
+              <Button onClick={() => { void reports.generatePreview(); }}>生成今日报告</Button>
             )}
           </div>
         }
