@@ -28,11 +28,13 @@ export const GET = withApiHandler(async (request) => {
   const url = new URL(request.url);
   const start = url.searchParams.get('start');
   const end = url.searchParams.get('end');
+  const typeParam = url.searchParams.get('type');
+  const periodType = typeParam === 'weekly' || typeParam === 'monthly' ? typeParam : 'daily';
 
   ensureDatabaseReady();
 
-  const conditions: string[] = ["period_type = 'daily'"];
-  const bindings: string[] = [];
+  const conditions: string[] = ['period_type = ?'];
+  const bindings: string[] = [periodType];
   if (start) { conditions.push('report_date >= ?'); bindings.push(start); }
   if (end) { conditions.push('report_date <= ?'); bindings.push(end); }
   const whereClause = `WHERE ${conditions.join(' AND ')}`;
@@ -46,7 +48,8 @@ export const GET = withApiHandler(async (request) => {
   ).all(...bindings) as ReportExportRow[];
 
   const header = [
-    '日期', '总上传(bytes)', '总下载(bytes)', '峰值时段',
+    periodType === 'daily' ? '日期' : '周期',
+    '总上传(bytes)', '总下载(bytes)', '峰值时段',
     '平均信号', '在线率(%)', '网络质量', '发送时间', '创建时间',
   ].join(',');
 
@@ -58,7 +61,7 @@ export const GET = withApiHandler(async (request) => {
   ].map(escapeCsv).join(','));
 
   const csv = [header, ...csvRows].join('\n');
-  const filename = `reports_export_${getAppDateKey()}.csv`;
+  const filename = `${periodType}_reports_export_${getAppDateKey()}.csv`;
 
   return new Response('\uFEFF' + csv, {
     headers: {

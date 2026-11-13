@@ -14,6 +14,14 @@ import {
   toPublicWechatConfig,
 } from '../src/lib/notification-config.ts';
 import { withBasePath } from '../src/lib/base-path.ts';
+import {
+  enumerateDateKeys,
+  getMonthRange,
+  getPreviousMonthRange,
+  getPreviousWeekRange,
+  getWeekRange,
+  resolvePeriodDateRange,
+} from '../src/lib/period-report-range.ts';
 import { runDatabaseMigrations, type SqliteDatabase } from '../src/lib/db.ts';
 
 test('parseAppDateKeyRange converts Shanghai calendar days to inclusive UTC window', () => {
@@ -109,4 +117,37 @@ test('withBasePath prefixes PWA and API routes without double-prefixing', () => 
   assert.equal(withBasePath('/sw.js', '/apps/cpe-monitor'), '/apps/cpe-monitor/sw.js');
   assert.equal(withBasePath('/manifest.json', '/apps/cpe-monitor'), '/apps/cpe-monitor/manifest.json');
   assert.equal(withBasePath('/apps/cpe-monitor/sw.js', '/apps/cpe-monitor'), '/apps/cpe-monitor/sw.js');
+});
+
+test('period report ranges compute Shanghai week/month keys and round-trip stored keys', () => {
+  // 2026-10-31T16:30:00Z is 2026-11-01 00:30:00 in Asia/Shanghai -> previous month is 2026-10
+  const shanghaiNov1 = new Date('2026-10-31T16:30:00Z');
+  const currentMonth = getMonthRange(shanghaiNov1);
+  const previousMonth = getPreviousMonthRange(shanghaiNov1);
+  assert.equal(currentMonth.key, '2026-11');
+  assert.equal(previousMonth.key, '2026-10');
+  assert.equal(previousMonth.startDate, '2026-10-01');
+  assert.equal(previousMonth.endDate, '2026-10-31');
+
+  // 2026-11-08 22:30 Asia/Shanghai is Sunday -> previous week is 2026-W44 (2026-10-26..2026-11-01)
+  const shanghaiSun = new Date('2026-11-08T14:30:00Z');
+  const currentWeek = getWeekRange(shanghaiSun);
+  const previousWeek = getPreviousWeekRange(shanghaiSun);
+  assert.equal(currentWeek.key, '2026-W45');
+  assert.equal(previousWeek.key, '2026-W44');
+  assert.equal(previousWeek.startDate, '2026-10-26');
+  assert.equal(previousWeek.endDate, '2026-11-01');
+
+  const resolvedWeek = resolvePeriodDateRange('weekly', '2026-W44');
+  assert.ok(resolvedWeek);
+  assert.equal(resolvedWeek.startDate, '2026-10-26');
+  assert.equal(resolvedWeek.endDate, '2026-11-01');
+  assert.deepEqual(enumerateDateKeys(resolvedWeek.startDate, resolvedWeek.endDate), [
+    '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01',
+  ]);
+
+  const resolvedMonth = resolvePeriodDateRange('monthly', '2026-09');
+  assert.ok(resolvedMonth);
+  assert.equal(resolvedMonth.startDate, '2026-09-01');
+  assert.equal(resolvedMonth.endDate, '2026-09-30');
 });

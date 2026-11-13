@@ -37,7 +37,7 @@ export default function ReportsPage() {
         icon={<TrendingUp className="h-6 w-6" />}
         actions={
           <div className="flex items-center gap-2">
-            <ExportCsvButton href="/api/export/reports" />
+            <ExportCsvButton href={tab === 'daily' ? '/api/export/reports' : `/api/export/reports?type=${tab}`} />
             {tab === 'daily' && (
               <Button onClick={() => { void reports.generatePreview(); }}>生成今日报告</Button>
             )}

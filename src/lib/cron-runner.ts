@@ -9,7 +9,7 @@ import {
   generateAndStoreMonthlyReport,
   generateAndStoreWeeklyReport,
 } from './scheduler';
-import { getMonthRange, getWeekRange } from './report-generator';
+import { getPreviousMonthRange, getPreviousWeekRange } from './report-generator';
 import { getAppDateKey } from './date-time';
 import { writeSystemLog } from './system-log';
 import {
@@ -72,8 +72,8 @@ async function main(): Promise<void> {
   });
 
   const todayKey = getAppDateKey(now);
-  const weekKey = getWeekRange(now).key;
-  const monthKey = getMonthRange(now).key;
+  const weekKey = getPreviousWeekRange(now).key;
+  const monthKey = getPreviousMonthRange(now).key;
 
   const dailyDue = isDailyReportDue(schedulerEnabled, hasReportRow('daily', todayKey), now);
   const weeklyDue = isWeeklyReportDue(schedulerEnabled, hasReportRow('weekly', weekKey), now);

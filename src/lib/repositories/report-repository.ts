@@ -104,3 +104,22 @@ export function listPeriodReports(periodType: 'weekly' | 'monthly', limit = 20):
     'SELECT * FROM daily_reports WHERE period_type = ? ORDER BY report_date DESC LIMIT ?',
   ).all(periodType, limit) as PeriodReportRow[];
 }
+
+export function findPeriodReportById(id: number): PeriodReportRow | null {
+  ensureDatabaseReady();
+  const row = db.prepare(
+    "SELECT * FROM daily_reports WHERE id = ? AND period_type IN ('weekly', 'monthly')",
+  ).get(id) as PeriodReportRow | undefined;
+  return row ?? null;
+}
+
+export function findPeriodReportByKey(
+  periodType: 'weekly' | 'monthly',
+  periodKey: string,
+): PeriodReportRow | null {
+  ensureDatabaseReady();
+  const row = db.prepare(
+    'SELECT * FROM daily_reports WHERE period_type = ? AND report_date = ?',
+  ).get(periodType, periodKey) as PeriodReportRow | undefined;
+  return row ?? null;
+}
