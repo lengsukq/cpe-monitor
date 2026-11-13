@@ -179,57 +179,71 @@ export function PeriodReportsView({ type }: PeriodReportsViewProps) {
                 }}
                 className="card-hover cursor-pointer transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <CardContent className="flex flex-wrap items-center gap-4 p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10">
-                    <Icon className="h-5 w-5 text-brand" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold">{report.periodKey}</p>
-                      {report.startDate && report.endDate ? (
-                        <span className="text-xs text-muted-foreground">
-                          {report.startDate} ~ {report.endDate}
-                        </span>
-                      ) : null}
+                <CardContent className="space-y-3 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:space-y-0">
+                  <div className="flex items-center justify-between gap-3 sm:min-w-0 sm:flex-1 sm:justify-start">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                      <Icon className="h-5 w-5" />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      总流量 {formatBytes(totalTraffic)} · 生成于{' '}
-                      {formatAppDateTime(report.createdAt, {
-                        hour: undefined,
-                        minute: undefined,
-                        second: undefined,
-                      })}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 text-sm">
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground">下载</p>
-                      <p className="font-medium tabular-nums">{formatBytes(report.totalDownload || 0)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground">上传</p>
-                      <p className="font-medium tabular-nums">{formatBytes(report.totalUpload || 0)}</p>
-                    </div>
-                    {report.avgSignal !== null && (
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">信号</p>
-                        <p className="font-medium tabular-nums">{report.avgSignal} dBm</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-foreground">{report.periodKey}</p>
+                        {report.startDate && report.endDate ? (
+                          <span className="text-xs text-muted-foreground">
+                            {report.startDate} ~ {report.endDate}
+                          </span>
+                        ) : null}
                       </div>
-                    )}
-                    <Badge variant={getReportQualityVariant(report.networkQuality)}>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        总流量 {formatBytes(totalTraffic)} · 生成于{' '}
+                        {formatAppDateTime(report.createdAt, {
+                          hour: undefined,
+                          minute: undefined,
+                          second: undefined,
+                        })}
+                      </p>
+                    </div>
+                    <Badge variant={getReportQualityVariant(report.networkQuality)} className="shrink-0 sm:hidden">
+                      {report.networkQuality || '-'}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 rounded-xl bg-muted/35 p-2.5 text-center sm:flex sm:items-center sm:gap-5 sm:bg-transparent sm:p-0 sm:text-right">
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">下载</p>
+                      <p className="mt-0.5 text-xs font-semibold tabular-nums sm:text-sm">
+                        {formatBytes(report.totalDownload || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">上传</p>
+                      <p className="mt-0.5 text-xs font-semibold tabular-nums sm:text-sm">
+                        {formatBytes(report.totalUpload || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">平均信号</p>
+                      <p className="mt-0.5 text-xs font-semibold tabular-nums sm:text-sm">
+                        {report.avgSignal !== null ? `${report.avgSignal} dBm` : '—'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2.5">
+                    <Badge variant={getReportQualityVariant(report.networkQuality)} className="hidden sm:inline-flex">
                       {report.networkQuality || '-'}
                     </Badge>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
+                      className="w-full sm:w-auto"
                       onClick={(event) => {
                         event.stopPropagation();
                         void openReport(report);
                       }}
                     >
-                      <Eye className="mr-1 h-3.5 w-3.5" />
-                      详情
+                      <Eye className="mr-1.5 h-3.5 w-3.5" />
+                      查看详情
                     </Button>
                   </div>
                 </CardContent>
