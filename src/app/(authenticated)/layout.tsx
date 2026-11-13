@@ -26,7 +26,7 @@ export default function AuthenticatedLayout({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { unreadCount, markAsRead, sseStatus } = useAlertNotification();
+  const { unreadCount, sseStatus } = useAlertNotification();
 
   useKeyboardShortcuts({
     onOpenPalette: () => setPaletteOpen(true),
@@ -119,7 +119,7 @@ export default function AuthenticatedLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <TopNav alertUnreadCount={unreadCount} onAlertBellClick={markAsRead} connectionStatus={sseStatus} managedAuth={managedAuth} />
+      <TopNav connectionStatus={sseStatus} managedAuth={managedAuth} />
       <main className="mx-auto max-w-screen-2xl px-3 pt-20 sm:px-5 lg:px-7 lg:pt-28 pb-20 lg:pb-[max(2.5rem,env(safe-area-inset-bottom))]">
         <ErrorBoundary key={pathname}>
           <PageTransition key={pathname}>

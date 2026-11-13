@@ -22,6 +22,7 @@ import {
   getWeekRange,
   resolvePeriodDateRange,
 } from '../src/lib/period-report-range.ts';
+import { computeDataPlanForecast } from '../src/lib/data-plan-forecast.ts';
 import { runDatabaseMigrations, type SqliteDatabase } from '../src/lib/db.ts';
 
 test('parseAppDateKeyRange converts Shanghai calendar days to inclusive UTC window', () => {
@@ -150,4 +151,40 @@ test('period report ranges compute Shanghai week/month keys and round-trip store
   assert.ok(resolvedMonth);
   assert.equal(resolvedMonth.startDate, '2026-09-01');
   assert.equal(resolvedMonth.endDate, '2026-09-30');
+});
+
+test('computeDataPlanForecast calculates cycle bounds, projection, and budget', () => {
+  const gib = 1073741824;
+  // 2026-11-13 12:00 CST with resetDay=1 -> 11.5 elapsed days of 30
+  const now = new Date('2026-11-13T04:00:00Z');
+  const exceedCase = computeDataPlanForecast({
+    usedBytes: 240 * gib,
+    limitBytes: 480 * gib,
+    resetDay: 1,
+    warningThresholdPercent: 95,
+    now,
+  });
+  assert.equal(exceedCase.cycleStartDate, '2026-11-01');
+  assert.equal(exceedCase.cycleEndDate, '2026-11-30');
+  assert.equal(exceedCase.nextResetDate, '2026-12-01');
+  assert.equal(exceedCase.totalCycleDays, 30);
+  assert.equal(exceedCase.elapsedCalendarDays, 13);
+  assert.equal(exceedCase.remainingCalendarDays, 18);
+  assert.equal(exceedCase.status, 'will_exceed');
+  assert.ok(exceedCase.projectedTotalBytes > 480 * gib);
+  assert.ok(exceedCase.estimatedExhaustDate);
+
+  // Healthy case with custom reset day (20th, short-month safe)
+  const healthyCase = computeDataPlanForecast({
+    usedBytes: 40 * gib,
+    limitBytes: 480 * gib,
+    resetDay: 20,
+    warningThresholdPercent: 90,
+    now,
+  });
+  assert.equal(healthyCase.cycleStartDate, '2026-10-20');
+  assert.equal(healthyCase.cycleEndDate, '2026-11-19');
+  assert.equal(healthyCase.nextResetDate, '2026-11-20');
+  assert.equal(healthyCase.status, 'healthy');
+  assert.equal(healthyCase.estimatedExhaustDate, null);
 });

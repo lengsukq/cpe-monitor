@@ -31,13 +31,11 @@ const navItems = [
 ];
 
 interface TopNavProps {
-  alertUnreadCount?: number;
-  onAlertBellClick?: () => void;
   connectionStatus?: 'connecting' | 'connected' | 'disconnected';
   managedAuth?: boolean;
 }
 
-export function TopNav({ alertUnreadCount = 0, onAlertBellClick, connectionStatus = 'disconnected', managedAuth = false }: TopNavProps) {
+export function TopNav({ connectionStatus = 'disconnected', managedAuth = false }: TopNavProps) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
   const { hue, setHue } = useThemeColor();
@@ -99,20 +97,6 @@ export function TopNav({ alertUnreadCount = 0, onAlertBellClick, connectionStatu
         </nav>
 
         <div className="flex items-center gap-1.5">
-          <Link
-            href="/alerts/history"
-            onClick={onAlertBellClick}
-            className="relative inline-flex size-10 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="告警通知"
-            title="告警通知"
-          >
-            <Bell className="h-4 w-4" aria-hidden />
-            {alertUnreadCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
-                {alertUnreadCount > 99 ? '99+' : alertUnreadCount}
-              </span>
-            )}
-          </Link>
           <div className="relative">
             <button
               ref={paletteBtnRef}
